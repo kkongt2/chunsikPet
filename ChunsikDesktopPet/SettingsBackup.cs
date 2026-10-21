@@ -46,7 +46,7 @@ namespace ChunsikDesktop {
                 SettingsBundle bundle;
                 using (XmlReader reader = XmlReader.Create(dialog.FileName, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null })) bundle = (SettingsBundle)new XmlSerializer(typeof(SettingsBundle)).Deserialize(reader);
                 Validate(bundle);
-                if (MessageBox.Show("현재 알림·할 일·캐릭터 설정을 백업 내용으로 바꿉니다.\n복원 후 프로그램이 종료되므로 EXE를 다시 실행해 주세요.\n계속할까요?", "설정 복원", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+                if (MessageBox.Show("현재 알림·할 일·캐릭터 설정을 백업 내용으로 바꿉니다.\n복원 후 프로그램을 자동으로 다시 시작합니다.\n계속할까요?", "설정 복원", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
                 Dictionary<string, byte[]> files = new Dictionary<string, byte[]> { { "reminders.xml", Bytes(bundle.Reminders) }, { "todos.xml", Bytes(bundle.Todos) }, { "pets.xml", Bytes(bundle.Pets) }, { "fullscreen.txt", System.Text.Encoding.UTF8.GetBytes(bundle.Fullscreen ? "on" : "off") } };
                 Dictionary<string, byte[]> originals = new Dictionary<string, byte[]>(); Directory.CreateDirectory(folder);
                 foreach (string name in files.Keys) originals[name] = File.Exists(Path.Combine(folder, name)) ? File.ReadAllBytes(Path.Combine(folder, name)) : null;
@@ -54,7 +54,8 @@ namespace ChunsikDesktop {
                 foreach (string name in originals.Keys) if (originals[name] != null) File.WriteAllBytes(Path.Combine(backup, name), originals[name]);
                 try { foreach (string name in files.Keys) { string target = Path.Combine(folder, name); File.WriteAllBytes(target + ".restore", files[name]); if (File.Exists(target)) File.Replace(target + ".restore", target, target + ".bak"); else File.Move(target + ".restore", target); } }
                 catch { foreach (string name in originals.Keys) { string target = Path.Combine(folder, name); if (originals[name] == null) File.Delete(target); else File.WriteAllBytes(target, originals[name]); } throw; }
-                MessageBox.Show("설정을 복원했어요. EXE를 다시 실행해 주세요.\n이전 설정은 " + backup + "에 보관했어요."); PetWindow.Quit();
+                MessageBox.Show("설정을 복원했어요. 자동으로 다시 시작합니다.\n이전 설정은 " + backup + "에 보관했어요.");
+                TimeToolWindow.StopAll(); ReminderService.Current.ClearPendingForRestore(); AppLifecycle.Restart();
             } catch (Exception e) { MessageBox.Show("복원 실패: " + e.Message); }
         }
     }

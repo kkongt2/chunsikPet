@@ -397,6 +397,11 @@ namespace ChunsikDesktop {
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
             if (editor != null) editor.Close();
         }
+        public void ClearPendingForRestore() {
+            regrouping = true;
+            foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
+            active.Clear(); queue.Clear(); snoozes.Clear(); regrouping = false; SaveSession();
+        }
         public NoticeData NotifyTimer(Action acknowledge) {
             NoticeData data = new NoticeData { Label = "타이머 완료", Kind = "timer", Messages = new List<string> { "시간이 다 됐어요! 수고했어요 ♥ 확인 버튼을 눌러주세요." }, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes, Acknowledge = acknowledge };
             Enqueue(data, settings.Sound); return data;

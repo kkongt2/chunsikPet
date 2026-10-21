@@ -7,13 +7,14 @@ using System.Windows;
 [assembly: AssemblyDescription("Desktop companion, reminders and sticky notes")]
 [assembly: AssemblyCompany("kkongt2.kang")]
 [assembly: AssemblyProduct("Chunsik Desktop Pet")]
-[assembly: AssemblyVersion("1.46.3.0")]
-[assembly: AssemblyFileVersion("1.46.3.0")]
+[assembly: AssemblyVersion("1.46.4.0")]
+[assembly: AssemblyFileVersion("1.46.4.0")]
 namespace ChunsikDesktop {
     internal static class Program {
         [STAThread]
-        private static void Main() {
+        private static void Main(string[] args) {
             try {
+                if (!AppLifecycle.WaitForPrior(args)) { MessageBox.Show("이전 실행이 종료되지 않아 재시작하지 못했어요. 기존 춘식이를 종료한 뒤 다시 실행해 주세요."); return; }
                 string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "assets-v32");
                 Directory.CreateDirectory(folder);
                 Assembly assembly = Assembly.GetExecutingAssembly();
