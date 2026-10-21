@@ -453,6 +453,8 @@ namespace ChunsikDesktop {
         public bool IsDragging { get { return dragging || resizing; } }
         public bool IsEditing { get; private set; }
         readonly TextBox inlineEditor;
+        readonly Button completeButton, saveEditButton, cancelEditButton;
+        double completeAllowedAfter;
         readonly ScrollViewer messageScroll;
         readonly Func<bool> persist;
         readonly TextBlock fontLabel;
@@ -492,13 +494,21 @@ namespace ChunsikDesktop {
                 if (e.Key == System.Windows.Input.Key.Escape) { EndEdit(false); e.Handled = true; }
                 else if (e.Key == System.Windows.Input.Key.Enter && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0) { EndEdit(true); e.Handled = true; }
             };
-            inlineEditor.LostKeyboardFocus += delegate { if (IsEditing) EndEdit(true); };
+            // Moving focus to Save/Cancel must not implicitly save before Click runs.
+            // Leaving the window still saves through Deactivated below.
             Deactivated += delegate { if (IsEditing) EndEdit(true); };
             WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 6) }; Grid.SetRow(buttons, 2); content.Children.Add(buttons);
             Button smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
             fontLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3), FontSize = 11 }; buttons.Children.Add(fontLabel);
             buttons.Children.Add(NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }));
-            Button done = new Button { Content = "✓ 완료", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; done.Click += delegate { if (EndEdit(true)) complete(); }; buttons.Children.Add(done);
+            completeButton = NoteButton("✓ 할 일 완료", "이 할 일을 완료 처리", delegate {
+                if (IsEditing || evadeClock.Elapsed.TotalSeconds < completeAllowedAfter) return;
+                complete();
+            }); buttons.Children.Add(completeButton);
+            saveEditButton = NoteButton("저장", "메시지만 저장 · Ctrl+Enter", delegate { EndEdit(true); });
+            cancelEditButton = NoteButton("취소", "변경사항 취소 · Esc", delegate { EndEdit(false); });
+            saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Collapsed;
+            buttons.Children.Add(saveEditButton); buttons.Children.Add(cancelEditButton);
             mascot = new Image { Stretch = Stretch.Uniform, Width = 86, Height = 66, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "포스트잇과 함께 끌어 옮기기" };
             // Match the wandering pet: high-quality downsampling for the large transparent source.
             RenderOptions.SetBitmapScalingMode(mascot, BitmapScalingMode.HighQuality);
@@ -547,6 +557,8 @@ namespace ChunsikDesktop {
         public void BeginEdit() {
             if (current == null || IsCompleting || IsEvading || IsEditing) return;
             IsEditing = true; inlineEditor.Text = current.Text;
+            completeButton.Visibility = Visibility.Collapsed;
+            saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Visible;
             inlineEditor.FontSize = current.FontSize; messageScroll.Visibility = Visibility.Collapsed; inlineEditor.Visibility = Visibility.Visible;
             Activate(); inlineEditor.Focus(); System.Windows.Input.Keyboard.Focus(inlineEditor); inlineEditor.CaretIndex = inlineEditor.Text.Length;
         }
@@ -560,6 +572,10 @@ namespace ChunsikDesktop {
                 if (!persist()) { current.Text = old; IsEditing = true; inlineEditor.Focus(); return false; }
             }
             inlineEditor.Visibility = Visibility.Collapsed; messageScroll.Visibility = Visibility.Visible;
+            saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Collapsed;
+            completeButton.Visibility = Visibility.Visible;
+            // A second click of a Save double-click must never complete the task.
+            completeAllowedAfter = evadeClock.Elapsed.TotalSeconds + System.Windows.Forms.SystemInformation.DoubleClickTime / 1000.0 + 0.1;
             Update(current); return true;
         }
         void DragNote(object sender, System.Windows.Input.MouseButtonEventArgs e) {
