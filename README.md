@@ -76,11 +76,15 @@ GitHub Actions에서 Windows Release 빌드와 스케줄 테스트를 실행하�
 
 ### GitHub Release 자동·수동 게시
 
+본문에는 이전 공개 Release 이후의 변경 요약, 포함된 전체 커밋과 링크, 전체 비교 링크를 담습니다. 첫 Release에는 해당 커밋까지의 전체 이력을 표시합니다.
+
+`.github/`, `docs/`, `tests/`, README, CHANGELOG, VERSION, LICENSE, Git 설정 파일 변경은 게시 사유에서 제외합니다. `Program.cs`의 AssemblyVersion/AssemblyFileVersion 숫자만 바뀐 경우도 제외합니다. 이미지·휴일 CSV·소스·프로젝트 파일 등의 변경은 게시 대상입니다. push마다 가벼운 확인 작업은 실행되지만 문서·워크플로만 변경됐다면 Windows 빌드·새 태그·새 Release는 모두 건너뜁니다.
+
 1. **main에 push하면 자동 실행**됩니다. **Actions → Publish latest Windows EXE → Run workflow**에서 **main**을 선택해 수동으로 실행할 수도 있습니다.
-2. 실행 시점의 `main` 최신 커밋과 `VERSION`을 읽습니다. Windows x64 EXE 빌드와 스케줄 테스트가 통과하면 `v버전` 태그, 변경 내역을 담은 Release 게시글, 첨부 파일 **ChunsikPet.exe**를 만들고 Latest로 지정합니다.
+2. 실행 시점의 `main` 최신 커밋과 `VERSION`을 읽습니다. 최신 공개 Release 태그의 커밋부터 비교하여 실제 프로그램·리소스·빌드 입력이 변경됐을 때만 Windows 빌드 및 게시 작업을 실행합니다. EXE 빌드와 스케줄 테스트가 통과하면 `v버전` 태그, Release 게시글, 첨부 파일 **ChunsikPet.exe**를 만들고 Latest로 지정합니다.
 3. 같은 태그의 Release가 이미 있으면 초안을 포함해 빌드·게시를 건너뜁니다. 기존 태그는 덮어쓰지 않으며, 태그만 존재하고 다른 커밋을 가리키면 오류로 중단합니다.
 
-별도 토큰 설정 없이 워크플로의 `GITHUB_TOKEN`을 사용합니다. 게시 중 업로드에 실패하면 Release는 초안으로 남습니다. 재시도하려면 실패한 초안을 삭제한 후 다시 실행하세요. 공개된 기존 Release는 수정하지 않습니다. 새 버전은 `VERSION`과 `Program.cs`의 두 버전 특성을 함께 변경해야 합니다.
+별도 토큰 설정 없이 워크플로의 `GITHUB_TOKEN`을 사용합니다. 게시 중 업로드에 실패하면 Release는 초안으로 남습니다. 재시도하려면 실패한 초안을 삭제한 후 다시 실행하세요. 기존 공개 Release의 본문은 같은 변경 내역 정책으로 갱신하며 태그·EXE는 변경하지 않습니다. 새 버전은 `VERSION`과 `Program.cs`의 두 버전 특성을 함께 변경해야 합니다.
 
 검증 범위와 수동 절차: [tests/WINDOWS-CHECKLIST.md](tests/WINDOWS-CHECKLIST.md). 물리 화면·절전·보안 제품 판정은 자동 테스트로 보장하지 않습니다.
 

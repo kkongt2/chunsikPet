@@ -13,34 +13,55 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  prepare:
     if: github.ref == 'refs/heads/main'
-    runs-on: windows-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.policy.outputs.publish }}
+      version: ${{ steps.policy.outputs.version }}
+      tag: ${{ steps.policy.outputs.tag }}
+      sha: ${{ steps.policy.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Check current version and existing release
-        id: version
+          fetch-depth: 0
+      - name: Test release policy
+        run: node --test tests/release-tag.test.cjs tests/release-policy.test.cjs
+      - name: Update release notes and check runtime changes
+        id: policy
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const { execFileSync } = require('child_process');
+            const policy = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-policy.cjs`);
             const version = fs.readFileSync('VERSION', 'utf8').trim();
             if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('VERSION must contain major.minor.patch');
             const tag = `v${version}`;
-            const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            const sha = policy.resolveCommit('HEAD');
+            core.setOutput('publish', 'false');
             core.setOutput('version', version);
             core.setOutput('tag', tag);
             core.setOutput('sha', sha);
-            // List releases too: draft releases must also prevent duplicate publication.
+            const repoUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
             const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
-            const existing = releases.find(r => r.tag_name === tag);
-            core.setOutput('exists', existing ? 'true' : 'false');
-            if (existing) {
-              await core.summary.addHeading('Release skipped').addRaw(`${tag} already exists (including drafts). No build or changes performed.`).write();
+            // Maintain published posts without changing their tags or assets.
+            await policy.refreshBodies(github, context.repo, releases, repoUrl);
+            let latest;
+            try {
+              latest = (await github.rest.repos.getLatestRelease(context.repo)).data;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            const base = latest ? policy.resolveCommit(`refs/tags/${latest.tag_name}`) : null;
+            const changed = policy.runtimeChanges(base, sha);
+            if (changed.length === 0) {
+              await core.summary.addHeading('Release skipped').addRaw(`No runtime/build-input changes since ${latest.tag_name}. Existing notes refreshed; no EXE build, tag or new release.`).write();
+              return;
+            }
+            if (releases.some(r => r.tag_name === tag)) {
+              await core.summary.addHeading('Release skipped').addRaw(`${tag} already exists (including drafts). Bump the application version before publishing runtime changes.`).write();
               return;
             }
             const { assertTagTarget } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-tag.cjs`);
@@ -49,49 +70,59 @@ jobs:
             for (const attribute of ['AssemblyVersion', 'AssemblyFileVersion']) {
               if (!source.includes(`${attribute}("${version}.0")`)) throw new Error(`${attribute} does not match VERSION`);
             }
+            core.setOutput('publish', 'true');
+            await core.summary.addHeading('Release planned').addList(changed).write();
+
+  release:
+    needs: prepare
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          fetch-depth: 0
       - uses: microsoft/setup-msbuild@v2
-        if: steps.version.outputs.exists == 'false'
-      - name: Test release tag checks
-        if: steps.version.outputs.exists == 'false'
-        run: node --test tests/release-tag.test.cjs
       - name: Build Release x64
-        if: steps.version.outputs.exists == 'false'
         run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
       - name: Build scheduling tests
-        if: steps.version.outputs.exists == 'false'
         run: msbuild tests/ScheduleTests.csproj /t:Rebuild /m
       - name: Run scheduling tests
-        if: steps.version.outputs.exists == 'false'
         run: .\tests\bin\ScheduleTests.exe
       - name: Tag, attach EXE and publish release
-        if: steps.version.outputs.exists == 'false'
         uses: actions/github-script@v7
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          RELEASE_SHA: ${{ steps.version.outputs.sha }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
         with:
           script: |
             const fs = require('fs');
-            const version = process.env.RELEASE_VERSION;
+            const policy = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-policy.cjs`);
             const tag = process.env.RELEASE_TAG;
             const sha = process.env.RELEASE_SHA;
-            // Recheck immediately before mutation, including releases created outside this workflow.
+            const repoUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
             const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
             if (releases.some(r => r.tag_name === tag)) {
               await core.summary.addHeading('Release skipped').addRaw(`${tag} already exists.`).write();
+              return;
+            }
+            let latest;
+            try {
+              latest = (await github.rest.repos.getLatestRelease(context.repo)).data;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            const base = latest ? policy.resolveCommit(`refs/tags/${latest.tag_name}`) : null;
+            if (policy.runtimeChanges(base, sha).length === 0) {
+              await core.summary.addHeading('Release skipped').addRaw('The latest release already includes all runtime changes.').write();
               return;
             }
             const { assertTagTarget } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-tag.cjs`);
             await assertTagTarget(github, context.repo, tag, sha);
             const exe = fs.readFileSync('ChunsikDesktopPet/bin/x64/Release/ChunsikPet.exe');
             if (exe.length < 2 || exe.toString('ascii', 0, 2) !== 'MZ') throw new Error('Built EXE is missing or invalid');
-            const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
-            const sections = changelog.split(/^## /m).slice(1);
-            const section = sections.find(s => s.startsWith(`${version} ·`));
-            const notes = section ? section.slice(section.indexOf('\n') + 1).trim() : 'Windows x64 Release build.';
-            const body = `${notes}\n\n### 다운로드\n\n첨부된 **ChunsikPet.exe**를 다운로드해 실행하세요. Windows x64 / .NET Framework 4.8이 필요합니다.\n\n소스 커밋: ${sha}`;
-            // Publish only after attachment upload succeeds, so users never see an empty release.
+            const body = policy.releaseBody(repoUrl, latest, { tag_name: tag, sha });
             const { data: release } = await github.rest.repos.createRelease({
               ...context.repo, tag_name: tag, target_commitish: sha,
               name: `춘식이 데스크톱 펫 ${tag}`, body, draft: true, prerelease: false
