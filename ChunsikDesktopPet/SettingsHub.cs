@@ -50,7 +50,7 @@ namespace ChunsikDesktop {
         public static void Attach(Window form, string name, Func<bool> flush) {
             Ensure(); TabItem tab = sections[name]; object content = form.Content; form.Content = null;
             FrameworkElement element = content as FrameworkElement; if (element != null && name == "알림") element.MinWidth = 0;
-            tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = name == "알림" ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
+            tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = name == "알림" ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto, VerticalScrollBarVisibility = name == "프로그램" ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
             form.Closed += delegate { forms.Remove(form); if (tab.Tag == form) { tab.Tag = null; tab.Content = null; } };
             tabs.SelectedItem = tab; window.Activate();
         }

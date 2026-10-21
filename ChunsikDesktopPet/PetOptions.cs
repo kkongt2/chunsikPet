@@ -135,6 +135,19 @@ namespace ChunsikDesktop {
             TextBlock paydayDates = new TextBlock { Text = PaydayCalendar.Describe(DateTime.Today, Options.PaydayDay), Foreground = Theme.Accent, Margin = new Thickness(0, 10, 0, 8) }; paydayPanel.Children.Add(paydayDates);
             payday.SelectionChanged += delegate { if (payday.SelectedItem != null) paydayDates.Text = PaydayCalendar.Describe(DateTime.Today, (int)payday.SelectedItem); };
             paydayPanel.Children.Add(new TextBlock { Text = "토·일·공휴일이면 직전 평일로 앞당겨요. 없는 날짜는 말일 기준이에요.\n공휴일·대체공휴일 달력: 2040년까지 내장 / 임시공휴일 제외\n월급날에는 실행할 때마다 12초간 재생돼요. 인터넷은 사용하지 않아요.", FontSize = 11, Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap });
+            // Reparent the existing controls without changing their autosave or preview handlers.
+            UIElement intro = root.Children[0], sleepHelp = root.Children[7];
+            UIElement opacityHelp = appearance.Children[2], avoidHelp = appearance.Children[4];
+            appearance.Children.Clear(); root.Children.Clear(); root.Children.Add(intro);
+            StackPanel looks = Theme.Card(root, "모양");
+            looks.Children.Add(new TextBlock { Text = "캐릭터 크기", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 5) }); looks.Children.Add(size);
+            looks.Children.Add(new TextBlock { Text = "걷는 속도 · 22 느리게 / 44 보통 / 80 빠르게", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 5) }); looks.Children.Add(speed);
+            looks.Children.Add(countLabel); looks.Children.Add(count);
+            transparencyLabel.Margin = new Thickness(0, 14, 0, 0); looks.Children.Add(transparencyLabel); looks.Children.Add(transparency); looks.Children.Add(opacityHelp);
+            StackPanel movement = Theme.Card(root, "움직임"); movement.Children.Add(avoid); movement.Children.Add(avoidHelp);
+            StackPanel sleep = Theme.Card(root, "수면"); sleep.Children.Add(enabled); sleep.Children.Add(idleRow); sleep.Children.Add(sleepHelp);
+            StackPanel events = Theme.Card(root, "이벤트");
+            while (paydayPanel.Children.Count > 0) { UIElement child = paydayPanel.Children[0]; paydayPanel.Children.RemoveAt(0); events.Children.Add(child); }
             TextBlock saveStatus = new TextBlock { Text = "변경사항은 자동으로 저장됩니다.", Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap }; root.Children.Add(saveStatus);
             bool refreshing = false;
             DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };

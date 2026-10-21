@@ -49,6 +49,12 @@ namespace ChunsikDesktop {
             button.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7)));
             button.Setters.Add(new Setter(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
             app.Resources[typeof(Button)] = button;
+            Style checkbox = new Style(typeof(CheckBox));
+            checkbox.Setters.Add(new Setter(Control.TemplateProperty, ToggleTemplate));
+            checkbox.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 9, 12, 9)));
+            checkbox.Setters.Add(new Setter(Control.ForegroundProperty, Accent));
+            checkbox.Setters.Add(new Setter(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
+            app.Resources[typeof(CheckBox)] = checkbox;
         }
         public static StackPanel Card(Panel parent, string title) {
             StackPanel panel = new StackPanel();
