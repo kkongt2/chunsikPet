@@ -421,15 +421,21 @@ namespace ChunsikDesktop {
         }
         static readonly Style SegmentStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='Padding' Value='8,7'/><Setter Property='FontSize' Value='11'/><Setter Property='Foreground' Value='#546578'/><Setter Property='Background' Value='Transparent'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border CornerRadius='9' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center'/></Border></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter Property='Opacity' Value='0.7'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.6'/></Trigger></Style.Triggers></Style>");
         static Grid TableRow() {
-            Grid grid = new Grid();
-            foreach (double width in new double[] { 64, -1, 238, 212, 86, 98, 145 })
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width < 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(width) });
+            Grid grid = new Grid { Margin = new Thickness(12) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(95) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            for (int i=0; i<7; i++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             return grid;
         }
-        static void Cell(Grid grid, UIElement child, int column) { Grid.SetColumn(child, column); grid.Children.Add(child); }
+        static void Cell(Grid grid, UIElement child, int field) {
+            string[] labels = { "사용", "알림 이름", "종류 · 시간", "요일 · 날짜", "말풍선 색상", "메시지", "관리" };
+            TextBlock label = new TextBlock { Text = labels[field], Foreground = Brushes.SlateGray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 10, 8, 10) };
+            Grid.SetRow(label, field); grid.Children.Add(label);
+            Grid.SetRow(child, field); Grid.SetColumn(child, 1); grid.Children.Add(child);
+        }
         public void OpenSettings() {
             if (editor != null) { SettingsHub.Open("알림"); return; }
-            Window win = new Window { Title = "춘식이 알림 설정", Width = 1280, Height = 670, MinWidth = 1240, MinHeight = 540, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            Window win = new Window { Title = "춘식이 알림 설정", Width = 1000, Height = 700, MinWidth = 620, MinHeight = 480, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterScreen };
             editor = win;
             List<Reminder> rows = new List<Reminder>(); foreach (Reminder item in settings.Items) rows.Add(item.Copy());
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
@@ -489,19 +495,39 @@ namespace ChunsikDesktop {
             StackPanel table = new StackPanel();
             ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = table };
             root.Children.Add(new Border { CornerRadius = new CornerRadius(14), Background = Brushes.White, BorderBrush = Line, BorderThickness = new Thickness(1), Padding = new Thickness(10), Child = scroll });
+            string selectedId = rows.Count > 0 ? rows[0].Id : null;
             Action render = null;
             render = delegate {
                 table.Children.Clear(); countdowns.Clear();
                 DockPanel toolbar = new DockPanel { Margin = new Thickness(4, 0, 4, 8) };
-                Button add = Pill("＋ 알림 추가", delegate { rows.Add(new Reminder()); render(); changed(); scroll.ScrollToBottom(); });
+                Button add = Pill("＋ 알림 추가", delegate { Reminder added = new Reminder(); rows.Add(added); selectedId = added.Id; render(); changed(); scroll.ScrollToTop(); });
                 DockPanel.SetDock(add, Dock.Right); toolbar.Children.Add(add);
                 toolbar.Children.Add(new TextBlock { Text = "알림 목록 · " + rows.Count, FontSize = 16, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Foreground = Accent }); table.Children.Add(toolbar);
-                Grid header = TableRow(); int col = 0;
-                foreach (string name in new string[] { "사용", "알림 이름", "알림 종류 · 시간", "요일 / 특정 날짜", "색상", "메시지 편집", "관리" }) Cell(header, new TextBlock { Text = name, Foreground = Brushes.SlateGray, Margin = new Thickness(5, 8, 0, 8) }, col++);
-                table.Children.Add(header);
+                if (!rows.Exists(delegate(Reminder r) { return r.Id == selectedId; })) selectedId = rows.Count > 0 ? rows[0].Id : null;
+                Grid body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(210) }); body.ColumnDefinitions.Add(new ColumnDefinition());
+                body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); table.Children.Add(body);
+                ListBox choices = new ListBox { Height = 430, BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, 12, 0), HorizontalContentAlignment = HorizontalAlignment.Stretch };
+                body.Children.Add(choices);
+                foreach (Reminder candidate in rows) {
+                    StackPanel summary = new StackPanel { Margin = new Thickness(6, 10, 6, 10) };
+                    summary.Children.Add(new TextBlock { Text = candidate.Title, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+                    TextBlock next = new TextBlock { FontSize = 11, Foreground = Accent, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0) };
+                    summary.Children.Add(next); countdowns[candidate.Id] = next;
+                    ListBoxItem choice = new ListBoxItem { Content = summary, Tag = candidate.Id }; choices.Items.Add(choice);
+                    if (candidate.Id == selectedId) choices.SelectedItem = choice;
+                }
+                choices.SelectionChanged += delegate { ListBoxItem chosen = choices.SelectedItem as ListBoxItem; if (chosen != null && (string)chosen.Tag != selectedId) { selectedId = (string)chosen.Tag; render(); } };
+                StackPanel detail = new StackPanel(); Grid.SetColumn(detail, 1); body.Children.Add(detail);
+                body.SizeChanged += delegate {
+                    bool narrow = body.ActualWidth < 760;
+                    body.ColumnDefinitions[0].Width = narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(210);
+                    body.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+                    Grid.SetRow(detail, narrow ? 1 : 0); Grid.SetColumn(detail, narrow ? 0 : 1); choices.Height = narrow ? 150 : 430;
+                };
                 foreach (Reminder row in rows) {
-                    Grid line = TableRow(); line.MinHeight = 58;
-                    Border card = new Border { Background = new SolidColorBrush(Color.FromRgb(250, 252, 255)), BorderBrush = Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = line }; table.Children.Add(card);
+                    if (row.Id != selectedId) continue;
+                    Grid line = TableRow();
+                    Border card = new Border { Background = new SolidColorBrush(Color.FromRgb(250, 252, 255)), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Child = line }; detail.Children.Add(card);
                     System.Windows.Controls.Primitives.ToggleButton toggle = new System.Windows.Controls.Primitives.ToggleButton { Width = 44, Height = 24, IsChecked = row.Enabled, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(5), ToolTip = "알림 켜기/끄기" };
                     toggle.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ToggleButton'><Border x:Name='track' Background='#CCD5DF' CornerRadius='12'><Ellipse x:Name='thumb' Width='18' Height='18' Fill='White' HorizontalAlignment='Left' Margin='3'/></Border><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='track' Property='Background' Value='#0064A8'/><Setter TargetName='thumb' Property='HorizontalAlignment' Value='Right'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='track' Property='BorderBrush' Value='#F6B73C'/><Setter TargetName='track' Property='BorderThickness' Value='2'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
                     System.Windows.Automation.AutomationProperties.SetName(toggle, row.Title + " 알림 사용");
@@ -509,9 +535,7 @@ namespace ChunsikDesktop {
                     StackPanel titleArea = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 4, 10, 4) };
                     if (row.IsBuiltin) titleArea.Children.Add(new TextBlock { Text = "기본 알림", FontSize = 10, Foreground = Accent });
                     TextBox title = new TextBox { Text = row.Title, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(2, 4, 2, 4), FontSize = 14 };
-                    title.TextChanged += delegate { row.Title = title.Text; changed(); }; titleArea.Children.Add(title); Cell(line, titleArea, 1);
-                    TextBlock countdown = new TextBlock { FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Accent, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 4, 0, 4) };
-                    titleArea.Children.Add(countdown); countdowns[row.Id] = countdown;
+                    title.TextChanged += delegate { row.Title = title.Text; ListBoxItem choice = choices.SelectedItem as ListBoxItem; if (choice != null) ((TextBlock)((StackPanel)choice.Content).Children[0]).Text = row.Title; changed(); }; titleArea.Children.Add(title); Cell(line, titleArea, 1);
                     StackPanel schedule = new StackPanel();
                     StackPanel segments = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 7) };
                     string[] types = { "time", "interval", "date" }, labels = { "매주 시각", "일정 간격", "특정 날짜" };
@@ -560,6 +584,7 @@ namespace ChunsikDesktop {
                     Button remove = Pill(row.IsBuiltin ? "기본" : "삭제", delegate { if (row.IsBuiltin) return; rows.Remove(row); render(); changed(); });
                     remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); Cell(line, actions, 6);
                 }
+                refreshCountdowns();
             };
             render(); refreshCountdowns(); countdownTimer.Tick += delegate { refreshCountdowns(); }; countdownTimer.Start();
             win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !save()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "저장 확인"); } };
