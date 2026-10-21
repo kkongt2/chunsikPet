@@ -132,7 +132,7 @@ namespace ChunsikDesktop {
                     shown = duration - elapsed.Elapsed;
                     if (!completed && shown <= TimeSpan.Zero) {
                         elapsed.Stop(); completed = true; status.Text = "시간이 다 됐어요! 수고했어요 ♥";
-                        try { SystemSounds.Exclamation.Play(); } catch { }
+                        try { if (!PresentationPolicy.IsSuppressed) SystemSounds.Exclamation.Play(); } catch { }
                     }
                     shown = TimeSpan.FromSeconds(Math.Max(0, Math.Ceiling(shown.TotalSeconds)));
                 }

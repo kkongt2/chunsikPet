@@ -534,6 +534,7 @@ namespace ChunsikDesktop {
             }
         }
         static void RunApp(string folder) {
+            PresentationPolicy.Start();
             PaydayCalendar.Load(Path.Combine(folder, "holidays-2025-2040.csv"));
             LoadFrames(Path.Combine(folder, "chunsik-payday.png"));
             paydayFrames = frames; paydayW = maxW; paydayH = maxH; paydayBodyH = frames[0].PixelHeight;

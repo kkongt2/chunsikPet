@@ -48,6 +48,13 @@ namespace ChunsikDesktop {
         public TrayController() {
             icon = MakeIcon(PetWindow.TrayImage);
             menu = new System.Windows.Forms.ContextMenuStrip();
+            System.Windows.Forms.ToolStripMenuItem quiet = new System.Windows.Forms.ToolStripMenuItem("방해 금지");
+            quiet.DropDownItems.Add(Item("30분 동안", delegate { PresentationPolicy.Set(30); }));
+            quiet.DropDownItems.Add(Item("1시간 동안", delegate { PresentationPolicy.Set(60); }));
+            quiet.DropDownItems.Add(Item("직접 해제할 때까지", delegate { PresentationPolicy.Set(-1); }));
+            quiet.DropDownItems.Add(Item("방해 금지 해제", delegate { PresentationPolicy.Set(0); }));
+            System.Windows.Forms.ToolStripMenuItem fullscreen = Item("전체 화면에서 자동 숨김", PresentationPolicy.ToggleFullscreen); quiet.DropDownItems.Add(fullscreen);
+            menu.Items.Add(quiet);
             menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
             menu.Items.Add(Item("알림 · 메시지 설정", delegate { ReminderService.Current.OpenSettings(); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
@@ -85,6 +92,7 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("프로그램 정보", ShowAbout));
             menu.Items.Add(Item("춘식이 모두 종료", delegate { PetWindow.Quit(); }));
             menu.Opening += delegate {
+                quiet.Text = "방해 금지 · " + PresentationPolicy.Status; fullscreen.Checked = PresentationPolicy.FullscreenEnabled;
                 avoid.Checked = PetPreferences.Current.Options.AvoidCursor;
                 avoid.Text = "마우스 피하기 · " + (avoid.Checked ? "ON" : "OFF");
                 foreach (System.Windows.Forms.ToolStripMenuItem choice in transparency.DropDownItems) choice.Checked = choice.Text.StartsWith(PetPreferences.Current.Options.TransparencyPercent + "%", StringComparison.Ordinal);

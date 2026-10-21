@@ -392,11 +392,11 @@ namespace ChunsikDesktop {
             }
             ReminderHistory.Record(data, data.Missed ? "절전·자리 비움 후 복구" : "대기");
             queue.Enqueue(data);
-            if (sound) { try { SystemSounds.Asterisk.Play(); } catch {} }
+            if (sound && !PresentationPolicy.IsSuppressed) { try { SystemSounds.Asterisk.Play(); } catch {} }
             ShowNext();
         }
         void ShowNext() {
-            if (stopping || collecting || regrouping || active.Count != 0 || queue.Count == 0) return;
+            if (PresentationPolicy.IsSuppressed || stopping || collecting || regrouping || active.Count != 0 || queue.Count == 0) return;
             List<PetWindow> pets = PetWindow.SpeechPets();
             if (pets.Count == 0) return;
             int total = 0; foreach (NoticeData waiting in queue) total += waiting.Messages.Count;
@@ -651,6 +651,8 @@ namespace ChunsikDesktop {
             timer.Interval = TimeSpan.FromMilliseconds(100);
             timer.Tick += delegate {
                 if (closed) return;
+                if (PresentationPolicy.IsSuppressed) { elapsed.Stop(); return; }
+                elapsed.Start();
                 List<PetWindow> live = PetWindow.SpeechPets();
                 if (assigned != null) foreach (PetWindow pet in assigned) {
                     if (!live.Contains(pet)) { ReminderService.Current.RebalanceNotices(); return; }
