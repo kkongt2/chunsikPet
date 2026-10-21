@@ -23,6 +23,7 @@ namespace ChunsikDesktop {
         public static PetPreferences Current;
         public PetOptions Options { get; private set; }
         public bool IsIdle { get; private set; }
+        public double InputIdleSeconds { get; private set; }
         static readonly string PathName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "pets.xml");
         static readonly XmlSerializer Serializer = new XmlSerializer(typeof(PetOptions));
         readonly DispatcherTimer timer = new DispatcherTimer();
@@ -57,11 +58,11 @@ namespace ChunsikDesktop {
             }
         }
         public void RefreshIdle() {
-            if (!Options.SleepEnabled) { IsIdle = false; return; }
             LASTINPUTINFO info = new LASTINPUTINFO(); info.cbSize = (uint)Marshal.SizeOf(typeof(LASTINPUTINFO));
             if (!GetLastInputInfo(ref info)) { IsIdle = false; return; }
             uint elapsed = unchecked((uint)Environment.TickCount - info.dwTime);
-            IsIdle = elapsed >= (uint)Options.IdleMinutes * 60000U;
+            InputIdleSeconds = elapsed / 1000.0;
+            IsIdle = Options.SleepEnabled && elapsed >= (uint)Options.IdleMinutes * 60000U;
         }
         bool Apply(PetOptions value, PetWindow remove = null) {
             if (!Valid(value)) return false;

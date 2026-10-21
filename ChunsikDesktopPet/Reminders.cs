@@ -19,6 +19,18 @@ namespace ChunsikDesktop {
         [XmlIgnore] public bool IsBuiltin { get { return Kind == "lunch" || Kind == "home" || Kind == "water" || Kind == "stretch"; } }
         public string ScheduleType { get; set; }
         public int IntervalMinutes { get; set; }
+        public bool ActivityEnabled { get; set; }
+        public string ActiveFrom { get; set; }
+        public string ActiveUntil { get; set; }
+        public bool PauseWhenIdle { get; set; }
+        public bool ActivityAllows(DateTime now, double idleSeconds) {
+            if (PauseWhenIdle && idleSeconds >= 300) return false;
+            if (!ActivityEnabled) return true;
+            TimeSpan from, until;
+            if (!ReminderRules.TryTime(ActiveFrom, out from) || !ReminderRules.TryTime(ActiveUntil, out until) || from == until) return false;
+            TimeSpan t = now.TimeOfDay;
+            return from < until ? t >= from && t < until : t >= from || t < until;
+        }
         public string Date { get; set; }
         public bool HasTime { get; set; }
         [XmlIgnore] public bool IsDate { get { return ScheduleType == "date"; } }
@@ -46,7 +58,7 @@ namespace ChunsikDesktop {
             if (result.Count == 0 && !String.IsNullOrWhiteSpace(Title)) result.Add(Title.Trim());
             return result;
         }
-        public Reminder() { Id = Guid.NewGuid().ToString("N"); ScheduleType = "time"; IntervalMinutes = 60; Enabled = true; Title = "새 알림"; Time = "15:00"; Repeat = "평일"; Days = -1; LastFired = ""; Messages = new List<string>(); }
+        public Reminder() { Id = Guid.NewGuid().ToString("N"); ScheduleType = "time"; IntervalMinutes = 60; ActiveFrom = "09:00"; ActiveUntil = "18:00"; Enabled = true; Title = "새 알림"; Time = "15:00"; Repeat = "평일"; Days = -1; LastFired = ""; Messages = new List<string>(); }
         public Reminder Copy() {
             Reminder copy = (Reminder)MemberwiseClone(); copy.Messages = GetMessages(); copy.Days = SelectedDays; return copy;
         }
@@ -265,7 +277,7 @@ namespace ChunsikDesktop {
                 if (!item.IsInterval || !item.Enabled) continue;
                 keep.Add(item.Id); bool same = false;
                 if (old != null) foreach (Reminder prior in old.Items)
-                    if (prior.Id == item.Id && prior.IsInterval && prior.Enabled && prior.IntervalMinutes == item.IntervalMinutes && prior.SelectedDays == item.SelectedDays) same = true;
+                    if (prior.Id == item.Id && prior.IsInterval && prior.Enabled && prior.IntervalMinutes == item.IntervalMinutes && prior.SelectedDays == item.SelectedDays && prior.ActivityEnabled == item.ActivityEnabled && prior.ActiveFrom == item.ActiveFrom && prior.ActiveUntil == item.ActiveUntil && prior.PauseWhenIdle == item.PauseWhenIdle) same = true;
                 if (!same || !intervalDue.ContainsKey(item.Id)) intervalDue[item.Id] = now.AddMinutes(item.IntervalMinutes);
             }
             foreach (string id in new List<string>(intervalDue.Keys)) if (!keep.Contains(id)) intervalDue.Remove(id);
@@ -298,6 +310,7 @@ namespace ChunsikDesktop {
                     if (item.Kind == "water" || item.Kind == "stretch") item.ScheduleType = "interval";
                     if (item.ScheduleType != "interval" && item.ScheduleType != "date") item.ScheduleType = "time";
                     if (item.IntervalMinutes < 1 || item.IntervalMinutes > 1439) item.IntervalMinutes = 60;
+                    TimeSpan from, until; if (!ReminderRules.TryTime(item.ActiveFrom, out from) || !ReminderRules.TryTime(item.ActiveUntil, out until) || from == until) { item.ActiveFrom = "09:00"; item.ActiveUntil = "18:00"; }
                     item.Days = item.SelectedDays;
                     item.Messages = item.GetMessages();
                 }
@@ -357,6 +370,7 @@ namespace ChunsikDesktop {
                 if (item.IsInterval) {
                     DateTime next;
                     if (!item.Enabled || !intervalDue.TryGetValue(item.Id, out next)) continue;
+                    if (!item.ActivityAllows(now, PetPreferences.Current.InputIdleSeconds) || !ReminderRules.OnDay(item, now)) { intervalDue[item.Id] = now.AddMinutes(item.IntervalMinutes); continue; }
                     if (now < lastCheck) { intervalDue[item.Id] = now.AddMinutes(item.IntervalMinutes); continue; }
                     if (now >= next) {
                         intervalDue[item.Id] = now.AddMinutes(item.IntervalMinutes);
@@ -399,6 +413,16 @@ namespace ChunsikDesktop {
         }
         void ShowNext() {
             if (PresentationPolicy.IsSuppressed || stopping || collecting || regrouping || active.Count != 0 || queue.Count == 0) return;
+            int pending = queue.Count;
+            while (pending-- > 0) {
+                NoticeData data = queue.Dequeue(); bool allowed = true;
+                if (data.Interval && !String.IsNullOrEmpty(data.ReminderId)) {
+                    Reminder item = settings.Items.Find(delegate(Reminder r) { return r.Id == data.ReminderId; });
+                    allowed = item != null && item.Enabled && ReminderRules.OnDay(item, DateTime.Now) && item.ActivityAllows(DateTime.Now, PetPreferences.Current.InputIdleSeconds);
+                }
+                if (allowed) queue.Enqueue(data); else ReminderHistory.Record(data, "활동 시간·자리 비움으로 생략");
+            }
+            if (queue.Count == 0) return;
             List<PetWindow> pets = PetWindow.SpeechPets();
             if (pets.Count == 0) return;
             int total = 0; foreach (NoticeData waiting in queue) total += waiting.Messages.Count;
@@ -539,6 +563,7 @@ namespace ChunsikDesktop {
                         schedule.Children.Add(specify);
                     }
                     schedule.Children.Add(clock);
+                    if (row.IsInterval) schedule.Children.Add(Pill(row.ActivityEnabled ? "활동 " + row.ActiveFrom + "~" + row.ActiveUntil : "활동 시간 · 자리 비움", delegate { EditActivity(win, row, changed); }));
                     Cell(line, new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 246, 253)), Padding = new Thickness(5), Margin = new Thickness(0, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center, Child = schedule }, 2);
                     if (row.IsDate) {
                         StackPanel dateArea = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8) };
@@ -566,6 +591,23 @@ namespace ChunsikDesktop {
             win.Closed += delegate { debounce.Stop(); editor = null; }; SettingsHub.Attach(win, "알림", save);
         }
         sealed class MessageDraft { public string Text; }
+        void EditActivity(Window owner, Reminder row, Action changed) {
+            Window dialog = new Window { Owner = SettingsHub.OwnerFor(owner), Title = "간격 알림 활동 시간", Width = 440, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            StackPanel content = new StackPanel { Margin = new Thickness(22) }; dialog.Content = content;
+            CheckBox enabled = new CheckBox { Content = "선택한 시간대에만 알려주기", IsChecked = row.ActivityEnabled, Margin = new Thickness(0, 0, 0, 14) }; content.Children.Add(enabled);
+            TimeSpan a, z; ReminderRules.TryTime(row.ActiveFrom, out a); ReminderRules.TryTime(row.ActiveUntil, out z);
+            NumberField ah = new NumberField(a.Hours, 23, "시작 시"), am = new NumberField(a.Minutes, 59, "시작 분"), zh = new NumberField(z.Hours, 23, "종료 시"), zm = new NumberField(z.Minutes, 59, "종료 분");
+            WrapPanel times = new WrapPanel(); foreach (UIElement element in new UIElement[] { ah, new TextBlock { Text = ":", Margin = new Thickness(4) }, am, new TextBlock { Text = " ~ ", Margin = new Thickness(4) }, zh, new TextBlock { Text = ":", Margin = new Thickness(4) }, zm }) times.Children.Add(element); content.Children.Add(times);
+            CheckBox idle = new CheckBox { Content = "입력이 5분 없으면 간격 알림 잠시 멈추기", IsChecked = row.PauseWhenIdle, Margin = new Thickness(0, 18, 0, 14) }; content.Children.Add(idle);
+            content.Children.Add(new TextBlock { Text = @"종료 시각은 포함하지 않아요. 22:00~06:00처럼 자정을 넘길 수 있어요.
+활동 시간 복귀·입력 재개 후 간격을 처음부터 계산해요.
+요일 선택도 함께 적용하며 중단 중 알림을 쌓지 않아요.", TextWrapping = TextWrapping.Wrap });
+            Button apply = Pill("적용", delegate {
+                string from = ah.Value.ToString("00") + ":" + am.Value.ToString("00"), until = zh.Value.ToString("00") + ":" + zm.Value.ToString("00");
+                if (enabled.IsChecked == true && from == until) { MessageBox.Show(dialog, "시작과 종료 시각을 다르게 선택해 주세요."); return; }
+                row.ActivityEnabled = enabled.IsChecked == true; row.ActiveFrom = from; row.ActiveUntil = until; row.PauseWhenIdle = idle.IsChecked == true; changed(); dialog.Close();
+            }); content.Children.Add(apply); dialog.ShowDialog();
+        }
         void EditMessages(Window owner, Reminder row, Func<bool> persist) {
             owner = SettingsHub.OwnerFor(owner);
             Window dialog = new Window { Owner = owner, Title = "메시지 편집 — " + row.Title, Width = 650, Height = 510, MinWidth = 560, MinHeight = 350, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterOwner };

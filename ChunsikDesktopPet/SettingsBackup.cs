@@ -30,8 +30,9 @@ namespace ChunsikDesktop {
             if (b.Reminders.Items == null || b.Reminders.Items.Count > 500 || b.Reminders.MessageSeconds < 3 || b.Reminders.MessageSeconds > 60 || b.Reminders.SnoozeMinutes < 1 || b.Reminders.SnoozeMinutes > 1440) throw new InvalidDataException("알림 설정 범위 오류");
             HashSet<string> ids = new HashSet<string>();
             foreach (Reminder r in b.Reminders.Items) {
-                TimeSpan time; DateTime date;
+                TimeSpan time, from, until; DateTime date;
                 if (r == null || String.IsNullOrEmpty(r.Id) || !ids.Add(r.Id) || String.IsNullOrWhiteSpace(r.Title) || !ReminderRules.TryTime(r.Time, out time) || r.SelectedDays < 0 || r.SelectedDays > 127 || (r.ScheduleType != "time" && r.ScheduleType != "interval" && r.ScheduleType != "date") || (r.IsInterval && (r.IntervalMinutes < 1 || r.IntervalMinutes > 1439)) || (r.IsDate && !ReminderRules.TryDate(r.Date, out date))) throw new InvalidDataException("잘못된 알림 항목");
+                if (r.ActivityEnabled && (!ReminderRules.TryTime(r.ActiveFrom, out from) || !ReminderRules.TryTime(r.ActiveUntil, out until) || from == until)) throw new InvalidDataException("활동 시간 오류");
             }
             if (b.Todos.Items == null || b.Todos.Items.Count > 50) throw new InvalidDataException("할 일 개수 오류"); ids.Clear();
             foreach (TodoItem t in b.Todos.Items) if (t == null || String.IsNullOrEmpty(t.Id) || !ids.Add(t.Id) || String.IsNullOrWhiteSpace(t.Text) || t.Text.Length > 160 || t.EveryMinutes < 1 || t.EveryMinutes > 1440 || t.DisplaySeconds < 1 || t.DisplaySeconds > 3600 || Double.IsNaN(t.NoteLeft) || Double.IsInfinity(t.NoteLeft) || Double.IsNaN(t.NoteTop) || Double.IsInfinity(t.NoteTop)) throw new InvalidDataException("잘못된 할 일 항목");
