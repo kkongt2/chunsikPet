@@ -378,7 +378,12 @@ namespace ChunsikDesktop {
             paper = new Border { CornerRadius = new CornerRadius(2, 2, 16, 2), BorderBrush = new SolidColorBrush(Color.FromRgb(190, 170, 102)), BorderThickness = new Thickness(0, 0, 1, 2), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 6, ShadowDepth = 2, Opacity = 0.2 } }; root.Children.Add(paper);
             tape = new Border { Width = 72, Height = 15, Background = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -3, 0, 0), RenderTransform = new RotateTransform(-4), IsHitTestVisible = false }; root.Children.Add(tape);
             heading = new TextBlock { Text = "TO-DO  /  잊지 말아요", FontSize = 10, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
-            heading.MouseLeftButtonDown += DragNote; content.Children.Add(heading);
+            StackPanel noteHeader = new StackPanel(); content.Children.Add(noteHeader);
+            heading.MouseLeftButtonDown += DragNote; noteHeader.Children.Add(heading);
+            Button addNote = NoteButton("＋ 새 포스트잇", "새 빈 포스트잇 추가", add);
+            addNote.HorizontalAlignment = HorizontalAlignment.Left;
+            addNote.Margin = new Thickness(0, 0, 0, 10);
+            noteHeader.Children.Add(addNote);
             message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(64, 55, 44)) };
             message.ToolTip = "더블클릭해서 바로 편집 · Ctrl+Enter 저장 · Esc 취소";
             message.Cursor = System.Windows.Input.Cursors.IBeam;
@@ -397,7 +402,6 @@ namespace ChunsikDesktop {
             Button smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
             fontLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3), FontSize = 11 }; buttons.Children.Add(fontLabel);
             buttons.Children.Add(NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }));
-            buttons.Children.Add(NoteButton("＋", "새 빈 포스트잇 추가", add));
             Button done = new Button { Content = "✓ 완료", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; done.Click += delegate { if (EndEdit(true)) complete(); }; buttons.Children.Add(done);
             Button settings = new Button { Content = "편집", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; settings.Click += delegate { BeginEdit(); }; buttons.Children.Add(settings);
             mascot = new Image { Stretch = Stretch.Uniform, Width = 86, Height = 66, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "포스트잇과 함께 끌어 옮기기" };
