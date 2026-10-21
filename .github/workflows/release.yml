@@ -41,18 +41,17 @@ jobs:
               await core.summary.addHeading('Release skipped').addRaw(`${tag} already exists (including drafts). No build or changes performed.`).write();
               return;
             }
-            try {
-              const { data: tagged } = await github.rest.repos.getCommit({ ...context.repo, ref: `tags/${tag}` });
-              if (tagged.sha !== sha) throw new Error(`${tag} already points to another commit. Existing tags are never moved.`);
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
+            const { assertTagTarget } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-tag.cjs`);
+            await assertTagTarget(github, context.repo, tag, sha);
             const source = fs.readFileSync('ChunsikDesktopPet/Program.cs', 'utf8');
             for (const attribute of ['AssemblyVersion', 'AssemblyFileVersion']) {
               if (!source.includes(`${attribute}("${version}.0")`)) throw new Error(`${attribute} does not match VERSION`);
             }
       - uses: microsoft/setup-msbuild@v2
         if: steps.version.outputs.exists == 'false'
+      - name: Test release tag checks
+        if: steps.version.outputs.exists == 'false'
+        run: node --test tests/release-tag.test.cjs
       - name: Build Release x64
         if: steps.version.outputs.exists == 'false'
         run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
@@ -81,12 +80,8 @@ jobs:
               await core.summary.addHeading('Release skipped').addRaw(`${tag} already exists.`).write();
               return;
             }
-            try {
-              const { data: tagged } = await github.rest.repos.getCommit({ ...context.repo, ref: `tags/${tag}` });
-              if (tagged.sha !== sha) throw new Error(`${tag} points to another commit. Refusing to replace it.`);
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
+            const { assertTagTarget } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-tag.cjs`);
+            await assertTagTarget(github, context.repo, tag, sha);
             const exe = fs.readFileSync('ChunsikDesktopPet/bin/x64/Release/ChunsikPet.exe');
             if (exe.length < 2 || exe.toString('ascii', 0, 2) !== 'MZ') throw new Error('Built EXE is missing or invalid');
             const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');

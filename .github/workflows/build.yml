@@ -10,6 +10,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Test release tag checks
+        run: node --test tests/release-tag.test.cjs
       - uses: microsoft/setup-msbuild@v2
       - name: Build Release x64
         run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
