@@ -9,6 +9,8 @@ using System.Xml.Serialization;
 
 namespace ChunsikDesktop {
     public class PetOptions {
+        public int Size { get; set; }
+        public int Speed { get; set; }
         public int TransparencyPercent { get; set; }
         public bool AvoidCursor { get; set; }
         public bool SleepEnabled { get; set; }
@@ -16,7 +18,7 @@ namespace ChunsikDesktop {
         public int PetCount { get; set; }
         public int PaydayDay { get; set; }
         public bool PaydayEnabled { get; set; }
-        public PetOptions() { SleepEnabled = true; IdleMinutes = 5; PetCount = 1; PaydayDay = 20; PaydayEnabled = true; }
+        public PetOptions() { Size = 80; Speed = 44; SleepEnabled = true; IdleMinutes = 5; PetCount = 1; PaydayDay = 20; PaydayEnabled = true; }
         public PetOptions Copy() { return (PetOptions)MemberwiseClone(); }
     }
     public sealed class PetPreferences {
@@ -37,7 +39,7 @@ namespace ChunsikDesktop {
             timer.Interval = TimeSpan.FromMilliseconds(500); timer.Tick += delegate { RefreshIdle(); }; timer.Start();
         }
         public static bool Valid(PetOptions value) {
-            return value != null && value.IdleMinutes >= 1 && value.IdleMinutes <= 1440 && value.PetCount >= 1 && value.PetCount <= 20 && value.PaydayDay >= 1 && value.PaydayDay <= 31 && value.TransparencyPercent >= 0 && value.TransparencyPercent <= 90;
+            return value != null && value.Size >= 50 && value.Size <= 500 && value.Speed >= 10 && value.Speed <= 200 && value.IdleMinutes >= 1 && value.IdleMinutes <= 1440 && value.PetCount >= 1 && value.PetCount <= 20 && value.PaydayDay >= 1 && value.PaydayDay <= 31 && value.TransparencyPercent >= 0 && value.TransparencyPercent <= 90;
         }
         static PetOptions Read(string path) {
             using (FileStream stream = File.OpenRead(path)) {
@@ -81,6 +83,8 @@ namespace ChunsikDesktop {
             if (remove != null && PetWindow.Count > value.PetCount) remove.Close();
             PetWindow.SetCount(value.PetCount); PetWindow.ApplyAppearance(); return true;
         }
+        public void SetSize(int size) { PetOptions value = Options.Copy(); value.Size = size; Apply(value); }
+        public void SetSpeed(int speed) { PetOptions value = Options.Copy(); value.Speed = speed; Apply(value); }
         public void SetTransparency(int percent) { PetOptions value = Options.Copy(); value.TransparencyPercent = percent; Apply(value); }
         public void SetCursorAvoidance(bool enabled) { PetOptions value = Options.Copy(); value.AvoidCursor = enabled; Apply(value); }
         public void ChangeCount(int count, PetWindow remove = null) {
@@ -93,6 +97,9 @@ namespace ChunsikDesktop {
             Window win = new Window { Title = "춘식이 설정 — 표시 · 움직임 · 수면", Width = 550, Height = Math.Min(760, SystemParameters.WorkArea.Height - 40), ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen };
             editor = win; win.Closed += delegate { editor = null; };
             StackPanel root = new StackPanel { Margin = new Thickness(22) }; win.Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            root.Children.Add(new TextBlock { Text = "크기·속도는 모든 일반 춘식이에 공통 적용하고 다음 실행에도 기억해요.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) });
+            ComboBox size = new ComboBox { ItemsSource = new int[] { 50, 80, 120, 180, 270, 500 }, SelectedItem = Options.Size, Margin = new Thickness(0, 0, 0, 10), ToolTip = "모든 춘식이 크기" }; root.Children.Add(size);
+            ComboBox speed = new ComboBox { ItemsSource = new int[] { 22, 44, 80 }, SelectedItem = Options.Speed, Margin = new Thickness(0, 0, 0, 14), ToolTip = "걷는 속도 · 22 느리게 / 44 보통 / 80 빠르게" }; root.Children.Add(speed);
             CheckBox enabled = new CheckBox { Content = "키보드·마우스 입력이 없으면 자동으로 잠들기", IsChecked = Options.SleepEnabled, Margin = new Thickness(0, 0, 0, 14) }; root.Children.Add(enabled);
             StackPanel idleRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 20) };
             idleRow.Children.Add(new TextBlock { Text = "입력 없이 ", VerticalAlignment = VerticalAlignment.Center });
@@ -135,7 +142,7 @@ namespace ChunsikDesktop {
                 if (!Int32.TryParse(minutes.Text.Trim(), out delay) || delay < 1 || delay > 1440) {
                     MessageBox.Show(SettingsHub.OwnerFor(win), "수면 대기 시간은 1~1440분의 정수로 입력해 주세요.", "입력 확인"); return false;
                 }
-                PetOptions value = new PetOptions { TransparencyPercent = (int)Math.Round(transparency.Value), AvoidCursor = avoid.IsChecked == true, SleepEnabled = enabled.IsChecked == true, IdleMinutes = delay, PetCount = (int)Math.Round(count.Value), PaydayDay = (int)payday.SelectedItem, PaydayEnabled = paydayEnabled.IsChecked == true };
+                PetOptions value = new PetOptions { Size = size.SelectedItem == null ? Options.Size : (int)size.SelectedItem, Speed = speed.SelectedItem == null ? Options.Speed : (int)speed.SelectedItem, TransparencyPercent = (int)Math.Round(transparency.Value), AvoidCursor = avoid.IsChecked == true, SleepEnabled = enabled.IsChecked == true, IdleMinutes = delay, PetCount = (int)Math.Round(count.Value), PaydayDay = (int)payday.SelectedItem, PaydayEnabled = paydayEnabled.IsChecked == true };
                 return Apply(value);
             }; save.Click += delegate { apply(); }; buttons.Children.Add(save); SettingsHub.Attach(win, "캐릭터", apply);
         }

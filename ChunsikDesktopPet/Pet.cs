@@ -43,12 +43,17 @@ namespace ChunsikDesktop {
             get { if (Pets.Count == 0) return false; foreach (PetWindow pet in Pets) if (!pet.paused) return false; return true; }
         }
         public static void PauseAll(bool value) { foreach (PetWindow pet in Pets) { pet.EndReaction(); pet.paused = value; } }
-        public static void ResizeAll(double value) { foreach (PetWindow pet in Pets) pet.ResizePet(value); }
-        public static void SpeedAll(double value) { foreach (PetWindow pet in Pets) pet.speed = value; }
+        public static void ResizeAll(double value) { PetPreferences.Current.SetSize((int)value); }
+        public static void SpeedAll(double value) { PetPreferences.Current.SetSpeed((int)value); }
         public static int Count { get { return Pets.Count; } }
         public static void ApplyAppearance() {
             if (PetPreferences.Current == null) return;
-            foreach (PetWindow pet in Pets) PresentationPolicy.SetOpacity(pet, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
+            foreach (PetWindow pet in Pets) {
+                PetOptions value = PetPreferences.Current.Options;
+                if (pet.size != value.Size) pet.ResizePet(value.Size);
+                pet.speed = value.Speed;
+                PresentationPolicy.SetOpacity(pet, 1.0 - value.TransparencyPercent / 100.0);
+            }
         }
         double fleeUntil;
         int fleeDirection;
@@ -217,7 +222,8 @@ namespace ChunsikDesktop {
                 // Tool window + no activation: walking never steals keyboard focus.
                 if (IntPtr.Size == 8) SetWindowLongPtr(hwnd, -20, new IntPtr(GetWindowLongPtr(hwnd, -20).ToInt64() | 0x08000080L));
                 else SetWindowLong32(hwnd, -20, GetWindowLong32(hwnd, -20) | 0x08000080);
-                ResizePet(80);
+                ResizePet(PetPreferences.Current == null ? 80 : PetPreferences.Current.Options.Size);
+                speed = PetPreferences.Current == null ? 44 : PetPreferences.Current.Options.Speed;
                 if (!IsTodoCompanion && PetPreferences.Current != null) PresentationPolicy.SetOpacity(this, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
                 Rect area = WorkArea(); Left = area.Left + Rng.NextDouble() * Math.Max(0, area.Width - Width);
                 Top = area.Bottom - Height; ChooseState(); timer.Start();
@@ -518,16 +524,17 @@ namespace ChunsikDesktop {
                 paused = !paused; ((MenuItem)s).Header = paused ? "다시 걷기" : "잠깐 쉬기"; if (paused) SetFrame(6);
             }); menu.Items.Add(pause);
             menu.Opened += delegate { pause.Header = paused ? "다시 걷기" : "잠깐 쉬기"; };
-            MenuItem sizes = new MenuItem(); sizes.Header = "크기";
-            sizes.Items.Add(Item("작게 (50)", delegate { ResizePet(50); }));
-            sizes.Items.Add(Item("보통 (80)", delegate { ResizePet(80); }));
-            sizes.Items.Add(Item("크게 (120)", delegate { ResizePet(120); })); sizes.Items.Add(Item("더 크게 (180)", delegate { ResizePet(180); }));
-            sizes.Items.Add(Item("엄청 크게 (270)", delegate { ResizePet(270); }));
-            sizes.Items.Add(Item("진격의 춘식이 (500)", delegate { ResizePet(500); })); menu.Items.Add(sizes);
-            MenuItem speeds = new MenuItem(); speeds.Header = "걷는 속도";
-            speeds.Items.Add(Item("느리게", delegate { speed = 22; }));
-            speeds.Items.Add(Item("보통", delegate { speed = 44; }));
-            speeds.Items.Add(Item("빠르게", delegate { speed = 80; })); menu.Items.Add(speeds);
+            MenuItem sizes = new MenuItem(); sizes.Header = "크기 (모두 · 저장)";
+            sizes.Items.Add(Item("작게 (50)", delegate { PetPreferences.Current.SetSize(50); }));
+            sizes.Items.Add(Item("보통 (80)", delegate { ResizePet(PetPreferences.Current == null ? 80 : PetPreferences.Current.Options.Size);
+                speed = PetPreferences.Current == null ? 44 : PetPreferences.Current.Options.Speed; }));
+            sizes.Items.Add(Item("크게 (120)", delegate { PetPreferences.Current.SetSize(120); })); sizes.Items.Add(Item("더 크게 (180)", delegate { PetPreferences.Current.SetSize(180); }));
+            sizes.Items.Add(Item("엄청 크게 (270)", delegate { PetPreferences.Current.SetSize(270); }));
+            sizes.Items.Add(Item("진격의 춘식이 (500)", delegate { PetPreferences.Current.SetSize(500); })); menu.Items.Add(sizes);
+            MenuItem speeds = new MenuItem(); speeds.Header = "걷는 속도 (모두 · 저장)";
+            speeds.Items.Add(Item("느리게", delegate { PetPreferences.Current.SetSpeed(22); }));
+            speeds.Items.Add(Item("보통", delegate { PetPreferences.Current.SetSpeed(44); }));
+            speeds.Items.Add(Item("빠르게", delegate { PetPreferences.Current.SetSpeed(80); })); menu.Items.Add(speeds);
             menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
             menu.Items.Add(Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }));
             menu.Items.Add(new Separator());
