@@ -18,6 +18,7 @@ internal static class GhostNoteTests {
         note.Update(item); note.Show(); Pump();
         GhostNoteHeader header = Field<GhostNoteHeader>(note, "ghostHeader");
         Check(NativeNoteInput.IsClickThrough(note), "ghost body has native click-through style");
+        Console.WriteLine("Header visible=" + header.IsVisible + ", loaded=" + header.IsLoaded + ", note loaded=" + note.IsLoaded + ", heading loaded=" + Field<TextBlock>(note, "heading").IsLoaded + ", click-through=" + NativeNoteInput.IsClickThrough(header));
         Check(header.IsVisible && !NativeNoteInput.IsClickThrough(header), "separate header remains clickable");
         Check(note.Opacity == 0.6 && note.Topmost, "ghost is translucent and topmost");
         ((Button)header.Content).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();

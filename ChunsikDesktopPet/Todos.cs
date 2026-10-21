@@ -439,7 +439,7 @@ namespace ChunsikDesktop {
                 if (loadingOpacity || current == null) return;
                 double old = current.NoteOpacity; current.NoteOpacity = noteOpacity.Value / 100;
                 if (!persist()) current.NoteOpacity = old;
-                Opacity = IsEditing ? 1 : Math.Max(0.5, Math.Min(0.7, current.NoteOpacity)); opacityMenu.Header = "불투명도 " + Math.Round(Opacity * 100) + "%";
+                Opacity = IsEditing ? 1 : Math.Max(0.5, Math.Min(0.7, current.NoteOpacity)); opacityMenu.Header = "불투명도 " + Math.Round(current.NoteOpacity * 100) + "%";
             };
             System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
             grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
@@ -457,6 +457,8 @@ namespace ChunsikDesktop {
             }; root.Children.Add(grip);
             ghostHeader = new GhostNoteHeader(this, BeginEdit);
             SourceInitialized += delegate { ApplyGhostMode(); };
+            Loaded += delegate { ApplyGhostMode(); };
+            ContentRendered += delegate { SyncGhostHeader(); };
             IsVisibleChanged += delegate { if (!IsVisible) ghostHeader.Hide(); else ApplyGhostMode(); };
             LocationChanged += delegate { SyncGhostHeader(); };
             SizeChanged += delegate { SyncGhostHeader(); };
