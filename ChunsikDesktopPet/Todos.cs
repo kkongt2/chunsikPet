@@ -411,6 +411,7 @@ namespace ChunsikDesktop {
         readonly Image mascot;
         readonly Grid noteContent;
         readonly TextBlock heading;
+        readonly TextBlock shiftHint;
         readonly Action<double, double> moved;
         TodoItem current;
         bool dragging, resizing, positionReady;
@@ -446,6 +447,13 @@ namespace ChunsikDesktop {
             addNote.HorizontalAlignment = HorizontalAlignment.Left;
             addNote.Margin = new Thickness(0, 0, 0, 10);
             noteHeader.Children.Add(addNote);
+            shiftHint = new TextBlock {
+                Text = "Shift 꾹! 잠깐 멈출게요 🐾", FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(119, 94, 62)),
+                Margin = new Thickness(0, 0, 0, 7), TextWrapping = TextWrapping.Wrap,
+                ToolTip = "Shift 키를 누르는 동안 커서를 피하지 않아요. 누른 채로 편집하거나 옮겨보세요."
+            };
+            noteHeader.Children.Add(shiftHint);
             message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(64, 55, 44)) };
             message.ToolTip = "더블클릭해서 바로 편집 · Ctrl+Enter 저장 · Esc 취소";
             message.Cursor = System.Windows.Input.Cursors.IBeam;
@@ -555,6 +563,7 @@ namespace ChunsikDesktop {
             Opacity = item.NoteOpacity;
             if (lastStandalone != item.Standalone) positionReady = false;
             lastStandalone = item.Standalone; current = item;
+            shiftHint.Visibility = item.Standalone && item.AvoidCursor ? Visibility.Visible : Visibility.Collapsed;
             paper.Background = BubblePalette.BrushFor(item.Color);
             if (!resizing) { Width = item.NoteWidth; Height = item.NoteHeight; }
             message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize; fontLabel.Text = item.FontSize.ToString();
