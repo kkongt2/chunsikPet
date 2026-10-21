@@ -34,24 +34,6 @@ internal static class NoticePlacementTests {
         Rect alone = NoticePlacement.Place(screens[0], new Point(-1000, 900), new Size(310, 200), new List<Rect>());
         occupied.Clear(); occupied.Add(new Rect(100, 100, 1000, 1000));
         Check(alone == NoticePlacement.Place(screens[0], new Point(-1000, 900), new Size(310, 200), occupied), "different monitor collision ignored");
-        foreach (Rect area in screens) {
-            Rect note = new Rect(area.Left + 20, area.Top + 20, 260, 280);
-            Point cursor = new Point(note.Left - 60, note.Top + 100);
-            Check(TodoAvoidance.Near(note, cursor, 70), "proximity triggers outside paper");
-            Check(!TodoAvoidance.Near(note, new Point(note.Right + 100, note.Bottom + 100), 70), "distant cursor ignored");
-            Point target = TodoAvoidance.Target(note, area, cursor, new List<Rect>());
-            Rect destination = new Rect(target, note.Size);
-            Check(area.Contains(destination), "escape stays on owning monitor");
-            Check(!TodoAvoidance.Near(destination, cursor, 90), "escape clears cursor with margin");
-            List<Rect> crowded = new List<Rect> { area };
-            Point fallback = TodoAvoidance.Target(note, area, cursor, crowded);
-            Check(!TodoAvoidance.Near(new Rect(fallback, note.Size), cursor, 90), "crowded desktop still escapes");
-            Point chasing = new Point(destination.Left + 10, destination.Top + 10);
-            Point retarget = TodoAvoidance.Target(destination, area, chasing, new List<Rect>());
-            Check(!TodoAvoidance.Near(new Rect(retarget, note.Size), chasing, 90), "moving cursor can be escaped again immediately");
-        }
-        Rect tiny = new Rect(0, 0, 260, 280);
-        Check(TodoAvoidance.Target(tiny, tiny, new Point(130, 140), new List<Rect>()) == tiny.TopLeft, "no room remains stable");
         Console.WriteLine("PASS: " + count + " multi-monitor placement assertions");
     }
 }

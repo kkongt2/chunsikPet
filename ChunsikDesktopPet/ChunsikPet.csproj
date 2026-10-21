@@ -54,8 +54,8 @@
     <Compile Include="Reminders.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
+    <Compile Include="GhostNoteHeader.cs" />
     <Compile Include="TodoModels.cs" />
-    <Compile Include="TodoAvoidance.cs" />
     <Compile Include="TrayController.cs" />
   </ItemGroup>
   <ItemGroup>

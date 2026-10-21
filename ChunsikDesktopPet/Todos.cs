@@ -72,7 +72,8 @@ namespace ChunsikDesktop {
                     if (item.EveryMinutes < 1 || item.EveryMinutes > 1440) item.EveryMinutes = 60;
                     if (item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) item.DisplaySeconds = 20;
                     if (item.Text == null) item.Text = "";
-                    if (Double.IsNaN(item.NoteOpacity) || item.NoteOpacity < 0.2 || item.NoteOpacity > 1) item.NoteOpacity = 1;
+                    if (Double.IsNaN(item.NoteOpacity) || item.NoteOpacity < 0.2 || item.NoteOpacity > 1) item.NoteOpacity = 0.6;
+                    item.NoteOpacity = Math.Max(0.5, Math.Min(0.7, item.NoteOpacity));
                     if (item.FontSize < 10 || item.FontSize > 64) item.FontSize = 17;
                     if (Double.IsNaN(item.NoteWidth) || item.NoteWidth < 220 || item.NoteWidth > 1200) item.NoteWidth = 260;
                     if (Double.IsNaN(item.NoteHeight) || item.NoteHeight < 200 || item.NoteHeight > 1200) item.NoteHeight = 280;
@@ -119,7 +120,7 @@ namespace ChunsikDesktop {
         }
         void AddBlank(TodoItem near) {
             if (settings.Items.Count >= 50) { MessageBox.Show("포스트잇은 최대 50개까지 저장할 수 있어요."); return; }
-            TodoItem item = new TodoItem { Color = near.Color, FontSize = near.FontSize, NoteOpacity = near.NoteOpacity, AvoidCursor = near.AvoidCursor, NoteWidth = near.NoteWidth, NoteHeight = near.NoteHeight };
+            TodoItem item = new TodoItem { Color = near.Color, FontSize = near.FontSize, NoteOpacity = near.NoteOpacity, NoteWidth = near.NoteWidth, NoteHeight = near.NoteHeight };
             Runtime source;
             if (runtimes.TryGetValue(near.Id, out source)) { item.HasPosition = true; item.NoteLeft = source.Note.Left + 32; item.NoteTop = source.Note.Top + 32; }
             settings.Items.Add(item);
@@ -160,7 +161,7 @@ namespace ChunsikDesktop {
             if (ReminderService.Current != null) occupied.AddRange(ReminderService.Current.VisibleBounds());
             double now = clock.Elapsed.TotalSeconds;
             foreach (Runtime run in runtimes.Values) {
-                if (run.Note.IsCompleting || run.Note.IsEvading) { if (run.Note.IsVisible) occupied.Add(new Rect(run.Note.Left, run.Note.Top, run.Note.Width, run.Note.Height)); continue; }
+                if (run.Note.IsCompleting) { if (run.Note.IsVisible) occupied.Add(new Rect(run.Note.Left, run.Note.Top, run.Note.Width, run.Note.Height)); continue; }
                 TodoItem item = run.Item;
                 run.Pet = item.Standalone ? null : item.Dedicated ? run.Owned : pets.Count == 0 ? null : pets[Math.Max(0, Math.Min(pets.Count - 1, item.PetIndex))];
                 bool blocked = !item.Standalone && (run.Pet == null || (ReminderService.Current != null && ReminderService.Current.IsSpeakingFor(run.Pet)));
@@ -247,14 +248,11 @@ namespace ChunsikDesktop {
                     font.Children.Add(Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); changed(); render(); }));
                     font.Children.Add(new TextBlock { Text = item.FontSize + "", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6) });
                     font.Children.Add(Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); changed(); render(); }));
-                    WrapPanel opacityRow = SettingRow(cardContent, "불투명도");
-                    Slider opacitySlider = new Slider { Minimum = 20, Maximum = 100, Value = item.NoteOpacity * 100, Width = 180, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+                    WrapPanel opacityRow = SettingRow(cardContent, "평소 불투명도");
+                    Slider opacitySlider = new Slider { Minimum = 50, Maximum = 70, Value = item.NoteOpacity * 100, Width = 180, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
                     TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", Margin = new Thickness(10, 0, 0, 0) };
                     opacityRow.Children.Add(opacitySlider); opacityRow.Children.Add(opacityText);
                     opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); };
-                    WrapPanel avoidanceRow = SettingRow(cardContent, "커서 피하기");
-                    CheckBox avoidance = new CheckBox { Content = "가까이 오면 즉시 빠르게 피하기 (Shift로 잠시 고정)", IsChecked = item.AvoidCursor };
-                    avoidanceRow.Children.Add(avoidance); avoidance.Click += delegate { item.AvoidCursor = avoidance.IsChecked == true; changed(); };
                     WrapPanel display = SettingRow(cardContent, "표시 방식");
                     display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));
                     if (!item.Always) {
@@ -294,62 +292,12 @@ namespace ChunsikDesktop {
     }
     public sealed class TodoNote : Window {
         bool disposing;
-        readonly DispatcherTimer evadeTimer = new DispatcherTimer();
-        readonly Stopwatch evadeClock = Stopwatch.StartNew();
-        double evadeAfter, lastEvadeTick;
-        Point evadeTarget;
-        public bool IsEvading { get; private set; }
-        void EvadeTick() {
-            double now = evadeClock.Elapsed.TotalSeconds;
-            double dt = Math.Max(0.001, Math.Min(0.05, now - lastEvadeTick)); lastEvadeTick = now;
-            if (disposing || current == null || !IsVisible) return;
-            bool shift = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
-            // Keyboard focus and an unrelated settings window must not disable avoidance.
-            // Only actual interaction with this note (or Shift) temporarily holds it still.
-            if (!current.Standalone || !current.AvoidCursor || IsCompleting || IsEditing || IsDragging ||
-                shift || ContextMenu.IsOpen || inlineEditor.IsMouseCaptureWithin ||
-                PresentationPolicy.IsSuppressed || now < evadeAfter) {
-                if (IsEvading) { CancelEvade(); moved(Left, Top); }
-                return;
-            }
-            System.Drawing.Point screen = System.Windows.Forms.Cursor.Position;
-            Point local = PointFromScreen(new Point(screen.X, screen.Y));
-            Point cursor = new Point(Left + local.X, Top + local.Y);
-            Rect note = new Rect(Left, Top, ActualWidth, ActualHeight);
-            bool near = TodoAvoidance.Near(note, cursor, 70);
-            if (!IsEvading && !near) return;
-            if (!IsEvading || TodoAvoidance.Near(new Rect(evadeTarget, note.Size), cursor, 80)) {
-                List<Rect> occupied = new List<Rect>();
-                foreach (Window window in Application.Current.Windows) {
-                    if (window == this || !window.IsVisible || !(window is TodoNote || window is NoticeWindow)) continue;
-                    // Convert every HWND from physical pixels into this window's DIP space.
-                    Rect pixels = ScreenLayout.BoundsPixels(window); if (pixels.IsEmpty) continue;
-                    Point a = PointFromScreen(pixels.TopLeft), b = PointFromScreen(pixels.BottomRight);
-                    occupied.Add(new Rect(new Point(Left + a.X, Top + a.Y), new Point(Left + b.X, Top + b.Y)));
-                }
-                evadeTarget = TodoAvoidance.Target(note, WorkingArea(), cursor, occupied);
-            }
-            Vector delta = evadeTarget - new Point(Left, Top);
-            double distance = delta.Length;
-            if (distance < 1) {
-                if (IsEvading) { CancelEvade(); positionReady = true; moved(Left, Top); }
-                return;
-            }
-            IsEvading = true;
-            // Start moving on the first proximity sample, without roll-up or cooldown.
-            double step = Math.Min(distance, 2200 * dt);
-            Left += delta.X / distance * step; Top += delta.Y / distance * step;
-            ClampPosition(WorkingArea()); positionReady = true;
-        }
-        void CancelEvade() {
-            IsEvading = false;
-        }
-
+        readonly Stopwatch interactionClock = Stopwatch.StartNew();
         readonly DispatcherTimer swallowTimer = new DispatcherTimer();
         public bool IsCompleting { get; private set; }
         public void AnimateComplete(Action finished) {
-            if (IsCompleting || IsEvading || disposing) return;
-            IsCompleting = true; UpdateLayout();
+            if (IsCompleting || disposing) return;
+            IsCompleting = true; ghostHeader.Hide(); UpdateLayout();
             double oldHeight = ActualHeight; SizeToContent = SizeToContent.Manual; Height = oldHeight;
             root.IsHitTestVisible = false;
             mascot.Visibility = Visibility.Visible; mascot.Source = peekArt;
@@ -393,7 +341,7 @@ namespace ChunsikDesktop {
             };
             swallowTimer.Interval = TimeSpan.FromMilliseconds(25); swallowTimer.Tick += tick; swallowTimer.Start();
         }
-        public void DisposeNote() { disposing = true; swallowTimer.Stop(); evadeTimer.Stop(); Close(); }
+        public void DisposeNote() { disposing = true; swallowTimer.Stop(); Close(); }
         static System.Windows.Media.Imaging.BitmapSource peekArt;
         public static void LoadArt(string folder) {
             System.Windows.Media.Imaging.BitmapImage bitmap = new System.Windows.Media.Imaging.BitmapImage();
@@ -411,8 +359,7 @@ namespace ChunsikDesktop {
         readonly Image mascot;
         readonly Grid noteContent;
         readonly TextBlock heading;
-        readonly TextBlock shiftHint;
-        readonly Button avoidanceButton;
+        readonly GhostNoteHeader ghostHeader;
         readonly Action<double, double> moved;
         TodoItem current;
         bool dragging, resizing, positionReady;
@@ -441,33 +388,15 @@ namespace ChunsikDesktop {
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             paper = new Border { CornerRadius = new CornerRadius(2, 2, 16, 2), BorderBrush = new SolidColorBrush(Color.FromRgb(190, 170, 102)), BorderThickness = new Thickness(0, 0, 1, 2), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 6, ShadowDepth = 2, Opacity = 0.2 } }; root.Children.Add(paper);
             tape = new Border { Width = 72, Height = 15, Background = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -3, 0, 0), RenderTransform = new RotateTransform(-4), IsHitTestVisible = false }; root.Children.Add(tape);
-            heading = new TextBlock { Text = "TO-DO  /  잊지 말아요", FontSize = 10, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
+            heading = new TextBlock { Text = "🐾 헤더 클릭으로 편집", FontSize = 10, Height = 24, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
             StackPanel noteHeader = new StackPanel(); content.Children.Add(noteHeader);
             heading.MouseLeftButtonDown += DragNote; noteHeader.Children.Add(heading);
             Button addNote = NoteButton("＋ 새 포스트잇", "새 빈 포스트잇 추가", add);
             addNote.HorizontalAlignment = HorizontalAlignment.Left;
-            addNote.Margin = new Thickness(0, 0, 4, 6);
-            WrapPanel headerActions = new WrapPanel();
-            headerActions.Children.Add(addNote);
-            avoidanceButton = NoteButton("🐾 피하기 ON", "커서 피하기 켜기/끄기 · Shift를 누르면 잠깐 멈춰요", delegate {
-                if (current == null) return;
-                bool previous = current.AvoidCursor;
-                CancelEvade();
-                current.AvoidCursor = !previous;
-                if (!persist()) current.AvoidCursor = previous;
-                Update(current);
-            });
-            avoidanceButton.Margin = new Thickness(0, 0, 0, 6);
-            headerActions.Children.Add(avoidanceButton); noteHeader.Children.Add(headerActions);
-            shiftHint = new TextBlock {
-                Text = "Shift 꾹! 잠깐 멈출게요 🐾", FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(119, 94, 62)),
-                Margin = new Thickness(0, 0, 0, 7), TextWrapping = TextWrapping.Wrap,
-                ToolTip = "Shift 키를 누르는 동안 커서를 피하지 않아요. 누른 채로 편집하거나 옮겨보세요."
-            };
-            noteHeader.Children.Add(shiftHint);
+            addNote.Margin = new Thickness(0, 0, 0, 6);
+            noteHeader.Children.Add(addNote);
             message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(64, 55, 44)) };
-            message.ToolTip = "더블클릭해서 바로 편집 · Ctrl+Enter 저장 · Esc 취소";
+            message.ToolTip = "평소에는 클릭이 뒤로 통과해요. 상단 헤더를 눌러 편집하세요.";
             message.Cursor = System.Windows.Input.Cursors.IBeam;
             messageScroll = new ScrollViewer { Background = Brushes.Transparent, Content = message, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             Grid.SetRow(messageScroll, 1); content.Children.Add(messageScroll);
@@ -486,7 +415,7 @@ namespace ChunsikDesktop {
             fontLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3), FontSize = 11 }; buttons.Children.Add(fontLabel);
             buttons.Children.Add(NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }));
             completeButton = NoteButton("✓ 할 일 완료", "이 할 일을 완료 처리", delegate {
-                if (IsEditing || evadeClock.Elapsed.TotalSeconds < completeAllowedAfter) return;
+                if (IsEditing || interactionClock.Elapsed.TotalSeconds < completeAllowedAfter) return;
                 complete();
             }); buttons.Children.Add(completeButton);
             saveEditButton = NoteButton("저장", "메시지만 저장 · Ctrl+Enter", delegate { EndEdit(true); });
@@ -499,8 +428,10 @@ namespace ChunsikDesktop {
             mascot.SnapsToDevicePixels = true; mascot.UseLayoutRounding = true;
             mascot.MouseLeftButtonDown += DragNote; root.Children.Add(mascot);
             ContextMenu menu = new ContextMenu(); MenuItem manage = new MenuItem { Header = "포스트잇 설정" }; manage.Click += delegate { edit(); }; menu.Items.Add(manage); ContextMenu = menu;
-            MenuItem opacityMenu = new MenuItem { Header = "불투명도 (20~100%)" }; menu.Items.Add(opacityMenu);
-            Slider noteOpacity = new Slider { Minimum = 20, Maximum = 100, Width = 160, TickFrequency = 5, IsSnapToTickEnabled = true, Margin = new Thickness(8) };
+            MenuItem finishTask = new MenuItem { Header = "✓ 이 할 일 완료하기" };
+            finishTask.Click += delegate { if (EndEdit(true)) complete(); }; menu.Items.Add(finishTask);
+            MenuItem opacityMenu = new MenuItem { Header = "평소 불투명도 (50~70%)" }; menu.Items.Add(opacityMenu);
+            Slider noteOpacity = new Slider { Minimum = 50, Maximum = 70, Width = 160, TickFrequency = 5, IsSnapToTickEnabled = true, Margin = new Thickness(8) };
             MenuItem opacityControl = new MenuItem { Header = noteOpacity, StaysOpenOnClick = true }; opacityMenu.Items.Add(opacityControl);
             bool loadingOpacity = false;
             menu.Opened += delegate { loadingOpacity = true; noteOpacity.Value = current == null ? 100 : current.NoteOpacity * 100; loadingOpacity = false; };
@@ -508,11 +439,8 @@ namespace ChunsikDesktop {
                 if (loadingOpacity || current == null) return;
                 double old = current.NoteOpacity; current.NoteOpacity = noteOpacity.Value / 100;
                 if (!persist()) current.NoteOpacity = old;
-                Opacity = current.NoteOpacity; opacityMenu.Header = "불투명도 " + Math.Round(Opacity * 100) + "%";
+                Opacity = IsEditing ? 1 : Math.Max(0.5, Math.Min(0.7, current.NoteOpacity)); opacityMenu.Header = "불투명도 " + Math.Round(Opacity * 100) + "%";
             };
-            PreviewMouseDown += delegate { evadeAfter = evadeClock.Elapsed.TotalSeconds + System.Windows.Forms.SystemInformation.DoubleClickTime / 1000.0 + 0.1; CancelEvade(); };
-            IsVisibleChanged += delegate { if (IsVisible) { lastEvadeTick = evadeClock.Elapsed.TotalSeconds; evadeTimer.Start(); } else { CancelEvade(); evadeTimer.Stop(); } };
-            evadeTimer.Interval = TimeSpan.FromMilliseconds(16); evadeTimer.Tick += delegate { EvadeTick(); };
             System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
             grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
             grip.DragStarted += delegate { resizing = true; EndEdit(true); };
@@ -525,8 +453,26 @@ namespace ChunsikDesktop {
                 double oldWidth = current.NoteWidth, oldHeight = current.NoteHeight;
                 current.NoteWidth = Width; current.NoteHeight = Height;
                 if (!persist()) { current.NoteWidth = oldWidth; current.NoteHeight = oldHeight; Update(current); }
-                ClampPosition(WorkingArea());
+                ClampPosition(WorkingArea()); ApplyGhostMode();
             }; root.Children.Add(grip);
+            ghostHeader = new GhostNoteHeader(this, BeginEdit);
+            SourceInitialized += delegate { ApplyGhostMode(); };
+            IsVisibleChanged += delegate { if (!IsVisible) ghostHeader.Hide(); else ApplyGhostMode(); };
+            LocationChanged += delegate { SyncGhostHeader(); };
+            SizeChanged += delegate { SyncGhostHeader(); };
+            LayoutUpdated += delegate { SyncGhostHeader(); };
+            Closed += delegate { ghostHeader.Close(); };
+        }
+        void ApplyGhostMode() {
+            if (ghostHeader == null || disposing) return;
+            NativeNoteInput.SetClickThrough(this, !IsEditing && !IsDragging);
+            Opacity = IsEditing || IsDragging ? 1 : current == null ? 0.6 : Math.Max(0.5, Math.Min(0.7, current.NoteOpacity));
+            SyncGhostHeader();
+        }
+        void SyncGhostHeader() {
+            if (ghostHeader == null || disposing) return;
+            if (!IsVisible || IsEditing || IsDragging || IsCompleting || current == null) { ghostHeader.Hide(); return; }
+            ghostHeader.Align(heading, Math.Max(120, ActualWidth - 42));
         }
         static Button NoteButton(string text, string hint, Action action) {
             Button button = new Button { Content = text, ToolTip = hint, Padding = new Thickness(4, 3, 4, 3), Margin = new Thickness(2), FontSize = 11, Background = Brushes.Transparent, BorderBrush = Brushes.Tan, Cursor = System.Windows.Input.Cursors.Hand };
@@ -539,8 +485,8 @@ namespace ChunsikDesktop {
             Update(current);
         }
         public void BeginEdit() {
-            if (current == null || IsCompleting || IsEvading || IsEditing) return;
-            IsEditing = true; inlineEditor.Text = current.Text;
+            if (current == null || IsCompleting || IsEditing) return;
+            IsEditing = true; ApplyGhostMode(); inlineEditor.Text = current.Text;
             completeButton.Visibility = Visibility.Collapsed;
             saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Visible;
             inlineEditor.FontSize = current.FontSize; messageScroll.Visibility = Visibility.Collapsed; inlineEditor.Visibility = Visibility.Visible;
@@ -553,37 +499,32 @@ namespace ChunsikDesktop {
             IsEditing = false;
             if (save) {
                 current.Text = inlineEditor.Text;
-                if (!persist()) { current.Text = old; IsEditing = true; inlineEditor.Focus(); return false; }
+                if (!persist()) { current.Text = old; IsEditing = true; ApplyGhostMode(); inlineEditor.Focus(); return false; }
             }
             inlineEditor.Visibility = Visibility.Collapsed; messageScroll.Visibility = Visibility.Visible;
             saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Collapsed;
             completeButton.Visibility = Visibility.Visible;
             // A second click of a Save double-click must never complete the task.
-            completeAllowedAfter = evadeClock.Elapsed.TotalSeconds + System.Windows.Forms.SystemInformation.DoubleClickTime / 1000.0 + 0.1;
-            Update(current); return true;
+            completeAllowedAfter = interactionClock.Elapsed.TotalSeconds + System.Windows.Forms.SystemInformation.DoubleClickTime / 1000.0 + 0.1;
+            Update(current); ApplyGhostMode(); return true;
         }
         void DragNote(object sender, System.Windows.Input.MouseButtonEventArgs e) {
             if (current == null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed || !EndEdit(true)) return;
             // Dragging a legacy following note switches it to a detached, fixed companion.
-            if (!current.Standalone) current.Pinned = true; lastStandalone = true; positionReady = true; dragging = true;
+            if (!current.Standalone) current.Pinned = true; lastStandalone = true; positionReady = true; dragging = true; ApplyGhostMode();
             try { DragMove(); }
-            finally { dragging = false; Rect area = WorkingArea(); ClampPosition(area); moved(Left, Top); }
+            finally { dragging = false; Rect area = WorkingArea(); ClampPosition(area); moved(Left, Top); ApplyGhostMode(); }
             e.Handled = true;
         }
         public void Update(TodoItem item) {
-            if (IsEvading) return;
-            Opacity = item.NoteOpacity;
+            Opacity = IsEditing ? 1 : Math.Max(0.5, Math.Min(0.7, item.NoteOpacity));
             if (lastStandalone != item.Standalone) positionReady = false;
             lastStandalone = item.Standalone; current = item;
-            avoidanceButton.Content = item.AvoidCursor ? "🐾 피하기 ON" : "🐾 피하기 OFF";
-            avoidanceButton.Background = item.AvoidCursor ? BubblePalette.BrushFor("#D5F3DF") : Brushes.Transparent;
-            System.Windows.Automation.AutomationProperties.SetName(avoidanceButton, item.AvoidCursor ? "마우스 커서 피하기 켜짐, 클릭하여 끄기" : "마우스 커서 피하기 꺼짐, 클릭하여 켜기");
-            shiftHint.Visibility = item.Standalone && item.AvoidCursor ? Visibility.Visible : Visibility.Collapsed;
             paper.Background = BubblePalette.BrushFor(item.Color);
             if (!resizing) { Width = item.NoteWidth; Height = item.NoteHeight; }
             message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize; fontLabel.Text = item.FontSize.ToString();
             bool blank = String.IsNullOrWhiteSpace(item.Text);
-            message.Text = blank ? "더블클릭해서 할 일을 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
+            message.Text = blank ? "위쪽 헤더를 눌러 할 일을 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
             message.Foreground = blank ? Brushes.SlateGray : new SolidColorBrush(Color.FromRgb(64, 55, 44));
             mascot.Visibility = item.Standalone ? Visibility.Visible : Visibility.Collapsed;
             mascot.Source = item.Peek ? peekArt : PetWindow.ToolPose(false);
@@ -596,11 +537,12 @@ namespace ChunsikDesktop {
             noteContent.Margin = new Thickness(16, item.Peek ? 28 : 23, 16, 12);
             heading.MaxWidth = item.Peek ? 135 : 220;
             heading.HorizontalAlignment = HorizontalAlignment.Left;
+            ApplyGhostMode();
         }
         double NoteHeight { get { return ActualHeight > 0 ? ActualHeight : 200; } }
         Rect WorkingArea() { return ScreenLayout.AreaFor(this); }
         public void RememberRecoveredPosition() {
-            if (current == null || !current.Pinned || !IsVisible || dragging || IsCompleting || IsEvading) return;
+            if (current == null || !current.Pinned || !IsVisible || dragging || IsCompleting) return;
             if (Math.Abs(current.NoteLeft - Left) < 0.5 && Math.Abs(current.NoteTop - Top) < 0.5 && current.HasPosition) return;
             current.NoteLeft = Left; current.NoteTop = Top; current.HasPosition = true; moved(Left, Top);
         }
@@ -610,7 +552,7 @@ namespace ChunsikDesktop {
             Top = Math.Max(area.Top, Math.Min(area.Bottom - NoteHeight, Top));
         }
         public Rect PlaceStandalone(TodoItem item, List<Rect> occupied) {
-            if (dragging || resizing || IsEditing || IsEvading) return new Rect(Left, Top, Width, NoteHeight);
+            if (dragging || resizing || IsEditing) return new Rect(Left, Top, Width, NoteHeight);
             if (!positionReady) {
                 Rect area = SystemParameters.WorkArea;
                 Left = item.HasPosition ? item.NoteLeft : area.Right - Width - 24;
