@@ -55,6 +55,49 @@ namespace ChunsikDesktop {
         }
     }
     public static class ReminderRules {
+        public static bool SameSchedule(Reminder a, Reminder b) {
+            if (a.ScheduleType != b.ScheduleType) return false;
+            if (a.IsDate) return a.Date == b.Date && a.HasTime == b.HasTime && (!a.HasTime || a.Time == b.Time);
+            if (a.IsInterval) return a.IntervalMinutes == b.IntervalMinutes;
+            return a.Time == b.Time;
+        }
+        public static string Remaining(DateTime now, DateTime due) {
+            long seconds = (long)Math.Ceiling(Math.Max(0, (due-now).TotalSeconds));
+            return (seconds / 3600).ToString("00") + "시간 " + (seconds / 60 % 60).ToString("00") + "분 " + (seconds % 60).ToString("00") + "초";
+        }
+        public static DateTime? NextDue(Reminder item, DateTime now, DateTime previous, DateTime started, bool seen, DateTime? interval, double idle, out string state) {
+            state = "다음 알림";
+            if (!item.Enabled) { state = "알림 꺼짐"; return null; }
+            DateTime date; TimeSpan time;
+            if (item.IsDate) {
+                if (!TryDate(item.Date, out date)) { state = "날짜를 선택하세요"; return null; }
+                if (date < now.Date) { state = "지난 날짜 · 알림 종료"; return null; }
+                if (!item.HasTime) {
+                    if (DateDue(item, now, started, seen)) return now;
+                    state = date == now.Date && seen ? "이번 실행에서 알림 완료" : item.Date + " 프로그램 시작 시";
+                    return null;
+                }
+                if (!TryTime(item.Time, out time)) { state = "시간을 확인하세요"; return null; }
+                if (item.LastFired == DateKey(item)) { state = "알림 완료"; return null; }
+                return date.Add(time) > now ? date.Add(time) : now;
+            }
+            if (item.SelectedDays == 0) { state = "반복 요일 미선택"; return null; }
+            if (item.IsInterval) {
+                if (!OnDay(item, now)) { state = "오늘은 반복 요일이 아니에요"; return null; }
+                if (item.PauseWhenIdle && idle >= 300) { state = "자리 비움 · 입력 재개 후 계산"; return null; }
+                if (!item.ActivityAllows(now, idle)) { state = "활동 시간 밖 · 복귀 후 계산"; return null; }
+                if (!interval.HasValue) { state = "간격 알림 준비 중"; return null; }
+                return interval.Value > now ? interval.Value : now;
+            }
+            DateTime missed;
+            if (TryDue(item, previous, now, out missed)) return now;
+            if (!TryTime(item.Time, out time)) { state = "시간을 확인하세요"; return null; }
+            for (int i=0; i<=7; i++) {
+                DateTime candidate = now.Date.AddDays(i).Add(time);
+                if (candidate >= now && OnDay(item, candidate) && item.LastFired != candidate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) return candidate;
+            }
+            state = "다음 일정 없음"; return null;
+        }
         public static bool TryTime(string value, out TimeSpan time) {
             return TimeSpan.TryParseExact(value == null ? "" : value.Trim(), @"hh\:mm", CultureInfo.InvariantCulture, out time)
                 && time >= TimeSpan.Zero && time < TimeSpan.FromDays(1);

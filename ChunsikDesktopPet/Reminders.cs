@@ -152,6 +152,28 @@ namespace ChunsikDesktop {
             foreach (NoticeGroup group in active) if (group.Contains(pet)) return true;
             return false;
         }
+        public bool HasWaitingNotices { get { return queue.Count > 0; } }
+        string Countdown(string id, DateTime now, out string detail) {
+            detail = "PC의 로컬 날짜와 시간을 기준으로 계산합니다.";
+            Reminder item = settings.Items.Find(delegate(Reminder r) { return r.Id == id; });
+            if (item == null) return "저장 후 계산";
+            if (!item.Enabled) return "알림 꺼짐";
+            foreach (NoticeGroup group in active) if (group.Data.ReminderId == id)
+                return PresentationPolicy.IsSuppressed ? "방해 금지 · 표시 일시 중지" : "지금 알림 표시 중";
+            foreach (NoticeData pending in queue) if (pending.ReminderId == id)
+                return PresentationPolicy.IsSuppressed ? "방해 금지 · 알림 대기" : "앞선 알림 종료 후 표시";
+            foreach (Snooze later in snoozes) if (later.Notice.ReminderId == id) {
+                detail = "다시 알림: " + later.Due.ToString("yyyy-MM-dd HH:mm:ss");
+                return "다시 알림 · " + ReminderRules.Remaining(now, later.Due);
+            }
+            DateTime interval; DateTime? nextInterval = intervalDue.TryGetValue(id, out interval) ? (DateTime?)interval : null;
+            string state;
+            DateTime? due = ReminderRules.NextDue(item, now, lastCheck, sessionStarted, dateSeen.Contains(item.Id + ":" + item.Date), nextInterval,
+                PetPreferences.Current == null ? 0 : PetPreferences.Current.InputIdleSeconds, out state);
+            if (!due.HasValue) return state;
+            detail = "다음 예정: " + due.Value.ToString("yyyy-MM-dd (ddd) HH:mm:ss") + " · PC 로컬 시간";
+            return (PresentationPolicy.IsSuppressed ? "방해 금지 · 예정 " : "다음 알림 · ") + ReminderRules.Remaining(now, due.Value);
+        }
         public List<Rect> VisibleBounds() {
             List<Rect> result = new List<Rect>();
             foreach (NoticeGroup group in active) group.AddBounds(result);
@@ -318,7 +340,7 @@ namespace ChunsikDesktop {
         void Enqueue(NoticeData data, bool sound) {
             if (stopping || data.Messages == null || data.Messages.Count == 0) return;
             if (data.Interval && !String.IsNullOrEmpty(data.ReminderId)) {
-                foreach (NoticeGroup group in active) if (group.Data.ReminderId == data.ReminderId) return;
+                // Allow one pending recurrence even while its previous bubble is still open.
                 foreach (NoticeData waiting in queue) if (waiting.ReminderId == data.ReminderId) return;
                 foreach (Snooze later in snoozes) if (later.Notice.ReminderId == data.ReminderId) return;
             }
@@ -396,6 +418,8 @@ namespace ChunsikDesktop {
             intro.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent });
             intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 18) });
             intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 12) });
+            TextBlock schedulerClock = new TextBlock { Foreground = Accent, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10), ToolTip = TimeZoneInfo.Local.DisplayName };
+            intro.Children.Add(schedulerClock);
             TextBlock status = new TextBlock { Text = "모든 변경사항 저장됨", Foreground = Accent, Margin = new Thickness(0, 12, 0, 0) };
             StackPanel options = new StackPanel { Margin = new Thickness(0, 14, 0, 0) }; DockPanel.SetDock(options, Dock.Bottom); root.Children.Add(options);
             WrapPanel timing = new WrapPanel(); options.Children.Add(timing);
@@ -406,6 +430,17 @@ namespace ChunsikDesktop {
             NumberField snooze = new NumberField(settings.SnoozeMinutes, 1440, "다시 알림 분"); timing.Children.Add(snooze);
             timing.Children.Add(new TextBlock { Text = " 분 (1~1440)", VerticalAlignment = VerticalAlignment.Center }); options.Children.Add(status);
             DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
+            Dictionary<string, TextBlock> countdowns = new Dictionary<string, TextBlock>();
+            DispatcherTimer countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            Action refreshCountdowns = delegate {
+                DateTime now = DateTime.Now;
+                schedulerClock.Text = "PC 현재 시간 · " + now.ToString("yyyy-MM-dd (ddd) HH:mm:ss");
+                foreach (KeyValuePair<string, TextBlock> pair in countdowns) {
+                    string detail;
+                    if (debounce.IsEnabled) pair.Value.Text = "변경사항 저장 후 계산…";
+                    else { pair.Value.Text = Countdown(pair.Key, now, out detail); pair.Value.ToolTip = detail; }
+                }
+            };
             Func<bool> save = delegate {
                 debounce.Stop(); int minutes = snooze.Value;
                 if (seconds.Value < 3) { status.Text = "문구 전환 시간은 3~60초로 입력해 주세요."; status.Foreground = Brushes.Firebrick; return false; }
@@ -417,13 +452,16 @@ namespace ChunsikDesktop {
                     DateTime selectedDate;
                     if (row.IsDate && !ReminderRules.TryDate(row.Date, out selectedDate)) { status.Text = "특정 날짜 알림은 날짜를 반드시 선택해 주세요."; status.Foreground = Brushes.Firebrick; return false; }
                     Reminder copy = row.Copy(); copy.Title = copy.Title.Trim();
-                    foreach (Reminder live in settings.Items) if (live.Id == copy.Id) copy.LastFired = live.LastFired;
+                    foreach (Reminder live in settings.Items) if (live.Id == copy.Id)
+                        copy.LastFired = ReminderRules.SameSchedule(live, copy) ? live.LastFired : "";
                     updated.Items.Add(copy);
                 }
                 EnsureBuiltins(updated);
                 try { Write(updated); } catch (Exception ex) { status.Text = "저장 실패: " + ex.Message; status.Foreground = Brushes.Firebrick; return false; }
+                foreach (Reminder next in updated.Items) foreach (Reminder prior in settings.Items)
+                    if (next.Id == prior.Id && !ReminderRules.SameSchedule(prior, next)) dateSeen.RemoveWhere(delegate(string key) { return key.StartsWith(next.Id + ":", StringComparison.Ordinal); });
                 ResetIntervals(updated, settings, DateTime.Now);
-                settings = updated; status.Text = "모든 변경사항 저장됨"; status.Foreground = Accent; return true;
+                settings = updated; status.Text = "모든 변경사항 저장됨"; status.Foreground = Accent; refreshCountdowns(); return true;
             };
             Action changed = delegate { status.Text = "변경사항 저장 중…"; status.Foreground = Accent; debounce.Stop(); debounce.Start(); };
             debounce.Tick += delegate { save(); };
@@ -434,7 +472,7 @@ namespace ChunsikDesktop {
             root.Children.Add(new Border { CornerRadius = new CornerRadius(14), Background = Brushes.White, BorderBrush = Line, BorderThickness = new Thickness(1), Padding = new Thickness(10), Child = scroll });
             Action render = null;
             render = delegate {
-                table.Children.Clear();
+                table.Children.Clear(); countdowns.Clear();
                 DockPanel toolbar = new DockPanel { Margin = new Thickness(4, 0, 4, 8) };
                 Button add = Pill("＋ 알림 추가", delegate { rows.Add(new Reminder()); render(); changed(); scroll.ScrollToBottom(); });
                 DockPanel.SetDock(add, Dock.Right); toolbar.Children.Add(add);
@@ -453,6 +491,8 @@ namespace ChunsikDesktop {
                     if (row.IsBuiltin) titleArea.Children.Add(new TextBlock { Text = "기본 알림", FontSize = 10, Foreground = Accent });
                     TextBox title = new TextBox { Text = row.Title, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(2, 4, 2, 4), FontSize = 14 };
                     title.TextChanged += delegate { row.Title = title.Text; changed(); }; titleArea.Children.Add(title); Cell(line, titleArea, 1);
+                    TextBlock countdown = new TextBlock { FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Accent, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 4, 0, 4) };
+                    titleArea.Children.Add(countdown); countdowns[row.Id] = countdown;
                     StackPanel schedule = new StackPanel();
                     StackPanel segments = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 7) };
                     string[] types = { "time", "interval", "date" }, labels = { "매주 시각", "일정 간격", "특정 날짜" };
@@ -502,9 +542,9 @@ namespace ChunsikDesktop {
                     remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); Cell(line, actions, 6);
                 }
             };
-            render();
+            render(); refreshCountdowns(); countdownTimer.Tick += delegate { refreshCountdowns(); }; countdownTimer.Start();
             win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !save()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "저장 확인"); } };
-            win.Closed += delegate { debounce.Stop(); editor = null; }; SettingsHub.Attach(win, "알림", save);
+            win.Closed += delegate { debounce.Stop(); countdownTimer.Stop(); editor = null; }; SettingsHub.Attach(win, "알림", save);
         }
         sealed class MessageDraft { public string Text; }
         void EditActivity(Window owner, Reminder row, Action changed) {
@@ -625,6 +665,8 @@ namespace ChunsikDesktop {
                 if (elapsed.Elapsed.TotalSeconds >= Math.Max(3, data.Seconds) && start + shown < data.Messages.Count) {
                     start += shown; ShowBatch(); return;
                 }
+                // A final bubble may stay open, but must not block later scheduled alarms indefinitely.
+                if (elapsed.Elapsed.TotalSeconds >= Math.Max(3, data.Seconds) && ReminderService.Current.HasWaitingNotices) { Close(); return; }
                 Layout();
             };
         }

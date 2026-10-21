@@ -36,6 +36,38 @@ internal static class ScheduleTests {
         Check(ReminderRules.DateDue(r,D(21,12,0),D(21,9,0),false), "timed date boundary");
         r.LastFired = ReminderRules.DateKey(r);
         Check(!ReminderRules.DateDue(r,D(21,12,1),D(21,9,0),false), "timed date persists deduplication");
+        Reminder daily = new Reminder { Time = "12:00", Days = 127, LastFired = "2026-10-21" };
+        Reminder edited = daily.Copy(); edited.Time = "12:02";
+        Check(!ReminderRules.SameSchedule(daily, edited), "editing fired time invalidates old occurrence");
+        edited.LastFired = ReminderRules.SameSchedule(daily, edited) ? daily.LastFired : "";
+        Check(ReminderRules.TryDue(edited,D(21,12,1),D(21,12,2),out due), "edited alarm fires again same day");
+        Reminder textEdit = daily.Copy(); textEdit.Title = "renamed";
+        Check(ReminderRules.SameSchedule(daily,textEdit), "message/title edits preserve deduplication");
+        string state; DateTime? next;
+        next = ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,null,0,out state);
+        Check(next == D(22,12,0), "already fired today countdown chooses tomorrow");
+        daily.LastFired = "";
+        next = ReminderRules.NextDue(daily,D(21,11,59),D(21,11,59),D(21,9,0),false,null,0,out state);
+        Check(next == D(21,12,0), "countdown uses scheduled local time");
+        Check(ReminderRules.Remaining(D(21,11,59),next.Value)=="00시간 01분 00초", "minute countdown");
+        Check(ReminderRules.Remaining(D(21,11,0),D(23,12,0))=="49시간 00분 00초", "countdown hours include days");
+        Check(ReminderRules.Remaining(D(21,12,0),D(21,11,0))=="00시간 00분 00초", "countdown never negative");
+        daily.Days = 62;
+        next = ReminderRules.NextDue(daily,D(23,13,0),D(23,13,0),D(21,9,0),false,null,0,out state);
+        Check(next == D(26,12,0), "countdown skips weekend");
+        daily.Days = 0;
+        Check(!ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,null,0,out state).HasValue && state.Contains("요일"), "no weekday explains missing alarm");
+        daily.Days = 127; daily.Enabled = false;
+        Check(!ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,null,0,out state).HasValue && state.Contains("꺼짐"), "disabled countdown");
+        daily.Enabled = true; daily.ScheduleType = "interval";
+        next = ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,D(21,11,23),0,out state);
+        Check(next == D(21,11,23), "interval countdown uses actual running deadline");
+        daily.PauseWhenIdle = true;
+        Check(!ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,D(21,11,23),300,out state).HasValue && state.Contains("자리 비움"), "idle explains paused countdown");
+        daily.ScheduleType = "date"; daily.Date = "2026-10-22"; daily.HasTime = false;
+        Check(!ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,null,0,out state).HasValue && state.Contains("시작 시"), "untimed date has no invented midnight deadline");
+        daily.HasTime = true; daily.Time = "13:00";
+        Check(ReminderRules.NextDue(daily,D(21,11,0),D(21,11,0),D(21,9,0),false,null,0,out state)==D(22,13,0), "timed date countdown");
         Console.WriteLine("PASS: " + count + " scheduling assertions");
     }
 }
