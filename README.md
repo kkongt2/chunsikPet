@@ -1,7 +1,7 @@
 # 춘식이 데스크톱 펫
 
 Windows 작업표시줄 위의 캐릭터, 알림, 포스트잇, 타이머·스톱워치 프로그램입니다.
-만든이: **kkongt2.kang** · 현재 버전: **1.40.1**
+만든이: **kkongt2.kang** · 현재 버전: **1.40.2**
 
 ## Visual Studio에서 EXE 빌드
 
@@ -73,6 +73,14 @@ msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
 버전은 `VERSION`, 실행 파일 속성, 프로그램 정보, [CHANGELOG.md](CHANGELOG.md)에 기록합니다. 새 기능은 마이너 버전, 호환성을 유지하는 수정은 패치 버전을 올립니다.
 
 GitHub Actions에서 Windows Release 빌드와 스케줄 테스트를 실행하고, 성공한 실행의 **Artifacts → ChunsikPet-Windows-x64**에서 EXE를 받을 수 있습니다.
+
+### 수동으로 GitHub Release 게시
+
+1. **Actions → Publish latest Windows EXE → Run workflow**에서 **main**을 선택해 실행합니다.
+2. 실행 시점의 `main` 최신 커밋과 `VERSION`을 읽습니다. Windows x64 EXE 빌드와 스케줄 테스트가 통과하면 `v버전` 태그, 변경 내역을 담은 Release 게시글, 첨부 파일 **ChunsikPet.exe**를 만들고 Latest로 지정합니다.
+3. 같은 태그의 Release가 이미 있으면 초안을 포함해 빌드·게시를 건너뜁니다. 기존 태그는 덮어쓰지 않으며, 태그만 존재하고 다른 커밋을 가리키면 오류로 중단합니다.
+
+별도 토큰 설정 없이 워크플로의 `GITHUB_TOKEN`을 사용합니다. 게시 중 업로드에 실패하면 Release는 초안으로 남습니다. 재시도하려면 실패한 초안을 삭제한 후 다시 실행하세요. 공개된 기존 Release는 수정하지 않습니다. 새 버전은 `VERSION`과 `Program.cs`의 두 버전 특성을 함께 변경해야 합니다.
 
 검증 범위와 수동 절차: [tests/WINDOWS-CHECKLIST.md](tests/WINDOWS-CHECKLIST.md). 물리 화면·절전·보안 제품 판정은 자동 테스트로 보장하지 않습니다.
 
