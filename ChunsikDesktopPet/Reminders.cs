@@ -584,6 +584,7 @@ namespace ChunsikDesktop {
                     Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; Cell(line, edit, 5);
                     StackPanel actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                     actions.Children.Add(Pill("▶ 보기", delegate { PreviewUI.Reminder(win, row, delegate { return seconds.Value; }); }));
+                    actions.Children.Add(Pill("테스트 알림", delegate { Test(); }));
                     Button remove = Pill(row.IsBuiltin ? "기본" : "삭제", delegate { if (row.IsBuiltin) return; rows.Remove(row); render(); changed(); });
                     remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); Cell(line, actions, 6);
                 }

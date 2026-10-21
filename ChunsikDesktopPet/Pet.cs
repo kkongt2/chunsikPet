@@ -536,11 +536,10 @@ namespace ChunsikDesktop {
             speeds.Items.Add(Item("느리게", delegate { PetPreferences.Current.SetSpeed(22); }));
             speeds.Items.Add(Item("보통", delegate { PetPreferences.Current.SetSpeed(44); }));
             speeds.Items.Add(Item("빠르게", delegate { PetPreferences.Current.SetSpeed(80); })); menu.Items.Add(speeds);
-            menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
+            menu.Items.Add(Item("설정 열기", delegate { PetPreferences.Current.OpenSettings(); }));
             menu.Items.Add(Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("알림 설정 (점심·퇴근·사용자 지정)", delegate { ReminderService.Current.OpenSettings(); }));
-            menu.Items.Add(Item("테스트 알림", delegate { ReminderService.Current.Test(); }));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("이 춘식이 종료", delegate { PetPreferences.Current.ChangeCount(Pets.Count - 1, this); }));
             menu.Items.Add(Item("모두 종료", delegate { Quit(); }));

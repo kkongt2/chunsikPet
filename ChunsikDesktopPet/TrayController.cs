@@ -45,6 +45,13 @@ namespace ChunsikDesktop {
             System.Windows.Forms.ToolStripMenuItem result = new System.Windows.Forms.ToolStripMenuItem(label);
             result.Click += delegate { Dispatch(action); }; return result;
         }
+        System.Windows.Forms.ToolStripItem Take(string label) {
+            foreach (System.Windows.Forms.ToolStripItem item in Items(menu)) if (item.Text == label) { menu.Items.Remove(item); return item; }
+            throw new InvalidOperationException(label);
+        }
+        static System.Collections.Generic.IEnumerable<System.Windows.Forms.ToolStripItem> Items(System.Windows.Forms.ContextMenuStrip source) {
+            foreach (System.Windows.Forms.ToolStripItem item in source.Items) yield return item;
+        }
         public TrayController() {
             SettingsHub.About = ShowAbout;
             icon = MakeIcon(PetWindow.TrayImage);
@@ -94,6 +101,16 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("설정 백업 복원", SettingsBackup.Import));
             menu.Items.Add(Item("프로그램 정보", ShowAbout));
             menu.Items.Add(Item("춘식이 모두 종료", delegate { PetWindow.Quit(); }));
+            // Keep frequent actions at the top; reuse the same handlers inside submenus.
+            System.Windows.Forms.ToolStripMenuItem appearance = new System.Windows.Forms.ToolStripMenuItem("모양 · 움직임");
+            System.Windows.Forms.ToolStripMenuItem tools = new System.Windows.Forms.ToolStripMenuItem("도구");
+            System.Windows.Forms.ToolStripMenuItem management = new System.Windows.Forms.ToolStripMenuItem("관리");
+            foreach (System.Windows.Forms.ToolStripItem item in new System.Windows.Forms.ToolStripItem[] { sizes, speeds, transparency, avoid, pause, add }) { menu.Items.Remove(item); appearance.DropDownItems.Add(item); }
+            foreach (string label in new string[] { "스톱워치 · 전담 춘식이", "알림 이력 · 놓친 알림" }) tools.DropDownItems.Add(Take(label));
+            foreach (string label in new string[] { "설정 백업 내보내기", "설정 백업 복원", "프로그램 정보" }) management.DropDownItems.Add(Take(label));
+            System.Windows.Forms.ToolStripItem todo = Take("포스트잇 · 할 일 등록/관리"), timerItem = Take("타이머 · 전담 춘식이"), settingsItem = Take("설정 열기"), exit = Take("춘식이 모두 종료");
+            foreach (System.Windows.Forms.ToolStripItem item in new System.Collections.Generic.List<System.Windows.Forms.ToolStripItem>(Items(menu))) menu.Items.Remove(item);
+            menu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { quiet, todo, timerItem, settingsItem, new System.Windows.Forms.ToolStripSeparator(), appearance, tools, management, new System.Windows.Forms.ToolStripSeparator(), exit });
             menu.Opening += delegate {
                 quiet.Text = "방해 금지 · " + PresentationPolicy.Status; fullscreen.Checked = PresentationPolicy.FullscreenEnabled;
                 avoid.Checked = PetPreferences.Current.Options.AvoidCursor;
