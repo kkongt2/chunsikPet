@@ -20,11 +20,13 @@ namespace ChunsikDesktop {
         public int DisplaySeconds { get; set; }
         public string Color { get; set; }
         public int FontSize { get; set; }
+        public double NoteOpacity { get; set; }
+        public bool AvoidCursor { get; set; }
         public double NoteWidth { get; set; }
         public double NoteHeight { get; set; }
-        public TodoItem() { Id = Guid.NewGuid().ToString("N"); Text = ""; Pinned = true; Peek = true; Always = true; EveryMinutes = 60; DisplaySeconds = 20; Color = "#FFE894"; FontSize = 17; NoteWidth = 260; NoteHeight = 280; }
+        public TodoItem() { Id = Guid.NewGuid().ToString("N"); Text = ""; Pinned = true; Peek = true; Always = true; EveryMinutes = 60; DisplaySeconds = 20; Color = "#FFE894"; FontSize = 17; NoteOpacity = 1; AvoidCursor = true; NoteWidth = 260; NoteHeight = 280; }
         public static bool ValidAppearance(TodoItem item) {
-            return item.FontSize >= 10 && item.FontSize <= 64 && item.NoteWidth >= 220 && item.NoteWidth <= 1200 && item.NoteHeight >= 200 && item.NoteHeight <= 1200;
+            return item.NoteOpacity >= 0.2 && item.NoteOpacity <= 1 && item.FontSize >= 10 && item.FontSize <= 64 && item.NoteWidth >= 220 && item.NoteWidth <= 1200 && item.NoteHeight >= 200 && item.NoteHeight <= 1200;
         }
     }
     public class TodoSettings {
