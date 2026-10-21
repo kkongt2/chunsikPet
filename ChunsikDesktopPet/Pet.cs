@@ -15,6 +15,8 @@ namespace ChunsikDesktop {
         static readonly Random Rng = new Random();
         static readonly List<PetWindow> Pets = new List<PetWindow>();
         static BitmapSource[] frames;
+        static ImageSource[] seatedScootFrames;
+        bool scooting;
         static BitmapSource[] reactionFrames;
         static BitmapSource[] noticeFrames;
         static BitmapSource[] waterFrames;
@@ -114,6 +116,38 @@ namespace ChunsikDesktop {
                 frames[k].Freeze(); maxW = Math.Max(maxW, frames[k].PixelWidth); maxH = Math.Max(maxH, frames[k].PixelHeight);
             }
         }
+
+        // Reuse the seated sprite at its original resolution. Only the two feet
+        // deform sideways; the head, arms and contact height stay fixed.
+        static void BuildSeatedScootFrames() {
+            BitmapSource seated = frames[6]; double w = seated.PixelWidth, h = seated.PixelHeight;
+            seatedScootFrames = new ImageSource[12];
+            for (int i = 0; i < seatedScootFrames.Length; i++) {
+                double wave = Math.Sin(i * Math.PI * 2 / seatedScootFrames.Length);
+                DrawingGroup drawing = new DrawingGroup();
+                using (DrawingContext dc = drawing.Open()) {
+                    Rect full = new Rect(0, 0, w, h);
+                    // A transparent full-size drawing keeps every frame's layout identical.
+                    dc.DrawRectangle(Brushes.Transparent, null, full);
+                    double seam = h * 0.80, middle = w * 0.5;
+                    for (int foot = 0; foot < 2; foot++) {
+                        double x = foot == 0 ? 0 : middle;
+                        dc.PushClip(new RectangleGeometry(new Rect(x, seam, w * 0.5, h - seam)));
+                        dc.PushTransform(new ScaleTransform(1 + wave * (foot == 0 ? 0.09 : -0.09), 1, middle, seam));
+                        dc.DrawImage(seated, full); dc.Pop(); dc.Pop();
+                    }
+                    // Slight overlap hides the cut while leaving the seated body untouched.
+                    dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, seam + 1.5)));
+                    dc.DrawImage(seated, full); dc.Pop();
+                }
+                drawing.Freeze(); DrawingImage image = new DrawingImage(drawing); image.Freeze(); seatedScootFrames[i] = image;
+            }
+        }
+        void ShowSeatedScoot(double now) {
+            SetFrame(6); picture.Source = seatedScootFrames[(int)(now * 18) % seatedScootFrames.Length];
+            scooting = true; flip.ScaleX = flip.ScaleY = 1; squirm.Angle = 0; hop.X = hop.Y = 0;
+        }
+        void StopSeatedScoot() { if (scooting) SetFrame(6); }
 
         static void LoadSleepingFrame(string path) {
             if (!File.Exists(path)) { sleepingFrame = frames[5]; return; }
@@ -324,7 +358,7 @@ namespace ChunsikDesktop {
         }
         static double Clamp(double n, double lo, double hi) { return Math.Max(lo, Math.Min(Math.Max(lo, hi), n)); }
         void SetFrame(int index) {
-            frame = index;
+            scooting = false; frame = index;
             picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
             picture.Width = size * frames[index].PixelWidth / maxH;
             picture.Height = size * frames[index].PixelHeight / maxH;
@@ -399,8 +433,8 @@ namespace ChunsikDesktop {
                 if (frame != 7) SetFrame(7); return;
             }
             if (TodoService.Current != null && TodoService.Current.IsHoldingFor(this)) { if (frame != 4) SetFrame(4); return; }
+            if (EvadeCursor(now, dt, paused || state == 2)) return;
             if (paused) { if (frame != 6) SetFrame(6); return; }
-            if (EvadeCursor(now, dt)) return;
             Rect area = WorkArea();
             Top = area.Bottom - Height;
             if (now >= stateEnd) ChooseState();
@@ -411,8 +445,8 @@ namespace ChunsikDesktop {
                 if (now >= nextFrame) { SetFrame((frame + 1) % 4); nextFrame = now + 0.14; }
             } else if (state == 1) SetFrame(now % 4 > 3.65 ? 5 : 4);
         }
-        bool EvadeCursor(double now, double dt) {
-            if (IsTodoCompanion || PetPreferences.Current == null || !PetPreferences.Current.Options.AvoidCursor) { fleeUntil = 0; return false; }
+        bool EvadeCursor(double now, double dt, bool seated) {
+            if (IsTodoCompanion || PresentationPolicy.IsSuppressed || PetPreferences.Current == null || !PetPreferences.Current.Options.AvoidCursor) { fleeUntil = 0; StopSeatedScoot(); return false; }
             System.Drawing.Point screen = System.Windows.Forms.Cursor.Position;
             Point cursor = PointFromScreen(new Point(screen.X, screen.Y));
             double dx = Math.Max(0, Math.Max(-cursor.X, cursor.X - Width));
@@ -425,10 +459,13 @@ namespace ChunsikDesktop {
                 else if (fleeDirection > 0 && Left + Width >= area.Right - 2) fleeDirection = -1;
                 fleeUntil = now + 0.35;
             }
-            if (now >= fleeUntil) return false;
+            if (now >= fleeUntil) { StopSeatedScoot(); return false; }
             direction = fleeDirection;
-            Left = Clamp(Left + direction * Math.Max(240, speed * 4) * dt, area.Left, area.Right - Width);
+            // Seated pets scoot slowly instead of switching to the walking animation.
+            double escapeSpeed = seated ? Math.Max(48, Math.Min(90, size * 0.65)) : Math.Max(240, speed * 4);
+            Left = Clamp(Left + direction * escapeSpeed * dt, area.Left, area.Right - Width);
             Top = area.Bottom - Height;
+            if (seated) { state = 2; stateEnd = now + 0.8; ShowSeatedScoot(now); return true; }
             state = 1; stateEnd = now + 0.5;
             if (now >= nextFrame) { SetFrame(frame < 4 ? (frame + 1) % 4 : 0); nextFrame = now + 0.07; }
             return true;
@@ -543,6 +580,7 @@ namespace ChunsikDesktop {
             LoadFrames(Path.Combine(folder, "chunsik-tickle.png"));
             reactionFrames = frames;
             LoadFrames(Path.Combine(folder, "chunsik-sprites.png"));
+            BuildSeatedScootFrames();
             LoadSleepingFrame(Path.Combine(folder, "chunsik-sleep.png"));
             TodoNote.LoadArt(folder);
             Application app = new Application(); app.ShutdownMode = ShutdownMode.OnExplicitShutdown;

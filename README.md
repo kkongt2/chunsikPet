@@ -1,7 +1,7 @@
 # 춘식이 데스크톱 펫
 
 Windows 작업표시줄 위의 캐릭터, 알림, 포스트잇, 타이머·스톱워치 프로그램입니다.
-만든이: **kkongt2.kang** · 현재 버전: **1.39.1**
+만든이: **kkongt2.kang** · 현재 버전: **1.40.0**
 
 ## Visual Studio에서 EXE 빌드
 
@@ -75,3 +75,7 @@ msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
 GitHub Actions에서 Windows Release 빌드와 스케줄 테스트를 실행하고, 성공한 실행의 **Artifacts → ChunsikPet-Windows-x64**에서 EXE를 받을 수 있습니다.
 
 검증 범위와 수동 절차: [tests/WINDOWS-CHECKLIST.md](tests/WINDOWS-CHECKLIST.md). 물리 화면·절전·보안 제품 판정은 자동 테스트로 보장하지 않습니다.
+
+## 앉은 자세 마우스 회피 (1.40.0)
+
+마우스 피하기 ON 상태에서 ‘모두 잠깐 쉬기’ 또는 캐릭터의 ‘잠깐 쉬기’를 켜도 커서를 피합니다. 자동으로 앉아 쉬던 캐릭터에도 적용됩니다. 상체를 세운 앉은 자세와 바닥 접촉 높이를 유지하고 양쪽 발만 움직이며 천천히 이동합니다. 커서가 멀어지거나 마우스 피하기를 끄면 이동을 멈추며, 수동 쉬기는 해제하지 않습니다. 알림 모션·드래그·수면 중 회피 제외 규칙은 유지합니다.
