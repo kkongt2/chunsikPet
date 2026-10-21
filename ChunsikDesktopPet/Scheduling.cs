@@ -55,6 +55,10 @@ namespace ChunsikDesktop {
         }
     }
     public static class ReminderRules {
+        public static string IntervalLabel(int minutes) {
+            if (minutes < 60) return minutes + "분 간격";
+            return (minutes / 60) + "시간" + (minutes % 60 == 0 ? "" : " " + (minutes % 60) + "분") + " 간격";
+        }
         public static bool SameSchedule(Reminder a, Reminder b) {
             if (a.ScheduleType != b.ScheduleType) return false;
             if (a.IsDate) return a.Date == b.Date && a.HasTime == b.HasTime && (!a.HasTime || a.Time == b.Time);

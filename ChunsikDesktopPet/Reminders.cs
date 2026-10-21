@@ -291,7 +291,7 @@ namespace ChunsikDesktop {
             }
         }
         NoticeData FromReminder(Reminder item) {
-            return new NoticeData { BubbleColor = item.BubbleColor, ReminderId = item.Id, Interval = item.IsInterval, Kind = item.Kind, Label = (item.IsDate ? item.Date + (item.HasTime ? " " + item.Time : " · 시작할 때") : item.IsInterval ? (item.IntervalMinutes / 60) + "시간 " + (item.IntervalMinutes % 60) + "분 간격" : item.Time) + " · " + item.Title, Messages = item.GetMessages(), Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes };
+            return new NoticeData { BubbleColor = item.BubbleColor, ReminderId = item.Id, Interval = item.IsInterval, Kind = item.Kind, Label = (item.IsDate ? item.Date + (item.HasTime ? " " + item.Time : " · 시작할 때") : item.IsInterval ? ReminderRules.IntervalLabel(item.IntervalMinutes) : item.Time) + " · " + item.Title, Messages = item.GetMessages(), Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes };
         }
         void Check() {
             DateTime now = DateTime.Now, lastBeforeCheck = lastCheck;
@@ -764,7 +764,7 @@ namespace ChunsikDesktop {
         public NoticeWindow(NoticeData data, int index, PetWindow pet, Action snooze, Action dismiss) {
             Pet = pet;
             Closed += delegate { if (!batchClosing) dismiss(); };
-            Title = "춘식이 말풍선"; Width = 310; SizeToContent = SizeToContent.Height;
+            Title = "춘식이 말풍선"; Width = 370; SizeToContent = SizeToContent.Height;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true; Background = Brushes.Transparent; Topmost = true;
             ShowInTaskbar = false; ShowActivated = false;
@@ -779,12 +779,16 @@ namespace ChunsikDesktop {
             stack.Children.Add(scroll);
             DockPanel controls = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
             controls.Children.Add(new TextBlock { Text = (index + 1) + " / " + data.Messages.Count, VerticalAlignment = VerticalAlignment.Center, FontSize = 11, Foreground = Brushes.DimGray });
-            StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            Button later = new Button { Content = data.SnoozeMinutes + "분 뒤", ToolTip = "전체 메시지를 " + data.SnoozeMinutes + "분 뒤 다시 알림" };
-            later.Click += delegate { snooze(); };
+            WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
+            ComboBox delay = new ComboBox { Width = 86, FontSize = 14, Margin = new Thickness(4, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "다시 알림까지 기다릴 시간" };
+            List<int> delays = new List<int> { 5, 10, 30 }; if (!delays.Contains(data.SnoozeMinutes)) delays.Add(data.SnoozeMinutes);
+            foreach (int minutes in delays) { ComboBoxItem choice = new ComboBoxItem { Content = minutes + "분 후", Tag = minutes }; delay.Items.Add(choice); if (minutes == data.SnoozeMinutes) delay.SelectedItem = choice; }
+            buttons.Children.Add(delay);
+            Button later = new Button { Content = "다시 알림", ToolTip = "선택한 시간 뒤 전체 메시지를 다시 알려드려요" };
+            later.Click += delegate { data.SnoozeMinutes = (int)((ComboBoxItem)delay.SelectedItem).Tag; snooze(); };
             Button close = new Button { Content = "닫기", ToolTip = "이 알림의 모든 말풍선 닫기" }; close.Click += delegate { dismiss(); };
             foreach (Button button in new Button[] { later, close }) {
-                button.Padding = new Thickness(6, 3, 6, 3); button.Margin = new Thickness(4, 0, 0, 0); button.FontSize = 11; buttons.Children.Add(button);
+                button.Padding = new Thickness(10, 7, 10, 7); button.Margin = new Thickness(4, 0, 0, 0); button.FontSize = 14; buttons.Children.Add(button);
             }
             controls.Children.Add(buttons); stack.Children.Add(controls);
             Canvas tailCanvas = new Canvas { Height = 15, Margin = new Thickness(0, -2, 0, 0) };
