@@ -253,7 +253,7 @@ namespace ChunsikDesktop {
                     opacityRow.Children.Add(opacitySlider); opacityRow.Children.Add(opacityText);
                     opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); };
                     WrapPanel avoidanceRow = SettingRow(cardContent, "커서 피하기");
-                    CheckBox avoidance = new CheckBox { Content = "가까이 오면 돌돌 말아서 이동 (Shift로 잠시 고정)", IsChecked = item.AvoidCursor };
+                    CheckBox avoidance = new CheckBox { Content = "가까이 오면 즉시 빠르게 피하기 (Shift로 잠시 고정)", IsChecked = item.AvoidCursor };
                     avoidanceRow.Children.Add(avoidance); avoidance.Click += delegate { item.AvoidCursor = avoidance.IsChecked == true; changed(); };
                     WrapPanel display = SettingRow(cardContent, "표시 방식");
                     display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));
@@ -296,89 +296,53 @@ namespace ChunsikDesktop {
         bool disposing;
         readonly DispatcherTimer evadeTimer = new DispatcherTimer();
         readonly Stopwatch evadeClock = Stopwatch.StartNew();
-        double nearSince = -1, evadeAfter, evadeStarted;
-        Point evadeOrigin, evadeTarget;
-        ScaleTransform rollScale;
-        TranslateTransform carry;
-        Border rolledPaper;
+        double evadeAfter, lastEvadeTick;
+        Point evadeTarget;
         public bool IsEvading { get; private set; }
         void EvadeTick() {
-            if (disposing || current == null || !IsVisible) return;
             double now = evadeClock.Elapsed.TotalSeconds;
-            if (IsEvading) {
-                double t = now - evadeStarted;
-                // 160 ms roll, 280 ms dash, 160 ms unroll.
-                double fold = t < 0.16 ? t / 0.16 : t < 0.44 ? 1 : Math.Max(0, 1 - (t - 0.44) / 0.16);
-                rollScale.ScaleY = Math.Max(0.035, 1 - fold);
-                noteContent.Opacity = 1 - fold; tape.Opacity = 1 - fold;
-                rolledPaper.Opacity = fold;
-                carry.Y = -Math.Sin(Math.Min(1, Math.Max(0, (t - 0.16) / 0.28)) * Math.PI * 4) * 6;
-                double travel = Math.Max(0, Math.Min(1, (t - 0.16) / 0.28));
-                travel = travel * travel * (3 - 2 * travel);
-                Left = evadeOrigin.X + (evadeTarget.X - evadeOrigin.X) * travel;
-                Top = evadeOrigin.Y + (evadeTarget.Y - evadeOrigin.Y) * travel;
-                if (t >= 0.60) {
-                    CancelEvade(); ClampPosition(WorkingArea()); positionReady = true;
-                    evadeAfter = now + 3; moved(Left, Top);
-                }
+            double dt = Math.Max(0.001, Math.Min(0.05, now - lastEvadeTick)); lastEvadeTick = now;
+            if (disposing || current == null || !IsVisible) return;
+            bool shift = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+            // Keyboard focus and an unrelated settings window must not disable avoidance.
+            // Only actual interaction with this note (or Shift) temporarily holds it still.
+            if (!current.Standalone || !current.AvoidCursor || IsCompleting || IsEditing || IsDragging ||
+                shift || ContextMenu.IsOpen || inlineEditor.IsMouseCaptureWithin ||
+                PresentationPolicy.IsSuppressed || now < evadeAfter) {
+                if (IsEvading) { CancelEvade(); moved(Left, Top); }
                 return;
             }
-            bool shift = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
-            if (!current.Standalone || !current.AvoidCursor || IsCompleting || IsEditing || IsDragging ||
-                shift || ContextMenu.IsOpen || IsKeyboardFocusWithin || System.Windows.Input.Mouse.Captured != null ||
-                System.Windows.Forms.Control.MouseButtons != System.Windows.Forms.MouseButtons.None ||
-                PresentationPolicy.IsSuppressed || (TodoService.Current != null && TodoService.Current.SettingsOpen) || now < evadeAfter) { nearSince = -1; return; }
             System.Drawing.Point screen = System.Windows.Forms.Cursor.Position;
             Point local = PointFromScreen(new Point(screen.X, screen.Y));
-            Rect nearby = new Rect(-36, -36, ActualWidth + 72, ActualHeight + 72);
-            if (!nearby.Contains(local)) { nearSince = -1; return; }
-            if (nearSince < 0) nearSince = now;
-            // Leave enough time for an intentional double-click before fleeing.
-            if (now - nearSince < 0.65) return;
             Point cursor = new Point(Left + local.X, Top + local.Y);
-            Rect area = WorkingArea();
-            Point best = new Point(Left, Top); double bestScore = -1;
-            for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++) {
-                double left = area.Left + Math.Max(0, area.Width - Width) * x / 2;
-                double top = area.Top + Math.Max(0, area.Height - Height) * y / 2;
-                Rect candidate = new Rect(left, top, Width, Height);
-                Rect clearance = candidate; clearance.Inflate(80, 80);
-                if (clearance.Contains(cursor)) continue;
-                bool overlap = false;
+            Rect note = new Rect(Left, Top, ActualWidth, ActualHeight);
+            bool near = TodoAvoidance.Near(note, cursor, 70);
+            if (!IsEvading && !near) return;
+            if (!IsEvading || TodoAvoidance.Near(new Rect(evadeTarget, note.Size), cursor, 80)) {
+                List<Rect> occupied = new List<Rect>();
                 foreach (Window window in Application.Current.Windows) {
                     if (window == this || !window.IsVisible || !(window is TodoNote || window is NoticeWindow)) continue;
-                    if (candidate.IntersectsWith(new Rect(window.Left, window.Top, window.ActualWidth, window.ActualHeight))) { overlap = true; break; }
+                    // Convert every HWND from physical pixels into this window's DIP space.
+                    Rect pixels = ScreenLayout.BoundsPixels(window); if (pixels.IsEmpty) continue;
+                    Point a = PointFromScreen(pixels.TopLeft), b = PointFromScreen(pixels.BottomRight);
+                    occupied.Add(new Rect(new Point(Left + a.X, Top + a.Y), new Point(Left + b.X, Top + b.Y)));
                 }
-                if (overlap) continue;
-                double dx = Math.Max(candidate.Left - cursor.X, Math.Max(0, cursor.X - candidate.Right));
-                double dy = Math.Max(candidate.Top - cursor.Y, Math.Max(0, cursor.Y - candidate.Bottom));
-                double score = dx * dx + dy * dy;
-                if (score > bestScore) { bestScore = score; best = new Point(left, top); }
+                evadeTarget = TodoAvoidance.Target(note, WorkingArea(), cursor, occupied);
             }
-            nearSince = -1;
-            if (bestScore < 0) { evadeAfter = now + 1; return; }
-            evadeOrigin = new Point(Left, Top); evadeTarget = best; evadeStarted = now; IsEvading = true; evadeTimer.Interval = TimeSpan.FromMilliseconds(16);
-            UpdateLayout();
-            // Roll the actual paper towards the mascot, with a shaded cylindrical edge.
-            double anchorY = current.Peek ? 0 : paper.ActualHeight;
-            rollScale = new ScaleTransform(1, 1, 0, anchorY); paper.RenderTransform = rollScale;
-            carry = new TranslateTransform(); mascot.RenderTransform = carry;
-            rolledPaper = new Border { Height = 15, Margin = new Thickness(5, current.Peek ? 20 : 0, 5, current.Peek ? 0 : 94),
-                VerticalAlignment = current.Peek ? VerticalAlignment.Top : VerticalAlignment.Bottom,
-                CornerRadius = new CornerRadius(8), BorderBrush = Brushes.Tan, BorderThickness = new Thickness(1),
-                Background = new LinearGradientBrush(new GradientStopCollection {
-                    new GradientStop(Colors.White, 0), new GradientStop(((SolidColorBrush)paper.Background).Color, 0.4), new GradientStop(Colors.Tan, 1)
-                }, new Point(0, 0), new Point(0, 1)), Opacity = 0, IsHitTestVisible = false };
-            root.Children.Insert(1, rolledPaper); root.IsHitTestVisible = false;
+            Vector delta = evadeTarget - new Point(Left, Top);
+            double distance = delta.Length;
+            if (distance < 1) {
+                if (IsEvading) { CancelEvade(); positionReady = true; moved(Left, Top); }
+                return;
+            }
+            IsEvading = true;
+            // Start moving on the first proximity sample, without roll-up or cooldown.
+            double step = Math.Min(distance, 2200 * dt);
+            Left += delta.X / distance * step; Top += delta.Y / distance * step;
+            ClampPosition(WorkingArea()); positionReady = true;
         }
         void CancelEvade() {
-            if (!IsEvading) return;
-            IsEvading = false; nearSince = -1; evadeTimer.Interval = TimeSpan.FromMilliseconds(80);
-            paper.RenderTransform = Transform.Identity; mascot.RenderTransform = Transform.Identity;
-            noteContent.Opacity = tape.Opacity = 1; root.IsHitTestVisible = true;
-            if (rolledPaper != null) root.Children.Remove(rolledPaper);
-            rolledPaper = null;
-            if (current != null) Update(current);
+            IsEvading = false;
         }
 
         readonly DispatcherTimer swallowTimer = new DispatcherTimer();
@@ -526,9 +490,9 @@ namespace ChunsikDesktop {
                 if (!persist()) current.NoteOpacity = old;
                 Opacity = current.NoteOpacity; opacityMenu.Header = "불투명도 " + Math.Round(Opacity * 100) + "%";
             };
-            PreviewMouseDown += delegate { evadeAfter = evadeClock.Elapsed.TotalSeconds + 2; nearSince = -1; };
-            IsVisibleChanged += delegate { if (IsVisible) { evadeAfter = evadeClock.Elapsed.TotalSeconds + 2; evadeTimer.Start(); } else { CancelEvade(); evadeTimer.Stop(); } };
-            evadeTimer.Interval = TimeSpan.FromMilliseconds(80); evadeTimer.Tick += delegate { EvadeTick(); };
+            PreviewMouseDown += delegate { evadeAfter = evadeClock.Elapsed.TotalSeconds + System.Windows.Forms.SystemInformation.DoubleClickTime / 1000.0 + 0.1; CancelEvade(); };
+            IsVisibleChanged += delegate { if (IsVisible) { lastEvadeTick = evadeClock.Elapsed.TotalSeconds; evadeTimer.Start(); } else { CancelEvade(); evadeTimer.Stop(); } };
+            evadeTimer.Interval = TimeSpan.FromMilliseconds(16); evadeTimer.Tick += delegate { EvadeTick(); };
             System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
             grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
             grip.DragStarted += delegate { resizing = true; EndEdit(true); };
