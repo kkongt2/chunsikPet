@@ -35,6 +35,7 @@ namespace ChunsikDesktop {
         public string Id { get; set; }
         public string Text { get; set; }
         public bool Done { get; set; }
+        public DateTime? CompletedAt { get; set; }
         public bool Dedicated { get; set; }
         public bool Pinned { get; set; }
         public bool Peek { get; set; }
@@ -143,8 +144,15 @@ namespace ChunsikDesktop {
             FinishComplete(item);
         }
         void FinishComplete(TodoItem item) {
-            item.Done = true;
-            if (!Save()) { item.Done = false; return; }
+            DateTime? previousDate = item.CompletedAt; item.Done = true; item.CompletedAt = DateTime.Now;
+            DateTime? completion = item.CompletedAt;
+            if (!Save()) { item.Done = false; item.CompletedAt = previousDate; return; }
+            UndoToast.ShowCompleted(item.Text, delegate {
+                if (!settings.Items.Contains(item) || !item.Done || item.CompletedAt != completion) return;
+                item.Done = false; item.CompletedAt = null;
+                if (!Save()) { item.Done = true; item.CompletedAt = completion; }
+                if (renderEditor != null) renderEditor();
+            });
             if (renderEditor != null) renderEditor();
         }
         public bool IsHoldingFor(PetWindow pet) {
@@ -230,7 +238,7 @@ namespace ChunsikDesktop {
                     StackPanel cardContent = new StackPanel { Margin = new Thickness(18) };
                     Border card = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), BorderBrush = new SolidColorBrush(Color.FromRgb(224, 232, 242)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 0, 14), Child = cardContent }; list.Children.Add(card);
                     DockPanel heading = new DockPanel { Margin = new Thickness(0, 0, 0, item.Done ? 0 : 10) }; cardContent.Children.Add(heading);
-                    Button done = Button(item.Done ? "✓ 완료됨" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else { item.Done = false; changed(); render(); } });
+                    Button done = Button(item.Done ? "✓ 완료됨" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else { item.Done = false; item.CompletedAt = null; changed(); render(); } });
                     done.ToolTip = item.Done ? "다시 할 일로 되돌리기" : "완료 처리하기";
                     if (item.Done) { done.Background = BubblePalette.BrushFor("#D5F3DF"); done.Foreground = Brushes.DarkGreen; }
                     DockPanel.SetDock(done, Dock.Left); heading.Children.Add(done);
@@ -238,7 +246,7 @@ namespace ChunsikDesktop {
                     delete.Background = Brushes.White; delete.Foreground = Brushes.SlateGray; DockPanel.SetDock(delete, Dock.Right); heading.Children.Add(delete);
                     TextBox title = new TextBox { Text = item.Text, FontSize = 17, FontWeight = FontWeights.SemiBold, Padding = new Thickness(10, 8, 5, 8), MaxLength = 160, BorderThickness = new Thickness(0), Foreground = item.Done ? Brushes.Gray : new SolidColorBrush(Color.FromRgb(41, 53, 72)) }; heading.Children.Add(title);
                     title.TextChanged += delegate { item.Text = title.Text; changed(); };
-                    if (item.Done) continue;
+                    if (item.Done) { cardContent.Children.Add(new TextBlock { Text = item.CompletedAt.HasValue ? "완료 · " + item.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm") : "완료 · 날짜 기록 없음", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 6, 0, 0) }); continue; }
                     cardContent.Children.Add(Button("▶ 표시 미리보기", delegate { PreviewUI.Todo(win, item); }));
                     WrapPanel display = SettingRow(cardContent, "표시 방식");
                     display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));

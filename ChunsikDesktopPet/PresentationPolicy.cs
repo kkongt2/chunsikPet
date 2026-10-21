@@ -37,7 +37,7 @@ namespace ChunsikDesktop {
         static void Refresh() {
             IsSuppressed = indefinite || until > DateTime.Now || (FullscreenEnabled && Fullscreen());
             foreach (Window w in Application.Current.Windows) {
-                if (!(w is PetWindow || w is TodoNote || w is NoticeWindow || w is TimeToolWindow)) continue;
+                if (!(w is PetWindow || w is TodoNote || w is NoticeWindow || w is TimeToolWindow || w is UndoToast)) continue;
                 if (IsSuppressed) { if (!hidden.ContainsKey(w)) hidden[w] = w.Opacity; w.Opacity = 0; w.IsHitTestVisible = false; }
                 else if (hidden.ContainsKey(w)) { w.Opacity = hidden[w]; w.IsHitTestVisible = true; hidden.Remove(w); }
             }
