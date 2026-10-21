@@ -4,8 +4,25 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Runtime.InteropServices;
 namespace ChunsikDesktop {
     public static class ScreenLayout {
+        [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+        [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
+        public static Rect BoundsPixels(Window window) {
+            RECT r;
+            if (!GetWindowRect(new WindowInteropHelper(window).Handle, out r)) return Rect.Empty;
+            return new Rect(r.Left, r.Top, Math.Max(0, r.Right-r.Left), Math.Max(0, r.Bottom-r.Top));
+        }
+        public static Rect AreaPixels(Window window) {
+            System.Drawing.Rectangle r = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle).WorkingArea;
+            return new Rect(r.Left, r.Top, r.Width, r.Height);
+        }
+        public static void MovePixels(Window window, double x, double y) {
+            // Coordinates shared by different HWNDs must stay in physical desktop pixels.
+            SetWindowPos(new WindowInteropHelper(window).Handle, IntPtr.Zero, (int)Math.Round(x), (int)Math.Round(y), 0, 0, 0x0015);
+        }
         static DispatcherTimer debounce;
         static readonly HashSet<Window> tracked = new HashSet<Window>();
         static bool started;
@@ -26,7 +43,15 @@ namespace ChunsikDesktop {
         static void Loaded(object sender, RoutedEventArgs args) {
             Window w = sender as Window; if (w == null || tracked.Contains(w)) return; tracked.Add(w);
             HwndSource source = HwndSource.FromHwnd(new WindowInteropHelper(w).Handle);
-            HwndSourceHook hook = delegate(IntPtr hwnd, int message, IntPtr a, IntPtr b, ref bool handled) { if (message == 0x02E0 || message == 0x007E || message == 0x001A) Schedule(); return IntPtr.Zero; };
+            HwndSourceHook hook = delegate(IntPtr hwnd, int message, IntPtr a, IntPtr b, ref bool handled) {
+                // Crossing a DPI boundary is not a display topology change. WPF handles
+                // the window's DPI; never cancel another pet's drag or parachute here.
+                if (message == 0x02E0) w.Dispatcher.BeginInvoke(new Action(delegate {
+                    if (ReminderService.Current != null) ReminderService.Current.LayoutNotices();
+                }), DispatcherPriority.Loaded);
+                else if (message == 0x007E || message == 0x001A) Schedule();
+                return IntPtr.Zero;
+            };
             if (source != null) source.AddHook(hook);
             w.Closed += delegate { tracked.Remove(w); if (source != null && !source.IsDisposed) source.RemoveHook(hook); };
             w.Dispatcher.BeginInvoke(new Action(delegate { Clamp(w); }), DispatcherPriority.Loaded);
@@ -34,7 +59,7 @@ namespace ChunsikDesktop {
         static void DisplayChanged(object sender, EventArgs args) { if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted) Application.Current.Dispatcher.BeginInvoke(new Action(Schedule)); }
         static void Schedule() { if (debounce == null) return; debounce.Stop(); debounce.Start(); }
         public static void Clamp(Window w) {
-            if (!w.IsLoaded || !w.IsVisible || w.WindowState != WindowState.Normal) return;
+            if (!w.IsLoaded || !w.IsVisible || w.WindowState != WindowState.Normal || w is NoticeWindow) return;
             Rect area = AreaFor(w); double width = w.ActualWidth, height = w.ActualHeight;
             if (!(w is PetWindow || w is TodoNote || w is NoticeWindow)) {
                 w.MinWidth = Math.Min(w.MinWidth, Math.Max(100, area.Width - 20)); w.MinHeight = Math.Min(w.MinHeight, Math.Max(80, area.Height - 20));

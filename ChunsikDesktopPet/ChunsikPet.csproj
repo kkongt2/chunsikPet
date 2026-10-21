@@ -43,6 +43,7 @@
     <Compile Include="PreviewUI.cs" />
     <Compile Include="Scheduling.cs" />
     <Compile Include="ScreenLayout.cs" />
+    <Compile Include="NoticePlacement.cs" />
     <Compile Include="SettingsHub.cs" />
     <Compile Include="UndoToast.cs" />
     <Compile Include="SettingsBackup.cs" />

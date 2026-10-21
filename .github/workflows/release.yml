@@ -90,6 +90,10 @@ jobs:
         run: msbuild tests/ScheduleTests.csproj /t:Rebuild /m
       - name: Run scheduling tests
         run: .\tests\bin\ScheduleTests.exe
+      - name: Build multi-monitor placement tests
+        run: msbuild tests/NoticePlacementTests.csproj /t:Rebuild /m
+      - name: Run multi-monitor placement tests
+        run: .\tests\bin\NoticePlacementTests.exe
       - name: Tag, attach EXE and publish release
         uses: actions/github-script@v7
         env:

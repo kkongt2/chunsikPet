@@ -295,7 +295,7 @@ namespace ChunsikDesktop {
 
         Rect WorkArea() { return ScreenLayout.AreaFor(this); }
         public void RecoverDisplay() {
-            if (!IsLoaded || closing) return;
+            if (!IsLoaded || closing || pressed || dragging) return;
             falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
             Rect area = WorkArea(); LayoutPet(); Left = Clamp(Left, area.Left, area.Right - Width); Top = Math.Max(area.Top, area.Bottom - Height);
         }
@@ -475,7 +475,7 @@ namespace ChunsikDesktop {
             if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
             EndPayday(); StopFall(false); StopNoticeAnimation();
             pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
-            down = PointToScreen(e.GetPosition(this)); origin = new Point(Left, Top); CaptureMouse();
+            down = PointToScreen(e.GetPosition(this)); origin = ScreenLayout.BoundsPixels(this).TopLeft; CaptureMouse();
             e.Handled = true;
         }
         void OnMove(object sender, MouseEventArgs e) {
@@ -483,14 +483,15 @@ namespace ChunsikDesktop {
             Point at = PointToScreen(e.GetPosition(this));
             PresentationSource src = PresentationSource.FromVisual(this);
             if (src == null || src.CompositionTarget == null) return;
-            Vector delta = src.CompositionTarget.TransformFromDevice.Transform(at - down);
-            if (!dragging && (Math.Abs(delta.X) >= SystemParameters.MinimumHorizontalDragDistance || Math.Abs(delta.Y) >= SystemParameters.MinimumVerticalDragDistance)) {
+            Vector delta = at - down;
+            Vector localDelta = src.CompositionTarget.TransformFromDevice.Transform(delta);
+            if (!dragging && (Math.Abs(localDelta.X) >= SystemParameters.MinimumHorizontalDragDistance || Math.Abs(localDelta.Y) >= SystemParameters.MinimumVerticalDragDistance)) {
                 dragging = true;
                 EndReaction(); recentClicks.Clear();
                 // Resizing the reaction window must not shift the drag origin.
-                origin = new Point(Left, Top);
+                origin = ScreenLayout.BoundsPixels(this).TopLeft;
             }
-            if (dragging) { Left = origin.X + delta.X; Top = origin.Y + delta.Y; SetFrame(7); }
+            if (dragging) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
         }
         void OnUp(object sender, MouseButtonEventArgs e) {
             if (!pressed) return;
@@ -540,13 +541,20 @@ namespace ChunsikDesktop {
         public static List<PetWindow> SpeechPets() {
             List<PetWindow> result = new List<PetWindow>();
             foreach (PetWindow pet in Pets) if (!pet.closing && pet.IsLoaded) result.Add(pet);
-            result.Sort(delegate(PetWindow a, PetWindow b) { return a.Left.CompareTo(b.Left); });
+            result.Sort(delegate(PetWindow a, PetWindow b) { return ScreenLayout.BoundsPixels(a).Left.CompareTo(ScreenLayout.BoundsPixels(b).Left); });
             return result;
         }
         public bool TrySpeechAnchor(out Rect area, out Point head) {
             area = WorkArea();
             head = new Point(Left + Width / 2, Top + Height - picture.Height);
             return !closing && IsLoaded;
+        }
+        public bool TrySpeechAnchorPixels(out Rect area, out Point head) {
+            area = Rect.Empty; head = new Point();
+            if (closing || !IsLoaded || !IsVisible || PresentationSource.FromVisual(picture) == null) return false;
+            area = ScreenLayout.AreaPixels(this);
+            head = picture.PointToScreen(new Point(picture.ActualWidth / 2, 0));
+            return true;
         }
         public static void Celebrate() {
             if (PetPreferences.Current != null && PetPreferences.Current.IsIdle) return;

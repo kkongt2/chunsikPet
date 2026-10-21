@@ -698,30 +698,20 @@ namespace ChunsikDesktop {
         }
         public Rect Reposition(List<Rect> occupied) {
             Rect area; Point head;
-            if (!Pet.TrySpeechAnchor(out area, out head)) return Rect.Empty;
-            double width = ActualWidth > 0 ? ActualWidth : Width;
-            double height = ActualHeight > 0 ? ActualHeight : 150;
-            double left = Math.Max(area.Left + 4, Math.Min(area.Right - width - 4, head.X - width / 2));
-            double top = Math.Max(area.Top + 4, head.Y - height - 3);
-            Rect candidate = new Rect(left, top, width, height);
-            // Stack nearby bubbles upward so neighboring pets do not cover each other's text.
-            for (int pass = 0; pass < occupied.Count; pass++) {
-                bool moved = false;
-                foreach (Rect other in occupied) {
-                    if (other.IsEmpty || !candidate.IntersectsWith(other)) continue;
-                    double above = other.Top - height - 6;
-                    if (above >= area.Top + 4) { candidate.Y = above; moved = true; break; }
-                    double right = other.Right + 6;
-                    double besideLeft = other.Left - width - 6;
-                    if (right + width <= area.Right - 4) { candidate.X = right; moved = true; break; }
-                    if (besideLeft >= area.Left + 4) { candidate.X = besideLeft; moved = true; break; }
-                }
-                if (!moved) break;
+            if (!Pet.TrySpeechAnchorPixels(out area, out head)) return Rect.Empty;
+            // The pet and bubble can have different DPI values during monitor moves.
+            // Native rectangles keep placement and collision detection in one coordinate space.
+            for (int attempt = 0; attempt < 2; attempt++) {
+                Rect bounds = ScreenLayout.BoundsPixels(this);
+                if (bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0) return Rect.Empty;
+                Rect target = NoticePlacement.Place(area, head, bounds.Size, occupied);
+                ScreenLayout.MovePixels(this, target.Left, target.Top);
+                UpdateLayout();
             }
-            Left = candidate.X; Top = candidate.Y;
-            double stem = Math.Max(22, Math.Min(width - 46, head.X - Left - 12));
+            double width = ActualWidth > 0 ? ActualWidth : Width;
+            double stem = Math.Max(22, Math.Min(width - 46, PointFromScreen(head).X - 12));
             Canvas.SetLeft(tail, stem); Canvas.SetLeft(tailEdge, stem);
-            return candidate;
+            return ScreenLayout.BoundsPixels(this);
         }
     }
 }
