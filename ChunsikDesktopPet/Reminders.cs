@@ -114,20 +114,6 @@ namespace ChunsikDesktop {
         public List<Reminder> Items { get; set; }
         public ReminderSettings() { Sound = true; MessageSeconds = 7; SnoozeMinutes = 5; Items = new List<Reminder>(); }
     }
-    public sealed class NoticeData {
-        public string HistoryId;
-        [XmlIgnore] public Action Acknowledge;
-        public bool Missed;
-        public string ReminderId;
-        public bool Interval;
-        public string BubbleColor;
-        public string Label;
-        public string Kind;
-        public List<string> Messages;
-        public int Seconds;
-        public int SnoozeMinutes = 5;
-    }
-
     public sealed class ReminderService {
         public static ReminderService Current;
         public static readonly string SettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "reminders.xml");
@@ -195,11 +181,26 @@ namespace ChunsikDesktop {
             regrouping = false; ShowNext();
         }
         bool storageWarningShown, stopping;
+        bool resumeWarning;
+        void SaveSession() {
+            if (stopping || regrouping) return;
+            AlertState state = AlertStateStore.Current.State;
+            state.Waiting = new List<NoticeData>(queue);
+            foreach (NoticeGroup group in active) state.Waiting.Add(group.Data);
+            state.Snoozed = new List<SnoozedNotice>();
+            foreach (Snooze snooze in snoozes) state.Snoozed.Add(new SnoozedNotice { DueUtc = snooze.Due.ToUniversalTime(), Notice = snooze.Notice });
+            if (!AlertStateStore.Current.Save() && !resumeWarning) { resumeWarning = true; MessageBox.Show(AlertStateStore.Current.Warning, "알림 재개 정보"); }
+        }
+        public bool SoundEnabled { get { return settings.Sound; } }
+        public bool IsSnoozed(NoticeData data) { foreach (Snooze snooze in snoozes) if (snooze.Notice == data) return true; return false; }
         class Snooze { public DateTime Due; public NoticeData Notice; }
 
         public ReminderService() {
             settings = Load();
             ResetIntervals(settings, null, DateTime.Now);
+            AlertState restored = AlertStateStore.Current.State;
+            foreach (NoticeData data in restored.Waiting) queue.Enqueue(data);
+            foreach (SnoozedNotice saved in restored.Snoozed) snoozes.Add(new Snooze { Due = saved.DueUtc.ToLocalTime(), Notice = saved.Notice });
             timer.Interval = TimeSpan.FromSeconds(1); timer.Tick += delegate { Check(); }; timer.Start();
         }
         ReminderSettings Defaults() {
@@ -334,6 +335,7 @@ namespace ChunsikDesktop {
                 foreach (NoticeData data in dueNotices) { data.Missed = now - lastBeforeCheck > TimeSpan.FromMinutes(5); Enqueue(data, settings.Sound); }
             } finally { collecting = false; }
             ShowNext();
+            if (dueNotices.Count > 0) SaveSession();
         }
         void Enqueue(string message, bool sound) {
             Enqueue(new NoticeData { Label = "춘식이 알림", Messages = new List<string> { message }, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, sound);
@@ -346,7 +348,7 @@ namespace ChunsikDesktop {
                 foreach (Snooze later in snoozes) if (later.Notice.ReminderId == data.ReminderId) return;
             }
             ReminderHistory.Record(data, data.Missed ? "절전·자리 비움 후 복구" : "대기");
-            queue.Enqueue(data);
+            queue.Enqueue(data); SaveSession();
             if (sound && !PresentationPolicy.IsSuppressed) { try { SystemSounds.Asterisk.Play(); } catch {} }
             ShowNext();
         }
@@ -361,7 +363,7 @@ namespace ChunsikDesktop {
                 }
                 if (allowed) queue.Enqueue(data); else ReminderHistory.Record(data, "활동 시간·자리 비움으로 생략");
             }
-            if (queue.Count == 0) return;
+            if (queue.Count == 0) { SaveSession(); return; }
             List<PetWindow> pets = PetWindow.SpeechPets();
             if (pets.Count == 0) return;
             int total = 0; foreach (NoticeData waiting in queue) total += waiting.Messages.Count;
@@ -383,15 +385,15 @@ namespace ChunsikDesktop {
                         ReminderHistory.Record(data, group.AutomaticallyAdvanced ? "다음 알림으로 전환" : "확인");
                         if (!group.AutomaticallyAdvanced && data.Acknowledge != null) data.Acknowledge();
                     }
-                    if (!regrouping) ShowNext();
+                    SaveSession(); if (!regrouping) ShowNext();
                 };
                 active.Add(group);
             }
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Show();
-            LayoutNotices(); PetWindow.Celebrate();
+            LayoutNotices(); PetWindow.Celebrate(); SaveSession();
         }
         public void Stop() {
-            stopping = true; timer.Stop(); queue.Clear(); snoozes.Clear();
+            SaveSession(); stopping = true; timer.Stop(); queue.Clear(); snoozes.Clear();
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
             if (editor != null) editor.Close();
         }
@@ -405,6 +407,7 @@ namespace ChunsikDesktop {
             while (count-- > 0) { NoticeData pending = queue.Dequeue(); if (pending != data) queue.Enqueue(pending); }
             snoozes.RemoveAll(delegate(Snooze s) { return s.Notice == data; });
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) if (group.Data == data) group.Close();
+            SaveSession();
         }
         public void Replay(NoticeData old) {
             Enqueue(new NoticeData { Label = old.Label, Messages = new List<string>(old.Messages), Kind = old.Kind, BubbleColor = old.BubbleColor, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, false);

@@ -27,6 +27,10 @@ jobs:
         run: msbuild tests/TodoSettingsTests.csproj /t:Rebuild /m
       - name: Run post-it settings tests
         run: .\tests\bin\TodoSettingsTests.exe
+      - name: Build alert recovery tests
+        run: msbuild tests/AlertStateTests.csproj /t:Rebuild /m
+      - name: Run alert recovery tests
+        run: .\tests\bin\AlertStateTests.exe
       - uses: actions/upload-artifact@v4
         with:
           name: ChunsikPet-Windows-x64

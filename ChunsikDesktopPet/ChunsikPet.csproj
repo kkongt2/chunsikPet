@@ -52,6 +52,7 @@
     <Compile Include="PetOptions.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Reminders.cs" />
+    <Compile Include="AlertState.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
     <Compile Include="TodoModels.cs" />

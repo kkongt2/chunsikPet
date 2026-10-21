@@ -1,0 +1,6 @@
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFrameworkVersion>v4.8</TargetFrameworkVersion><AssemblyName>AlertStateTests</AssemblyName><OutputPath>bin\</OutputPath><LangVersion>5</LangVersion></PropertyGroup>
+  <ItemGroup><Reference Include="System" /><Reference Include="System.Xml" /></ItemGroup>
+  <ItemGroup><Compile Include="AlertStateTests.cs" /><Compile Include="..\ChunsikDesktopPet\AlertState.cs"><Link>AlertState.cs</Link></Compile></ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

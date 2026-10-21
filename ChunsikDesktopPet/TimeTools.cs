@@ -154,7 +154,7 @@ namespace ChunsikDesktop {
             lap.IsEnabled = elapsed.IsRunning && lapCount < 200;
             double phase = animation.Elapsed.TotalSeconds;
             acknowledge.Visibility = completed && !acknowledged ? Visibility.Visible : Visibility.Collapsed;
-            if (completed && !acknowledged && !PresentationPolicy.IsSuppressed && phase-lastRing >= 5) {
+            if (completed && !acknowledged && !PresentationPolicy.IsSuppressed && ReminderService.Current.SoundEnabled && !ReminderService.Current.IsSnoozed(completionNotice) && phase-lastRing >= 5) {
                 lastRing = phase; try { SystemSounds.Exclamation.Play(); } catch { }
             }
             bool wave = (completed && !acknowledged) || (elapsed.IsRunning && (int)(phase / 1.2) % 4 == 0);
