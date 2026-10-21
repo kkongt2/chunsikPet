@@ -130,11 +130,11 @@ namespace ChunsikDesktop {
                 Margin = new Thickness(0, 8, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
             });
             card.Children.Add(new System.Windows.Controls.TextBlock {
-                Text = "최종 업데이트", FontSize = 12, Foreground = System.Windows.Media.Brushes.SlateGray,
+                Text = "버전", FontSize = 12, Foreground = System.Windows.Media.Brushes.SlateGray,
                 Margin = new Thickness(0, 20, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
             });
             card.Children.Add(new System.Windows.Controls.TextBlock {
-                Text = "2026-10-21", FontSize = 16, FontWeight = FontWeights.SemiBold,
+                Text = "v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3), FontSize = 16, FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 6, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
             });
             content.Children.Add(new System.Windows.Controls.Border {
@@ -145,7 +145,6 @@ namespace ChunsikDesktop {
                 Content = "닫기", Padding = new Thickness(24, 7, 24, 7), HorizontalAlignment = HorizontalAlignment.Center
             };
             close.Click += delegate { SettingsHub.Close(); }; content.Children.Add(close);
-            content.Children.Add(new System.Windows.Controls.TextBlock { Text = "버전 " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 10) });
             System.Windows.Controls.Button export = new System.Windows.Controls.Button { Content = "설정 백업 내보내기", Padding = new Thickness(12), Margin = new Thickness(0, 4, 0, 4) }; export.Click += delegate { SettingsBackup.Export(); }; content.Children.Add(export);
             System.Windows.Controls.Button import = new System.Windows.Controls.Button { Content = "설정 복원", Padding = new Thickness(12) }; import.Click += delegate { SettingsBackup.Import(); }; content.Children.Add(import);
             SettingsHub.Attach(win, "프로그램", null);
