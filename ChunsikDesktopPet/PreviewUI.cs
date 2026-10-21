@@ -12,9 +12,9 @@ namespace ChunsikDesktop {
             Show(owner, delegate { return item.GetMessages().ToArray(); }, delegate { return item.BubbleColor; }, delegate { return item.Kind; }, seconds, false);
         }
         public static void Todo(Window owner, TodoItem item) {
-            Show(owner, delegate { return new string[] { item.Text }; }, delegate { return item.Color; }, delegate { return ""; }, delegate { return item.DisplaySeconds; }, true);
+            Show(owner, delegate { return new string[] { item.Text }; }, delegate { return item.Color; }, delegate { return ""; }, delegate { return item.DisplaySeconds; }, true, delegate { return item.FontSize; });
         }
-        static void Show(Window owner, Func<string[]> messages, Func<string> color, Func<string> kind, Func<int> seconds, bool postit) {
+        static void Show(Window owner, Func<string[]> messages, Func<string> color, Func<string> kind, Func<int> seconds, bool postit, Func<int> fontSize = null) {
             owner = SettingsHub.OwnerFor(owner);
             if (window != null) window.Close();
             Window win = new Window { Title = "설정 미리보기 · 실제 알림 기록에 남지 않아요", Width = 370, Height = 380, Owner = owner, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = Brushes.WhiteSmoke };
@@ -27,6 +27,7 @@ namespace ChunsikDesktop {
             Stopwatch clock = Stopwatch.StartNew(); DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
             refresh = delegate { bubble.Background = BubblePalette.BrushFor(color()); };
             Action draw = delegate {
+                if (fontSize != null) text.FontSize = fontSize();
                 string[] list = messages(); double t = clock.Elapsed.TotalSeconds; int duration = Math.Max(1, seconds());
                 text.Text = list.Length == 0 ? "메시지를 입력해 주세요" : list[((int)t / duration) % list.Length];
                 image.Source = PetWindow.PreviewPose(kind(), (int)(t * 5));

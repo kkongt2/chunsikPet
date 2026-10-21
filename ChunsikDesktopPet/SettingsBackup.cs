@@ -35,7 +35,7 @@ namespace ChunsikDesktop {
                 if (r.ActivityEnabled && (!ReminderRules.TryTime(r.ActiveFrom, out from) || !ReminderRules.TryTime(r.ActiveUntil, out until) || from == until)) throw new InvalidDataException("활동 시간 오류");
             }
             if (b.Todos.Items == null || b.Todos.Items.Count > 50) throw new InvalidDataException("할 일 개수 오류"); ids.Clear();
-            foreach (TodoItem t in b.Todos.Items) if (t == null || String.IsNullOrEmpty(t.Id) || !ids.Add(t.Id) || String.IsNullOrWhiteSpace(t.Text) || t.Text.Length > 160 || t.EveryMinutes < 1 || t.EveryMinutes > 1440 || t.DisplaySeconds < 1 || t.DisplaySeconds > 3600 || Double.IsNaN(t.NoteLeft) || Double.IsInfinity(t.NoteLeft) || Double.IsNaN(t.NoteTop) || Double.IsInfinity(t.NoteTop)) throw new InvalidDataException("잘못된 할 일 항목");
+            foreach (TodoItem t in b.Todos.Items) if (t == null || String.IsNullOrEmpty(t.Id) || !ids.Add(t.Id) || t.Text == null || t.Text.Length > 160 || !TodoItem.ValidAppearance(t) || t.EveryMinutes < 1 || t.EveryMinutes > 1440 || t.DisplaySeconds < 1 || t.DisplaySeconds > 3600 || Double.IsNaN(t.NoteLeft) || Double.IsInfinity(t.NoteLeft) || Double.IsNaN(t.NoteTop) || Double.IsInfinity(t.NoteTop)) throw new InvalidDataException("잘못된 할 일 항목");
         }
         public static void Import() {
             if (!Ready()) return;

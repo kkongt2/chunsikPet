@@ -23,6 +23,10 @@ jobs:
         run: msbuild tests/NoticePlacementTests.csproj /t:Rebuild /m
       - name: Run multi-monitor placement tests
         run: .\tests\bin\NoticePlacementTests.exe
+      - name: Build post-it settings tests
+        run: msbuild tests/TodoSettingsTests.csproj /t:Rebuild /m
+      - name: Run post-it settings tests
+        run: .\tests\bin\TodoSettingsTests.exe
       - uses: actions/upload-artifact@v4
         with:
           name: ChunsikPet-Windows-x64

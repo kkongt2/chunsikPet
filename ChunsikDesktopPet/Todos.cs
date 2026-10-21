@@ -31,29 +31,6 @@ namespace ChunsikDesktop {
             }; paint(); return grid;
         }
     }
-    public class TodoItem {
-        public string Id { get; set; }
-        public string Text { get; set; }
-        public bool Done { get; set; }
-        public DateTime? CompletedAt { get; set; }
-        public bool Dedicated { get; set; }
-        public bool Pinned { get; set; }
-        public bool Peek { get; set; }
-        public bool HasPosition { get; set; }
-        public double NoteLeft { get; set; }
-        public double NoteTop { get; set; }
-        [XmlIgnore] public bool Standalone { get { return Pinned || Peek; } }
-        public int PetIndex { get; set; }
-        public bool Always { get; set; }
-        public int EveryMinutes { get; set; }
-        public int DisplaySeconds { get; set; }
-        public string Color { get; set; }
-        public TodoItem() { Id = Guid.NewGuid().ToString("N"); Text = ""; Pinned = true; Peek = true; Always = true; EveryMinutes = 60; DisplaySeconds = 20; Color = "#FFE894"; }
-    }
-    public class TodoSettings {
-        public List<TodoItem> Items { get; set; }
-        public TodoSettings() { Items = new List<TodoItem>(); }
-    }
     public sealed class TodoService {
         public static TodoService Current;
         static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "todos.xml");
@@ -94,7 +71,10 @@ namespace ChunsikDesktop {
                     if (String.IsNullOrEmpty(item.Id) || !ids.Add(item.Id)) { item.Id = Guid.NewGuid().ToString("N"); ids.Add(item.Id); }
                     if (item.EveryMinutes < 1 || item.EveryMinutes > 1440) item.EveryMinutes = 60;
                     if (item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) item.DisplaySeconds = 20;
-                    if (String.IsNullOrWhiteSpace(item.Text)) item.Done = true;
+                    if (item.Text == null) item.Text = "";
+                    if (item.FontSize < 10 || item.FontSize > 64) item.FontSize = 17;
+                    if (Double.IsNaN(item.NoteWidth) || item.NoteWidth < 220 || item.NoteWidth > 1200) item.NoteWidth = 260;
+                    if (Double.IsNaN(item.NoteHeight) || item.NoteHeight < 200 || item.NoteHeight > 1200) item.NoteHeight = 280;
                 }
                 return data;
             }
@@ -107,27 +87,27 @@ namespace ChunsikDesktop {
             }
         }
         bool Save() {
-            foreach (TodoItem item in settings.Items) if (String.IsNullOrWhiteSpace(item.Text) || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) return false;
+            foreach (TodoItem item in settings.Items) if (item.Text == null || item.Text.Length > 160 || !TodoItem.ValidAppearance(item) || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) return false;
             try {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
                 string temp = FilePath + ".tmp";
                 using (FileStream stream = File.Create(temp)) Serializer.Serialize(stream, settings);
                 if (File.Exists(FilePath)) File.Replace(temp, FilePath, FilePath + ".bak", true); else File.Move(temp, FilePath);
-                Sync(); return true;
+                if (!stopping) Sync(); return true;
             } catch (Exception e) { MessageBox.Show("할 일 저장에 실패했어요. " + e.Message, "춘식이 할 일"); return false; }
         }
         void DisposeRuntime(Runtime run) { run.Note.DisposeNote(); if (run.Owned != null) run.Owned.Close(); }
         void Sync() {
             HashSet<string> keep = new HashSet<string>();
             foreach (TodoItem item in settings.Items) {
-                if (item.Done || String.IsNullOrWhiteSpace(item.Text) || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) continue;
+                if (item.Done || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) continue;
                 keep.Add(item.Id); Runtime run;
                 if (!runtimes.TryGetValue(item.Id, out run)) {
                     TodoItem captured = item;
                     run = new Runtime { Item = item, Always = item.Always, Minutes = item.EveryMinutes, Seconds = item.DisplaySeconds, Until = clock.Elapsed.TotalSeconds + item.DisplaySeconds };
                     run.Note = new TodoNote(delegate { Complete(captured); }, delegate { OpenSettings(null); }, delegate(double left, double top) {
                         captured.NoteLeft = left; captured.NoteTop = top; captured.HasPosition = true; Save(); if (renderEditor != null) renderEditor();
-                    }); runtimes.Add(item.Id, run);
+                    }, delegate { bool ok = Save(); if (ok && renderEditor != null) renderEditor(); return ok; }, delegate { AddBlank(captured); }); runtimes.Add(item.Id, run);
                 }
                 run.Item = item;
                 if (run.Always != item.Always || run.Minutes != item.EveryMinutes || run.Seconds != item.DisplaySeconds) { run.Always = item.Always; run.Minutes = item.EveryMinutes; run.Seconds = item.DisplaySeconds; run.Until = clock.Elapsed.TotalSeconds + item.DisplaySeconds; run.Next = 0; }
@@ -135,6 +115,18 @@ namespace ChunsikDesktop {
                 if ((item.Standalone || !item.Dedicated) && run.Owned != null) { run.Owned.Close(); run.Owned = null; }
             }
             foreach (string id in new List<string>(runtimes.Keys)) if (!keep.Contains(id)) { DisposeRuntime(runtimes[id]); runtimes.Remove(id); }
+        }
+        void AddBlank(TodoItem near) {
+            if (settings.Items.Count >= 50) { MessageBox.Show("포스트잇은 최대 50개까지 저장할 수 있어요."); return; }
+            TodoItem item = new TodoItem { Color = near.Color, FontSize = near.FontSize, NoteWidth = near.NoteWidth, NoteHeight = near.NoteHeight };
+            Runtime source;
+            if (runtimes.TryGetValue(near.Id, out source)) { item.HasPosition = true; item.NoteLeft = source.Note.Left + 32; item.NoteTop = source.Note.Top + 32; }
+            settings.Items.Add(item);
+            if (!Save()) { settings.Items.Remove(item); return; }
+            if (renderEditor != null) renderEditor();
+            // Wait for Tick to show and place the blank note before focusing its editor.
+            Tick(); Runtime run;
+            if (runtimes.TryGetValue(item.Id, out run)) run.Note.Dispatcher.BeginInvoke(new Action(run.Note.BeginEdit));
         }
         void Complete(TodoItem item) {
             Runtime run;
@@ -173,7 +165,7 @@ namespace ChunsikDesktop {
                 bool blocked = !item.Standalone && (run.Pet == null || (ReminderService.Current != null && ReminderService.Current.IsSpeakingFor(run.Pet)));
                 if (!item.Always && run.Until <= now && run.Next == 0) run.Next = Math.Max(run.Until + 1, run.Until - run.Seconds + item.EveryMinutes * 60);
                 if (!item.Always && run.Next > 0 && now >= run.Next && !blocked) { run.Until = now + run.Seconds; run.Next = 0; }
-                if ((blocked || (!item.Always && now >= run.Until)) && !run.Note.IsDragging) { run.Note.Hide(); continue; }
+                if ((blocked || (!item.Always && now >= run.Until)) && !run.Note.IsDragging && !run.Note.IsEditing) { run.Note.Hide(); continue; }
                 run.Note.Update(item);
                 if (!run.Note.IsVisible) run.Note.Show();
                 occupied.Add(item.Standalone ? run.Note.PlaceStandalone(item, occupied) : run.Note.Follow(run.Pet, occupied));
@@ -181,6 +173,7 @@ namespace ChunsikDesktop {
         }
         public void Stop() {
             stopping = true; timer.Stop();
+            foreach (Runtime run in runtimes.Values) run.Note.FlushEdit();
             if (saveEditor != null) saveEditor();
             foreach (Runtime run in runtimes.Values) DisposeRuntime(run); runtimes.Clear();
             if (editor != null) editor.Close();
@@ -218,7 +211,7 @@ namespace ChunsikDesktop {
             DockPanel addRow = new DockPanel { Margin = new Thickness(0, 0, 0, 14) }; top.Children.Add(addRow);
             TextBox entry = new TextBox { FontSize = 16, Padding = new Thickness(10), BorderThickness = new Thickness(0), Background = Brushes.Transparent, MaxLength = 160, ToolTip = "예: 기획서 작성 · Enter로 바로 등록" };
             DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            Func<bool> persist = delegate { debounce.Stop(); bool ok = Save(); status.Text = ok ? "저장됨 · 프로그램을 다시 열어도 할 일이 남아요" : "할 일 내용을 입력하고 간격을 1~1440분, 표시 시간을 1~3600초로 지정해 주세요. 저장되지 않았어요."; status.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick; return ok; };
+            Func<bool> persist = delegate { debounce.Stop(); bool ok = Save(); status.Text = ok ? "저장됨 · 프로그램을 다시 열어도 할 일이 남아요" : "간격을 1~1440분, 표시 시간을 1~3600초로 지정해 주세요. 저장되지 않았어요."; status.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick; return ok; };
             saveEditor = persist;
             Action changed = delegate { status.Text = "저장 중…"; debounce.Stop(); debounce.Start(); }; debounce.Tick += delegate { persist(); };
             StackPanel list = new StackPanel(); ScrollViewer scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; root.Children.Add(scroll);
@@ -231,6 +224,7 @@ namespace ChunsikDesktop {
                 settings.Items.Add(item); if (!persist()) { settings.Items.Remove(item); return; } entry.Clear(); render(); scroll.ScrollToBottom();
             };
             Button addButton = Button("＋ 할 일 등록", add); DockPanel.SetDock(addButton, Dock.Right); addRow.Children.Add(addButton); addRow.Children.Add(new Border { Background = Brushes.White, BorderBrush = Brushes.LightSteelBlue, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Margin = new Thickness(0, 3, 7, 3), Child = entry });
+            top.Children.Add(Button("＋ 빈 포스트잇", delegate { AddBlank(new TodoItem()); }));
             entry.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Enter) { add(); e.Handled = true; } };
             render = delegate {
                 list.Children.Clear();
@@ -248,6 +242,10 @@ namespace ChunsikDesktop {
                     title.TextChanged += delegate { item.Text = title.Text; changed(); };
                     if (item.Done) { cardContent.Children.Add(new TextBlock { Text = item.CompletedAt.HasValue ? "완료 · " + item.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm") : "완료 · 날짜 기록 없음", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 6, 0, 0) }); continue; }
                     cardContent.Children.Add(Button("▶ 표시 미리보기", delegate { PreviewUI.Todo(win, item); }));
+                    WrapPanel font = SettingRow(cardContent, "글자 크기");
+                    font.Children.Add(Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); changed(); render(); }));
+                    font.Children.Add(new TextBlock { Text = item.FontSize + "", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6) });
+                    font.Children.Add(Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); changed(); render(); }));
                     WrapPanel display = SettingRow(cardContent, "표시 방식");
                     display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));
                     if (!item.Always) {
@@ -329,7 +327,7 @@ namespace ChunsikDesktop {
                 swallowTimer.Stop(); swallowTimer.Tick -= tick; animation.Stop();
                 root.Children.Remove(overlay); paper.RenderTransform = Transform.Identity; tape.RenderTransform = new RotateTransform(-4); mascot.RenderTransform = Transform.Identity;
                 paper.Opacity = tape.Opacity = mascot.Opacity = 1; root.IsHitTestVisible = true;
-                SizeToContent = SizeToContent.Height; IsCompleting = false;
+                SizeToContent = SizeToContent.Manual; IsCompleting = false;
                 if (current != null) Update(current);
                 finished();
             };
@@ -351,42 +349,108 @@ namespace ChunsikDesktop {
         readonly Grid root;
         readonly Border tape;
         readonly Image mascot;
-        readonly StackPanel noteContent;
+        readonly Grid noteContent;
         readonly TextBlock heading;
         readonly Action<double, double> moved;
         TodoItem current;
-        bool dragging, positionReady;
-        public bool IsDragging { get { return dragging; } }
+        bool dragging, resizing, positionReady;
+        public bool IsDragging { get { return dragging || resizing; } }
+        public bool IsEditing { get; private set; }
+        readonly TextBox inlineEditor;
+        readonly ScrollViewer messageScroll;
+        readonly Func<bool> persist;
+        readonly TextBlock fontLabel;
         bool lastStandalone;
         public void ResetPosition() { positionReady = false; }
         readonly Border paper;
         readonly TextBlock message;
-        public TodoNote(Action complete, Action edit, Action<double, double> positionChanged) {
-            moved = positionChanged;
+        public TodoNote(Action complete, Action edit, Action<double, double> positionChanged, Func<bool> save, Action add) {
+            moved = positionChanged; persist = save;
             Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!disposing && TodoService.Current != null && !TodoService.Current.Stopping && !PetWindow.IsExiting) { e.Cancel = true; Hide(); } };
             UseLayoutRounding = true; SnapsToDevicePixels = true;
-            Title = "춘식이 포스트잇"; Width = 260; SizeToContent = SizeToContent.Height; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            Title = "춘식이 포스트잇"; Width = 260; Height = 280; MinWidth = 220; MinHeight = 200; MaxWidth = 1200; MaxHeight = 1200; SizeToContent = SizeToContent.Manual; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true; Background = Brushes.Transparent; Topmost = true; ShowActivated = false; ShowInTaskbar = false;
             root = new Grid { Margin = new Thickness(5) }; Content = root;
-            StackPanel content = new StackPanel { Margin = new Thickness(16, 23, 16, 12) }; noteContent = content;
+            Grid content = new Grid { Margin = new Thickness(16, 23, 16, 12) }; noteContent = content;
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            content.RowDefinitions.Add(new RowDefinition());
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             paper = new Border { CornerRadius = new CornerRadius(2, 2, 16, 2), BorderBrush = new SolidColorBrush(Color.FromRgb(190, 170, 102)), BorderThickness = new Thickness(0, 0, 1, 2), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 6, ShadowDepth = 2, Opacity = 0.2 } }; root.Children.Add(paper);
             tape = new Border { Width = 72, Height = 15, Background = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -3, 0, 0), RenderTransform = new RotateTransform(-4), IsHitTestVisible = false }; root.Children.Add(tape);
             heading = new TextBlock { Text = "TO-DO  /  잊지 말아요", FontSize = 10, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
             heading.MouseLeftButtonDown += DragNote; content.Children.Add(heading);
             message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(64, 55, 44)) };
-            content.Children.Add(new ScrollViewer { Content = message, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-            StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) }; content.Children.Add(buttons);
-            Button done = new Button { Content = "✓ 완료", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; done.Click += delegate { complete(); }; buttons.Children.Add(done);
-            Button settings = new Button { Content = "편집", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; settings.Click += delegate { edit(); }; buttons.Children.Add(settings);
+            message.ToolTip = "더블클릭해서 바로 편집 · Ctrl+Enter 저장 · Esc 취소";
+            message.Cursor = System.Windows.Input.Cursors.IBeam;
+            messageScroll = new ScrollViewer { Content = message, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            Grid.SetRow(messageScroll, 1); content.Children.Add(messageScroll);
+            inlineEditor = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxLength = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed, Background = Brushes.Transparent, BorderBrush = Brushes.Tan, Padding = new Thickness(4) };
+            Grid.SetRow(inlineEditor, 1); content.Children.Add(inlineEditor);
+            messageScroll.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e) { if (e.ClickCount == 2) { BeginEdit(); e.Handled = true; } };
+            inlineEditor.PreviewKeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) {
+                if (e.Key == System.Windows.Input.Key.Escape) { EndEdit(false); e.Handled = true; }
+                else if (e.Key == System.Windows.Input.Key.Enter && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0) { EndEdit(true); e.Handled = true; }
+            };
+            inlineEditor.LostKeyboardFocus += delegate { if (IsEditing) EndEdit(true); };
+            Deactivated += delegate { if (IsEditing) EndEdit(true); };
+            WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 6) }; Grid.SetRow(buttons, 2); content.Children.Add(buttons);
+            Button smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
+            fontLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3), FontSize = 11 }; buttons.Children.Add(fontLabel);
+            buttons.Children.Add(NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }));
+            buttons.Children.Add(NoteButton("＋", "새 빈 포스트잇 추가", add));
+            Button done = new Button { Content = "✓ 완료", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; done.Click += delegate { if (EndEdit(true)) complete(); }; buttons.Children.Add(done);
+            Button settings = new Button { Content = "편집", Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(3), Background = Brushes.Transparent, BorderBrush = Brushes.Tan }; settings.Click += delegate { BeginEdit(); }; buttons.Children.Add(settings);
             mascot = new Image { Stretch = Stretch.Uniform, Width = 86, Height = 66, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "포스트잇과 함께 끌어 옮기기" };
             // Match the wandering pet: high-quality downsampling for the large transparent source.
             RenderOptions.SetBitmapScalingMode(mascot, BitmapScalingMode.HighQuality);
             mascot.SnapsToDevicePixels = true; mascot.UseLayoutRounding = true;
             mascot.MouseLeftButtonDown += DragNote; root.Children.Add(mascot);
             ContextMenu menu = new ContextMenu(); MenuItem manage = new MenuItem { Header = "포스트잇 설정" }; manage.Click += delegate { edit(); }; menu.Items.Add(manage); ContextMenu = menu;
+            System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
+            grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
+            grip.DragStarted += delegate { resizing = true; EndEdit(true); };
+            grip.DragDelta += delegate(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e) {
+                Width = Math.Max(MinWidth, Math.Min(MaxWidth, Width + e.HorizontalChange));
+                Height = Math.Max(MinHeight, Math.Min(MaxHeight, Height + e.VerticalChange));
+            };
+            grip.DragCompleted += delegate {
+                resizing = false; if (current == null) return;
+                double oldWidth = current.NoteWidth, oldHeight = current.NoteHeight;
+                current.NoteWidth = Width; current.NoteHeight = Height;
+                if (!persist()) { current.NoteWidth = oldWidth; current.NoteHeight = oldHeight; Update(current); }
+                ClampPosition(WorkingArea());
+            }; root.Children.Add(grip);
+        }
+        static Button NoteButton(string text, string hint, Action action) {
+            Button button = new Button { Content = text, ToolTip = hint, Padding = new Thickness(4, 3, 4, 3), Margin = new Thickness(2), FontSize = 11, Background = Brushes.Transparent, BorderBrush = Brushes.Tan, Cursor = System.Windows.Input.Cursors.Hand };
+            button.Click += delegate { action(); }; return button;
+        }
+        void ChangeFont(int delta) {
+            if (current == null || !EndEdit(true)) return;
+            int old = current.FontSize; current.FontSize = Math.Max(10, Math.Min(64, old + delta));
+            if (!persist()) current.FontSize = old;
+            Update(current);
+        }
+        public void BeginEdit() {
+            if (current == null || IsCompleting || IsEditing) return;
+            IsEditing = true; inlineEditor.Text = current.Text;
+            inlineEditor.FontSize = current.FontSize; messageScroll.Visibility = Visibility.Collapsed; inlineEditor.Visibility = Visibility.Visible;
+            Activate(); inlineEditor.Focus(); System.Windows.Input.Keyboard.Focus(inlineEditor); inlineEditor.CaretIndex = inlineEditor.Text.Length;
+        }
+        public bool FlushEdit() { return EndEdit(true); }
+        bool EndEdit(bool save) {
+            if (!IsEditing) return true;
+            string old = current.Text;
+            IsEditing = false;
+            if (save) {
+                current.Text = inlineEditor.Text;
+                if (!persist()) { current.Text = old; IsEditing = true; inlineEditor.Focus(); return false; }
+            }
+            inlineEditor.Visibility = Visibility.Collapsed; messageScroll.Visibility = Visibility.Visible;
+            Update(current); return true;
         }
         void DragNote(object sender, System.Windows.Input.MouseButtonEventArgs e) {
-            if (current == null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed) return;
+            if (current == null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed || !EndEdit(true)) return;
             // Dragging a legacy following note switches it to a detached, fixed companion.
             if (!current.Standalone) current.Pinned = true; lastStandalone = true; positionReady = true; dragging = true;
             try { DragMove(); }
@@ -396,7 +460,12 @@ namespace ChunsikDesktop {
         public void Update(TodoItem item) {
             if (lastStandalone != item.Standalone) positionReady = false;
             lastStandalone = item.Standalone; current = item;
-            paper.Background = BubblePalette.BrushFor(item.Color); message.Text = item.Always ? "□ " + item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
+            paper.Background = BubblePalette.BrushFor(item.Color);
+            if (!resizing) { Width = item.NoteWidth; Height = item.NoteHeight; }
+            message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize; fontLabel.Text = item.FontSize.ToString();
+            bool blank = String.IsNullOrWhiteSpace(item.Text);
+            message.Text = blank ? "더블클릭해서 할 일을 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
+            message.Foreground = blank ? Brushes.SlateGray : new SolidColorBrush(Color.FromRgb(64, 55, 44));
             mascot.Visibility = item.Standalone ? Visibility.Visible : Visibility.Collapsed;
             mascot.Source = item.Peek ? peekArt : PetWindow.ToolPose(false);
             mascot.Width = item.Peek ? 86 : 76; mascot.Height = item.Peek ? 66 : 88;
@@ -422,7 +491,7 @@ namespace ChunsikDesktop {
             Top = Math.Max(area.Top, Math.Min(area.Bottom - NoteHeight, Top));
         }
         public Rect PlaceStandalone(TodoItem item, List<Rect> occupied) {
-            if (dragging) return new Rect(Left, Top, Width, NoteHeight);
+            if (dragging || resizing || IsEditing) return new Rect(Left, Top, Width, NoteHeight);
             if (!positionReady) {
                 Rect area = SystemParameters.WorkArea;
                 Left = item.HasPosition ? item.NoteLeft : area.Right - Width - 24;
