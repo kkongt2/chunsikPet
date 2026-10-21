@@ -54,34 +54,7 @@ namespace ChunsikDesktop {
     }
     // Real toggle controls: mouse, keyboard and screen readers use the same selected state.
     public sealed class WeekdayPicker : StackPanel {
-        static readonly Style DayStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"
-<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
-       xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type ToggleButton}'>
-  <Setter Property='Width' Value='24'/><Setter Property='Height' Value='24'/>
-  <Setter Property='Margin' Value='2,0,2,0'/><Setter Property='FontSize' Value='11'/>
-  <Setter Property='FontWeight' Value='SemiBold'/><Setter Property='Cursor' Value='Hand'/>
-  <Setter Property='Background' Value='#EDF1F5'/><Setter Property='Foreground' Value='#687586'/>
-  <Setter Property='BorderBrush' Value='#DCE3EB'/><Setter Property='BorderThickness' Value='1'/>
-  <Setter Property='Template'><Setter.Value>
-    <ControlTemplate TargetType='{x:Type ToggleButton}'>
-      <Border CornerRadius='12' Background='{TemplateBinding Background}'
-              BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}'>
-        <ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/>
-      </Border>
-    </ControlTemplate>
-  </Setter.Value></Setter>
-  <Style.Triggers>
-    <Trigger Property='IsChecked' Value='True'>
-      <Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/>
-      <Setter Property='BorderBrush' Value='#0064A8'/>
-    </Trigger>
-    <Trigger Property='IsMouseOver' Value='True'><Setter Property='Opacity' Value='0.82'/></Trigger>
-    <Trigger Property='IsPressed' Value='True'><Setter Property='Opacity' Value='0.65'/></Trigger>
-    <Trigger Property='IsKeyboardFocused' Value='True'>
-      <Setter Property='BorderBrush' Value='#F6B73C'/><Setter Property='BorderThickness' Value='2'/>
-    </Trigger>
-  </Style.Triggers>
-</Style>");
+        
         public WeekdayPicker() {
             Orientation = Orientation.Horizontal; VerticalAlignment = VerticalAlignment.Center;
             Margin = new Thickness(4, 0, 4, 0);
@@ -96,7 +69,7 @@ namespace ChunsikDesktop {
             for (int i = 0; i < 7; i++) {
                 int day = i;
                 System.Windows.Controls.Primitives.ToggleButton button = new System.Windows.Controls.Primitives.ToggleButton {
-                    Content = names[i], Style = DayStyle, IsChecked = item.HasDay(i),
+                    Content = names[i], Style = Theme.DayStyle, IsChecked = item.HasDay(i),
                     ToolTip = names[i] + "요일 알림 켜기/끄기"
                 };
                 System.Windows.Automation.AutomationProperties.SetName(button, names[i] + "요일 반복");
@@ -423,14 +396,14 @@ namespace ChunsikDesktop {
         public void Test() {
             Enqueue(new NoticeData { Label = "말풍선 테스트", Messages = new List<string> { "첫 번째 메시지예요!", "두 번째 메시지는 다른 춘식이가 맡아요.", "남은 메시지도 자동으로 이어서 보여줘요.", "전환 간격은 알림 설정에서 바꿀 수 있어요.", "다시 알림을 누르면 전체 문구를 다시 알려드려요." }, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, settings.Sound);
         }
-        static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(0, 100, 168));
+        static readonly Brush Accent = Theme.Accent;
         static readonly Brush Line = new SolidColorBrush(Color.FromRgb(222, 231, 240));
         static Button Pill(string text, Action action) {
             Button button = new Button { Content = text, Padding = new Thickness(10, 5, 10, 5), Margin = new Thickness(3), Foreground = Accent, Cursor = System.Windows.Input.Cursors.Hand };
-            button.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='box' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' CornerRadius='10' Background='#EDF6FD' BorderBrush='#CCE0F0' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='box' Property='Background' Value='#D9ECFA'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='box' Property='BorderBrush' Value='#0064A8'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            button.Template = Theme.ButtonTemplate;
             button.Click += delegate { action(); }; return button;
         }
-        static readonly Style SegmentStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='Padding' Value='8,7'/><Setter Property='FontSize' Value='11'/><Setter Property='Foreground' Value='#546578'/><Setter Property='Background' Value='Transparent'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border CornerRadius='9' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center'/></Border></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter Property='Opacity' Value='0.7'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.6'/></Trigger></Style.Triggers></Style>");
+        
         static Grid TableRow() {
             Grid grid = new Grid { Margin = new Thickness(12) };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(95) });
@@ -438,12 +411,13 @@ namespace ChunsikDesktop {
             for (int i=0; i<7; i++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             return grid;
         }
-        static void Cell(Grid grid, UIElement child, int field) {
+        static void FieldCell(Grid grid, UIElement child, int field) {
             string[] labels = { "사용", "알림 이름", "종류 · 시간", "요일 · 날짜", "말풍선 색상", "메시지", "관리" };
             TextBlock label = new TextBlock { Text = labels[field], Foreground = Brushes.SlateGray, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 10, 8, 10) };
             Grid.SetRow(label, field); grid.Children.Add(label);
             Grid.SetRow(child, field); Grid.SetColumn(child, 1); grid.Children.Add(child);
         }
+        static void Cell(Grid grid, UIElement child, int column) { Grid.SetColumn(child, column); grid.Children.Add(child); }
         public void OpenSettings() {
             if (editor != null) { SettingsHub.Open("알림"); return; }
             Window win = new Window { Title = "춘식이 알림 설정", Width = 1000, Height = 700, MinWidth = 620, MinHeight = 480, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterScreen };
@@ -540,19 +514,19 @@ namespace ChunsikDesktop {
                     Grid line = TableRow();
                     Border card = new Border { Background = new SolidColorBrush(Color.FromRgb(250, 252, 255)), BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Child = line }; detail.Children.Add(card);
                     System.Windows.Controls.Primitives.ToggleButton toggle = new System.Windows.Controls.Primitives.ToggleButton { Width = 44, Height = 24, IsChecked = row.Enabled, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(5), ToolTip = "알림 켜기/끄기" };
-                    toggle.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ToggleButton'><Border x:Name='track' Background='#CCD5DF' CornerRadius='12'><Ellipse x:Name='thumb' Width='18' Height='18' Fill='White' HorizontalAlignment='Left' Margin='3'/></Border><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='track' Property='Background' Value='#0064A8'/><Setter TargetName='thumb' Property='HorizontalAlignment' Value='Right'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='track' Property='BorderBrush' Value='#F6B73C'/><Setter TargetName='track' Property='BorderThickness' Value='2'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+                    toggle.Template = Theme.SwitchTemplate;
                     System.Windows.Automation.AutomationProperties.SetName(toggle, row.Title + " 알림 사용");
-                    toggle.Checked += delegate { row.Enabled = true; changed(); }; toggle.Unchecked += delegate { row.Enabled = false; changed(); }; Cell(line, toggle, 0);
+                    toggle.Checked += delegate { row.Enabled = true; changed(); }; toggle.Unchecked += delegate { row.Enabled = false; changed(); }; FieldCell(line, toggle, 0);
                     StackPanel titleArea = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 4, 10, 4) };
                     if (row.IsBuiltin) titleArea.Children.Add(new TextBlock { Text = "기본 알림", FontSize = 10, Foreground = Accent });
                     TextBox title = new TextBox { Text = row.Title, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(2, 4, 2, 4), FontSize = 14 };
-                    title.TextChanged += delegate { row.Title = title.Text; ListBoxItem choice = choices.SelectedItem as ListBoxItem; if (choice != null) ((TextBlock)((StackPanel)choice.Content).Children[0]).Text = row.Title; changed(); }; titleArea.Children.Add(title); Cell(line, titleArea, 1);
+                    title.TextChanged += delegate { row.Title = title.Text; ListBoxItem choice = choices.SelectedItem as ListBoxItem; if (choice != null) ((TextBlock)((StackPanel)choice.Content).Children[0]).Text = row.Title; changed(); }; titleArea.Children.Add(title); FieldCell(line, titleArea, 1);
                     StackPanel schedule = new StackPanel();
                     StackPanel segments = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 7) };
                     string[] types = { "time", "interval", "date" }, labels = { "매주 시각", "일정 간격", "특정 날짜" };
                     for (int k = 0; k < types.Length; k++) {
                         string selectedType = types[k];
-                        RadioButton segment = new RadioButton { Content = labels[k], GroupName = "schedule_" + row.Id, IsChecked = row.ScheduleType == selectedType, IsEnabled = !row.IsBuiltin, Style = SegmentStyle };
+                        RadioButton segment = new RadioButton { Content = labels[k], GroupName = "schedule_" + row.Id, IsChecked = row.ScheduleType == selectedType, IsEnabled = !row.IsBuiltin, Style = Theme.SegmentStyle };
                         segment.Checked += delegate { if (row.ScheduleType == selectedType) return; row.ScheduleType = selectedType; render(); changed(); };
                         segments.Children.Add(segment);
                     }
@@ -574,7 +548,7 @@ namespace ChunsikDesktop {
                     }
                     schedule.Children.Add(clock);
                     if (row.IsInterval) schedule.Children.Add(Pill(row.ActivityEnabled ? "활동 " + row.ActiveFrom + "~" + row.ActiveUntil : "활동 시간 · 자리 비움", delegate { EditActivity(win, row, changed); }));
-                    Cell(line, new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 246, 253)), Padding = new Thickness(5), Margin = new Thickness(0, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center, Child = schedule }, 2);
+                    FieldCell(line, new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 246, 253)), Padding = new Thickness(5), Margin = new Thickness(0, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center, Child = schedule }, 2);
                     if (row.IsDate) {
                         StackPanel dateArea = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8) };
                         DateTime date; DatePicker picker = new DatePicker { SelectedDateFormat = DatePickerFormat.Short, ToolTip = "필수: 알림 날짜를 선택하세요", Language = System.Windows.Markup.XmlLanguage.GetLanguage("ko-KR") };
@@ -582,19 +556,19 @@ namespace ChunsikDesktop {
                         picker.SelectedDateChanged += delegate { row.Date = picker.SelectedDate.HasValue ? picker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""; changed(); };
                         picker.DateValidationError += delegate(object sender, DatePickerDateValidationErrorEventArgs e) { e.ThrowException = false; picker.SelectedDate = null; row.Date = ""; changed(); };
                         dateArea.Children.Add(picker);
-                        dateArea.Children.Add(new TextBlock { Text = "날짜 필수 · 반복 없음\n시간 미지정: 당일 실행 시 알림", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 7, 0, 0) }); Cell(line, dateArea, 3);
+                        dateArea.Children.Add(new TextBlock { Text = "날짜 필수 · 반복 없음\n시간 미지정: 당일 실행 시 알림", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 7, 0, 0) }); FieldCell(line, dateArea, 3);
                     } else {
                         WeekdayPicker days = new WeekdayPicker { DataContext = row };
                         days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.CheckedEvent, new RoutedEventHandler(delegate { changed(); }));
-                        days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent, new RoutedEventHandler(delegate { changed(); })); Cell(line, days, 3);
+                        days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent, new RoutedEventHandler(delegate { changed(); })); FieldCell(line, days, 3);
                     }
-                    Cell(line, BubblePalette.Picker(row.BubbleColor, delegate(string color) { row.BubbleColor = color; changed(); }, 3), 4);
-                    Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; Cell(line, edit, 5);
+                    FieldCell(line, BubblePalette.Picker(row.BubbleColor, delegate(string color) { row.BubbleColor = color; changed(); }, 3), 4);
+                    Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; FieldCell(line, edit, 5);
                     StackPanel actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                     actions.Children.Add(Pill("▶ 보기", delegate { PreviewUI.Reminder(win, row, delegate { return seconds.Value; }); }));
                     actions.Children.Add(Pill("테스트 알림", delegate { Test(); }));
                     Button remove = Pill(row.IsBuiltin ? "기본" : "삭제", delegate { if (row.IsBuiltin) return; rows.Remove(row); render(); changed(); });
-                    remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); Cell(line, actions, 6);
+                    remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); FieldCell(line, actions, 6);
                 }
                 refreshCountdowns();
             };

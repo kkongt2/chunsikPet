@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -24,7 +24,7 @@ namespace ChunsikDesktop {
                 for (int i = 0; i < Colors.Length; i++) {
                     string color = Colors[i];
                     Button button = new Button { Width = 22, Height = 22, Margin = new Thickness(2), Content = (selected ?? Colors[0]) == color ? "✓" : "", FontSize = 12, Foreground = Brushes.DarkSlateGray, Background = BrushFor(color), ToolTip = Names[i], Cursor = System.Windows.Input.Cursors.Hand };
-                    button.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border CornerRadius='7' Background='{TemplateBinding Background}' BorderBrush='#8292A3' BorderThickness='1'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border></ControlTemplate>");
+                    button.Template = Theme.ButtonTemplate;
                     System.Windows.Automation.AutomationProperties.SetName(button, Names[i] + " 말풍선 색상");
                     button.Click += delegate { selected = color; paint(); change(color); }; grid.Children.Add(button);
                 }
@@ -193,17 +193,17 @@ namespace ChunsikDesktop {
             foreach (Runtime run in runtimes.Values) DisposeRuntime(run); runtimes.Clear();
             if (editor != null) editor.Close();
         }
-        static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(0, 100, 168));
-        static readonly ControlTemplate SoftButton = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='b' CornerRadius='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='b' Property='Opacity' Value='0.75'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#0064A8'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
-        static readonly Style ChoiceStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='Padding' Value='15,8'/><Setter Property='Margin' Value='2'/><Setter Property='Foreground' Value='#52637A'/><Setter Property='Background' Value='Transparent'/><Setter Property='FontSize' Value='12'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border x:Name='b' CornerRadius='9' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}' BorderBrush='Transparent' BorderThickness='1'><ContentPresenter HorizontalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#EAAE38'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/><Setter Property='FontWeight' Value='SemiBold'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter Property='Opacity' Value='0.8'/></Trigger></Style.Triggers></Style>");
+        static readonly Brush Accent = Theme.Accent;
+        
+        
         static Button Button(string text, Action action) {
-            Button b = new Button { Content = text, Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(3), Background = BubblePalette.BrushFor("#D9EAFE"), BorderBrush = new SolidColorBrush(Color.FromRgb(210, 225, 241)), Foreground = Accent, Template = SoftButton, Cursor = System.Windows.Input.Cursors.Hand }; b.Click += delegate { action(); }; return b;
+            Button b = new Button { Content = text, Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(3), Background = BubblePalette.BrushFor("#D9EAFE"), BorderBrush = new SolidColorBrush(Color.FromRgb(210, 225, 241)), Foreground = Accent, Template = Theme.ButtonTemplate, Cursor = System.Windows.Input.Cursors.Hand }; b.Click += delegate { action(); }; return b;
         }
         static FrameworkElement Choices(string first, string second, bool firstSelected, Action<bool> select) {
             StackPanel panel = new StackPanel { Orientation = Orientation.Horizontal };
             string group = Guid.NewGuid().ToString("N");
-            RadioButton a = new RadioButton { Content = first, GroupName = group, Style = ChoiceStyle, IsChecked = firstSelected };
-            RadioButton b = new RadioButton { Content = second, GroupName = group, Style = ChoiceStyle, IsChecked = !firstSelected };
+            RadioButton a = new RadioButton { Content = first, GroupName = group, Style = Theme.SegmentStyle, IsChecked = firstSelected };
+            RadioButton b = new RadioButton { Content = second, GroupName = group, Style = Theme.SegmentStyle, IsChecked = !firstSelected };
             a.Checked += delegate { select(true); }; b.Checked += delegate { select(false); };
             panel.Children.Add(a); panel.Children.Add(b);
             return new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 242, 248)), Child = panel, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
