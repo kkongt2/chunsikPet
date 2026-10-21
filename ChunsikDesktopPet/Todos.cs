@@ -412,6 +412,7 @@ namespace ChunsikDesktop {
         readonly Grid noteContent;
         readonly TextBlock heading;
         readonly TextBlock shiftHint;
+        readonly Button avoidanceButton;
         readonly Action<double, double> moved;
         TodoItem current;
         bool dragging, resizing, positionReady;
@@ -445,8 +446,19 @@ namespace ChunsikDesktop {
             heading.MouseLeftButtonDown += DragNote; noteHeader.Children.Add(heading);
             Button addNote = NoteButton("＋ 새 포스트잇", "새 빈 포스트잇 추가", add);
             addNote.HorizontalAlignment = HorizontalAlignment.Left;
-            addNote.Margin = new Thickness(0, 0, 0, 10);
-            noteHeader.Children.Add(addNote);
+            addNote.Margin = new Thickness(0, 0, 4, 6);
+            WrapPanel headerActions = new WrapPanel();
+            headerActions.Children.Add(addNote);
+            avoidanceButton = NoteButton("🐾 피하기 ON", "커서 피하기 켜기/끄기 · Shift를 누르면 잠깐 멈춰요", delegate {
+                if (current == null) return;
+                bool previous = current.AvoidCursor;
+                CancelEvade();
+                current.AvoidCursor = !previous;
+                if (!persist()) current.AvoidCursor = previous;
+                Update(current);
+            });
+            avoidanceButton.Margin = new Thickness(0, 0, 0, 6);
+            headerActions.Children.Add(avoidanceButton); noteHeader.Children.Add(headerActions);
             shiftHint = new TextBlock {
                 Text = "Shift 꾹! 잠깐 멈출게요 🐾", FontSize = 11,
                 Foreground = new SolidColorBrush(Color.FromRgb(119, 94, 62)),
@@ -563,6 +575,9 @@ namespace ChunsikDesktop {
             Opacity = item.NoteOpacity;
             if (lastStandalone != item.Standalone) positionReady = false;
             lastStandalone = item.Standalone; current = item;
+            avoidanceButton.Content = item.AvoidCursor ? "🐾 피하기 ON" : "🐾 피하기 OFF";
+            avoidanceButton.Background = item.AvoidCursor ? BubblePalette.BrushFor("#D5F3DF") : Brushes.Transparent;
+            System.Windows.Automation.AutomationProperties.SetName(avoidanceButton, item.AvoidCursor ? "마우스 커서 피하기 켜짐, 클릭하여 끄기" : "마우스 커서 피하기 꺼짐, 클릭하여 켜기");
             shiftHint.Visibility = item.Standalone && item.AvoidCursor ? Visibility.Visible : Visibility.Collapsed;
             paper.Background = BubblePalette.BrushFor(item.Color);
             if (!resizing) { Width = item.NoteWidth; Height = item.NoteHeight; }
