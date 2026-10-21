@@ -30,7 +30,13 @@ namespace ChunsikDesktop {
     public sealed class GhostNoteHeader : Window {
         readonly Window note;
         bool aligning;
-        public GhostNoteHeader(Window owner, Action edit) {
+        public GhostNoteHeader(Window owner, FrameworkElement control) {
+            note = owner; Title = "포스트잇 조작 버튼";
+            Width = 24; Height = 24; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            AllowsTransparency = true; Background = Brushes.Transparent; Topmost = true;
+            ShowActivated = false; ShowInTaskbar = false; Content = control;
+        }
+        public GhostNoteHeader(Window owner, Action edit, Action startDrag = null, Action finishDrag = null) {
             note = owner;
             Title = "포스트잇 편집 헤더";
             Width = 180; Height = 24; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
@@ -40,15 +46,28 @@ namespace ChunsikDesktop {
                 Background = new SolidColorBrush(Color.FromRgb(255, 232, 148)), Foreground = Brushes.SaddleBrown,
                 BorderBrush = Brushes.Tan, Padding = new Thickness(3, 1, 3, 1),
                 ToolTip = "클릭하면 선명하게 편집해요. 저장/취소하거나 다른 창을 누르면 다시 클릭이 통과해요." };
-            button.Click += delegate { edit(); }; Content = button;
+            bool dragging = false; Point down = new Point(), origin = new Point();
+            button.PreviewMouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e) {
+                down = button.PointToScreen(e.GetPosition(button)); origin = ScreenLayout.BoundsPixels(note).TopLeft; dragging = false;
+            };
+            button.PreviewMouseMove += delegate(object sender, System.Windows.Input.MouseEventArgs e) {
+                if (e.LeftButton != System.Windows.Input.MouseButtonState.Pressed || !button.IsMouseCaptured || startDrag == null) return;
+                Point at = button.PointToScreen(e.GetPosition(button)); Vector delta = at - down;
+                if (!dragging && delta.Length > 5) { dragging = true; startDrag(); }
+                if (dragging) { ScreenLayout.MovePixels(note, origin.X + delta.X, origin.Y + delta.Y); e.Handled = true; }
+            };
+            button.Click += delegate { if (!dragging) edit(); };
+            button.LostMouseCapture += delegate { if (dragging && finishDrag != null) finishDrag(); };
+            Content = button;
         }
-        public void Align(FrameworkElement anchor, double width) {
+        public void Align(FrameworkElement anchor, double width, double height = 24) {
             if (aligning || !note.IsVisible || !anchor.IsLoaded) return;
             aligning = true;
             try {
                 if (Owner == null) Owner = note;
                 Point position = anchor.PointToScreen(new Point(0, 0));
                 if (Math.Abs(Width - width) > 0.5) Width = width;
+                if (Math.Abs(Height - height) > 0.5) Height = height;
                 if (!IsVisible) {
                     Left = note.Left; Top = note.Top; Show();
                 }

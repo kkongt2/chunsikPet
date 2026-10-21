@@ -297,7 +297,7 @@ namespace ChunsikDesktop {
         public bool IsCompleting { get; private set; }
         public void AnimateComplete(Action finished) {
             if (IsCompleting || disposing) return;
-            IsCompleting = true; ghostHeader.Hide(); UpdateLayout();
+            IsCompleting = true; SyncGhostHeader(); UpdateLayout();
             double oldHeight = ActualHeight; SizeToContent = SizeToContent.Manual; Height = oldHeight;
             root.IsHitTestVisible = false;
             mascot.Visibility = Visibility.Visible; mascot.Source = peekArt;
@@ -370,7 +370,8 @@ namespace ChunsikDesktop {
         double completeAllowedAfter;
         readonly ScrollViewer messageScroll;
         readonly Func<bool> persist;
-        readonly TextBlock fontLabel;
+        readonly List<GhostNoteHeader> ghostControls = new List<GhostNoteHeader>();
+        readonly List<FrameworkElement> ghostAnchors = new List<FrameworkElement>();
         bool lastStandalone;
         public void ResetPosition() { positionReady = false; }
         readonly Border paper;
@@ -391,7 +392,7 @@ namespace ChunsikDesktop {
             heading = new TextBlock { Text = "🐾 헤더 클릭으로 편집", FontSize = 10, Height = 24, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
             StackPanel noteHeader = new StackPanel(); content.Children.Add(noteHeader);
             heading.MouseLeftButtonDown += DragNote; noteHeader.Children.Add(heading);
-            Button addNote = NoteButton("＋ 새 포스트잇", "새 빈 포스트잇 추가", add);
+            Button addNote = NoteButton("＋", "새 빈 포스트잇 추가", add);
             addNote.HorizontalAlignment = HorizontalAlignment.Left;
             addNote.Margin = new Thickness(0, 0, 0, 6);
             noteHeader.Children.Add(addNote);
@@ -412,9 +413,8 @@ namespace ChunsikDesktop {
             Deactivated += delegate { if (IsEditing) EndEdit(true); };
             WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 6) }; Grid.SetRow(buttons, 2); content.Children.Add(buttons);
             Button smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
-            fontLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3), FontSize = 11 }; buttons.Children.Add(fontLabel);
-            buttons.Children.Add(NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }));
-            completeButton = NoteButton("✓ 할 일 완료", "이 할 일을 완료 처리", delegate {
+            Button larger = NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }); buttons.Children.Add(larger);
+            completeButton = NoteButton("✓", "이 할 일을 완료 처리", delegate {
                 if (IsEditing || interactionClock.Elapsed.TotalSeconds < completeAllowedAfter) return;
                 complete();
             }); buttons.Children.Add(completeButton);
@@ -455,15 +455,30 @@ namespace ChunsikDesktop {
                 if (!persist()) { current.NoteWidth = oldWidth; current.NoteHeight = oldHeight; Update(current); }
                 ClampPosition(WorkingArea()); ApplyGhostMode();
             }; root.Children.Add(grip);
-            ghostHeader = new GhostNoteHeader(this, BeginEdit);
+            ghostHeader = new GhostNoteHeader(this, BeginEdit,
+                delegate { dragging = true; },
+                delegate { dragging = false; if (current != null) { current.Pinned = true; positionReady = true; ClampPosition(WorkingArea()); moved(Left, Top); ApplyGhostMode(); } });
+            foreach (Button original in new Button[] { addNote, smaller, larger, completeButton }) {
+                Button source = original;
+                Button proxy = NoteButton(source.Content.ToString(), source.ToolTip.ToString(), delegate { source.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
+                proxy.Margin = new Thickness(0); proxy.Opacity = 0.7;
+                proxy.Background = BubblePalette.BrushFor("#FFE894");
+                proxy.MouseEnter += delegate { proxy.Opacity = 1; }; proxy.MouseLeave += delegate { proxy.Opacity = 0.7; };
+                ghostAnchors.Add(source); ghostControls.Add(new GhostNoteHeader(this, proxy));
+            }
+            System.Windows.Controls.Primitives.Thumb proxyGrip = new System.Windows.Controls.Primitives.Thumb { Template = grip.Template, Cursor = grip.Cursor, ToolTip = grip.ToolTip };
+            proxyGrip.DragStarted += delegate { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragStartedEventArgs(0, 0)); };
+            proxyGrip.DragDelta += delegate(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e) { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(e.HorizontalChange, e.VerticalChange)); };
+            proxyGrip.DragCompleted += delegate(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e) { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragCompletedEventArgs(e.HorizontalChange, e.VerticalChange, e.Canceled)); };
+            ghostAnchors.Add(grip); ghostControls.Add(new GhostNoteHeader(this, proxyGrip));
             SourceInitialized += delegate { ApplyGhostMode(); };
             Loaded += delegate { ApplyGhostMode(); };
             ContentRendered += delegate { SyncGhostHeader(); };
-            IsVisibleChanged += delegate { if (!IsVisible) ghostHeader.Hide(); else ApplyGhostMode(); };
+            IsVisibleChanged += delegate { SyncGhostHeader(); if (IsVisible) ApplyGhostMode(); };
             LocationChanged += delegate { SyncGhostHeader(); };
             SizeChanged += delegate { SyncGhostHeader(); };
             LayoutUpdated += delegate { SyncGhostHeader(); };
-            Closed += delegate { ghostHeader.Close(); };
+            Closed += delegate { ghostHeader.Close(); foreach (GhostNoteHeader control in ghostControls) control.Close(); };
         }
         void ApplyGhostMode() {
             if (ghostHeader == null || disposing) return;
@@ -473,11 +488,19 @@ namespace ChunsikDesktop {
         }
         void SyncGhostHeader() {
             if (ghostHeader == null || disposing) return;
-            if (!IsVisible || IsEditing || IsDragging || IsCompleting || current == null) { ghostHeader.Hide(); return; }
-            ghostHeader.Align(heading, Math.Max(120, ActualWidth - 42));
+            bool show = IsVisible && !IsEditing && !IsCompleting && current != null;
+            if (show) ghostHeader.Align(heading, Math.Max(120, ActualWidth - 42)); else ghostHeader.Hide();
+            for (int i = 0; i < ghostControls.Count; i++) {
+                FrameworkElement anchor = ghostAnchors[i];
+                if (show && anchor.IsVisible && anchor.ActualWidth > 0 && anchor.ActualHeight > 0)
+                    ghostControls[i].Align(anchor, anchor.ActualWidth, anchor.ActualHeight);
+                else ghostControls[i].Hide();
+            }
         }
         static Button NoteButton(string text, string hint, Action action) {
             Button button = new Button { Content = text, ToolTip = hint, Padding = new Thickness(4, 3, 4, 3), Margin = new Thickness(2), FontSize = 11, Background = Brushes.Transparent, BorderBrush = Brushes.Tan, Cursor = System.Windows.Input.Cursors.Hand };
+            System.Windows.Automation.AutomationProperties.SetName(button, hint);
+            button.MinWidth = 28; button.MinHeight = 26;
             button.Click += delegate { action(); }; return button;
         }
         void ChangeFont(int delta) {
@@ -524,7 +547,7 @@ namespace ChunsikDesktop {
             lastStandalone = item.Standalone; current = item;
             paper.Background = BubblePalette.BrushFor(item.Color);
             if (!resizing) { Width = item.NoteWidth; Height = item.NoteHeight; }
-            message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize; fontLabel.Text = item.FontSize.ToString();
+            message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize;
             bool blank = String.IsNullOrWhiteSpace(item.Text);
             message.Text = blank ? "위쪽 헤더를 눌러 할 일을 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
             message.Foreground = blank ? Brushes.SlateGray : new SolidColorBrush(Color.FromRgb(64, 55, 44));
