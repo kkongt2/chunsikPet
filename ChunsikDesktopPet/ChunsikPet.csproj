@@ -39,6 +39,7 @@
   <ItemGroup>
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
+    <Compile Include="PreviewUI.cs" />
     <Compile Include="PetOptions.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Reminders.cs" />

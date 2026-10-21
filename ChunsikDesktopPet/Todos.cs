@@ -237,6 +237,7 @@ namespace ChunsikDesktop {
                     TextBox title = new TextBox { Text = item.Text, FontSize = 17, FontWeight = FontWeights.SemiBold, Padding = new Thickness(10, 8, 5, 8), MaxLength = 160, BorderThickness = new Thickness(0), Foreground = item.Done ? Brushes.Gray : new SolidColorBrush(Color.FromRgb(41, 53, 72)) }; heading.Children.Add(title);
                     title.TextChanged += delegate { item.Text = title.Text; changed(); };
                     if (item.Done) continue;
+                    cardContent.Children.Add(Button("▶ 표시 미리보기", delegate { PreviewUI.Todo(win, item); }));
                     WrapPanel display = SettingRow(cardContent, "표시 방식");
                     display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));
                     if (!item.Always) {

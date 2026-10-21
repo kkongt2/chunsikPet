@@ -28,6 +28,13 @@ namespace ChunsikDesktop {
         bool noticeAnimating;
         static BitmapSource sleepingFrame;
         static TrayController trayController;
+        public static BitmapSource PreviewPose(string kind, int tick) {
+            if (kind == "water") return waterFrames[tick % waterFrames.Length];
+            if (kind == "stretch") return stretchFrames[tick % stretchFrames.Length];
+            if (kind == "lunch") return noticeFrames[tick % 4];
+            if (kind == "home") return noticeFrames[4 + tick % 4];
+            return frames[tick % 2 == 0 ? 4 : 7];
+        }
         public static BitmapSource ToolPose(bool wave) { return frames[wave ? 7 : 4]; }
         public static BitmapSource TrayImage { get { return frames[4]; } }
         public static bool AllPaused {
