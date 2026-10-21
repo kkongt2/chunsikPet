@@ -161,7 +161,7 @@ namespace ChunsikDesktop {
             System.Windows.Controls.Button close = new System.Windows.Controls.Button {
                 Content = "닫기", Padding = new Thickness(24, 7, 24, 7), HorizontalAlignment = HorizontalAlignment.Center
             };
-            close.Click += delegate { SettingsHub.Close(); }; content.Children.Add(close);
+            close.Click += delegate { SettingsHub.Close(); };
             System.Windows.Controls.CheckBox startup = new System.Windows.Controls.CheckBox { Content = "Windows 로그인 시 자동 실행", IsChecked = StartupRegistration.Enabled, Margin = new Thickness(0, 12, 0, 12) };
             bool startupRefresh = false;
             startup.Click += delegate {
@@ -170,8 +170,11 @@ namespace ChunsikDesktop {
                 catch (Exception e) { MessageBox.Show("자동 실행을 등록하지 못했어요.\n" + e.Message + "\n회사 정책으로 차단되면 시작프로그램 폴더에 EXE 바로가기를 등록해 주세요."); }
                 startupRefresh = true; startup.IsChecked = StartupRegistration.Enabled; startupRefresh = false;
             }; content.Children.Add(startup);
-            System.Windows.Controls.Button export = new System.Windows.Controls.Button { Content = "설정 백업 내보내기", Padding = new Thickness(12), Margin = new Thickness(0, 4, 0, 4) }; export.Click += delegate { SettingsBackup.Export(); }; content.Children.Add(export);
-            System.Windows.Controls.Button import = new System.Windows.Controls.Button { Content = "설정 복원", Padding = new Thickness(12) }; import.Click += delegate { SettingsBackup.Import(); }; content.Children.Add(import);
+            System.Windows.Controls.StackPanel backup = Theme.Card(content, "설정 백업·복원");
+            backup.Children.Add(new System.Windows.Controls.TextBlock { Text = "알림·캐릭터·포스트잇 설정을 파일로 보관하거나 가져올 수 있어요.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10), Foreground = System.Windows.Media.Brushes.SlateGray });
+            System.Windows.Controls.Button export = new System.Windows.Controls.Button { Content = "설정 백업 내보내기", Padding = new Thickness(12), Margin = new Thickness(0, 4, 0, 4) }; export.Click += delegate { SettingsBackup.Export(); }; backup.Children.Add(export);
+            System.Windows.Controls.Button import = new System.Windows.Controls.Button { Content = "설정 복원", Padding = new Thickness(12) }; import.Click += delegate { SettingsBackup.Import(); }; backup.Children.Add(import);
+            close.Margin = new Thickness(0, 10, 0, 0); content.Children.Add(close);
             SettingsHub.Attach(win, "프로그램", null);
         }
         public void Dispose() {
