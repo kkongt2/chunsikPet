@@ -410,20 +410,13 @@ namespace ChunsikDesktop {
             heading.HorizontalAlignment = HorizontalAlignment.Left;
         }
         double NoteHeight { get { return ActualHeight > 0 ? ActualHeight : 200; } }
-        Rect WorkingArea() {
-            PresentationSource source = PresentationSource.FromVisual(this);
-            Matrix fromDevice = source == null || source.CompositionTarget == null ? Matrix.Identity : source.CompositionTarget.TransformFromDevice;
-            Rect candidate = new Rect(Double.IsNaN(Left) ? 0 : Left, Double.IsNaN(Top) ? 0 : Top, Width, NoteHeight);
-            Rect best = SystemParameters.WorkArea; double overlap = 0;
-            foreach (System.Windows.Forms.Screen screen in System.Windows.Forms.Screen.AllScreens) {
-                System.Drawing.Rectangle work = screen.WorkingArea;
-                Point a = fromDevice.Transform(new Point(work.Left, work.Top)), b = fromDevice.Transform(new Point(work.Right, work.Bottom));
-                Rect area = new Rect(a, b), intersection = Rect.Intersect(area, candidate);
-                double amount = intersection.IsEmpty ? 0 : intersection.Width * intersection.Height;
-                if (amount > overlap) { overlap = amount; best = area; }
-            }
-            return best;
+        Rect WorkingArea() { return ScreenLayout.AreaFor(this); }
+        public void RememberRecoveredPosition() {
+            if (current == null || !current.Pinned || !IsVisible || dragging || IsCompleting) return;
+            if (Math.Abs(current.NoteLeft - Left) < 0.5 && Math.Abs(current.NoteTop - Top) < 0.5 && current.HasPosition) return;
+            current.NoteLeft = Left; current.NoteTop = Top; current.HasPosition = true; moved(Left, Top);
         }
+
         void ClampPosition(Rect area) {
             Left = Math.Max(area.Left, Math.Min(area.Right - Width, Left));
             Top = Math.Max(area.Top, Math.Min(area.Bottom - NoteHeight, Top));

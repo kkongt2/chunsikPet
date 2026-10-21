@@ -13,15 +13,15 @@ namespace ChunsikDesktop {
     public static class ReminderHistory {
         static readonly string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "history.xml");
         static readonly XmlSerializer serializer = new XmlSerializer(typeof(List<HistoryEntry>));
-        static List<HistoryEntry> entries = Load(); static Window editor; static Action render;
+        static List<HistoryEntry> entries = Load(); static bool warned; static Window editor; static Action render;
         static List<HistoryEntry> Load() {
-            foreach (string p in new string[] { path, path + ".bak" }) try { if (File.Exists(p)) using (FileStream f = File.OpenRead(p)) return (List<HistoryEntry>)serializer.Deserialize(f); } catch { }
+            foreach (string p in new string[] { path, path + ".bak" }) try { if (File.Exists(p)) using (FileStream f = File.OpenRead(p)) { List<HistoryEntry> loaded = (List<HistoryEntry>)serializer.Deserialize(f); if (loaded == null) throw new InvalidDataException(); loaded.RemoveAll(delegate(HistoryEntry e) { return e == null || e.Notice == null || e.Notice.Messages == null; }); if (loaded.Count > 300) loaded.RemoveRange(300, loaded.Count - 300); return loaded; } } catch { }
             return new List<HistoryEntry>();
         }
         static void Save() {
             try { Directory.CreateDirectory(Path.GetDirectoryName(path)); using (FileStream f = File.Create(path + ".tmp")) serializer.Serialize(f, entries);
                 if (File.Exists(path)) File.Replace(path + ".tmp", path, path + ".bak"); else File.Move(path + ".tmp", path);
-            } catch (Exception e) { if (editor != null) editor.Title = "알림 이력 · 저장 실패: " + e.Message; }
+            } catch (Exception e) { if (editor != null) editor.Title = "알림 이력 · 저장 실패: " + e.Message; if (!warned) { warned = true; MessageBox.Show("알림 이력을 저장하지 못했어요. 이번 실행 중 기록만 유지됩니다.\n" + e.Message, "알림 이력"); } }
             if (render != null) render();
         }
         public static void Record(NoticeData data, string state) {

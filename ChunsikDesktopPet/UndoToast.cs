@@ -15,7 +15,7 @@ namespace ChunsikDesktop {
             DateTime until = DateTime.UtcNow.AddSeconds(12); DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             timer.Tick += delegate { int left = (int)Math.Ceiling((until - DateTime.UtcNow).TotalSeconds); if (left <= 0) { win.Close(); return; } button.Content = "↶ 되돌리기 (" + left + "초)"; };
             button.Click += delegate { win.Close(); undo(); };
-            win.Loaded += delegate { Rect a = SystemParameters.WorkArea; win.Left = a.Right - win.Width - 20; win.Top = a.Bottom - win.Height - 20; };
+            win.Loaded += delegate { Rect a = ScreenLayout.AreaFor(win); win.Left = a.Right - win.Width - 20; win.Top = a.Bottom - win.Height - 20; };
             win.Closed += delegate { timer.Stop(); if (current == win) current = null; }; timer.Start(); win.Show();
         }
     }

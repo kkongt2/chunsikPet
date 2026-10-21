@@ -9,6 +9,7 @@
     <RootNamespace>ChunsikDesktop</RootNamespace>
     <AssemblyName>ChunsikPet</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>ChunsikDesktop.Program</StartupObject>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>5</LangVersion>
@@ -40,6 +41,8 @@
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
     <Compile Include="PreviewUI.cs" />
+    <Compile Include="Scheduling.cs" />
+    <Compile Include="ScreenLayout.cs" />
     <Compile Include="SettingsHub.cs" />
     <Compile Include="UndoToast.cs" />
     <Compile Include="SettingsBackup.cs" />

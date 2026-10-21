@@ -1,0 +1,23 @@
+name: Windows build and scheduling tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build Release x64
+        run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
+      - name: Build scheduling tests
+        run: msbuild tests/ScheduleTests.csproj /t:Rebuild /m
+      - name: Run scheduling tests
+        run: .\tests\bin\ScheduleTests.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChunsikPet-Windows-x64
+          path: ChunsikDesktopPet/bin/x64/Release/ChunsikPet.exe

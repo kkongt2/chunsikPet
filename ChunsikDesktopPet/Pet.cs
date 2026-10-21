@@ -46,7 +46,7 @@ namespace ChunsikDesktop {
         public static int Count { get { return Pets.Count; } }
         public static void ApplyAppearance() {
             if (PetPreferences.Current == null) return;
-            foreach (PetWindow pet in Pets) pet.Opacity = 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0;
+            foreach (PetWindow pet in Pets) PresentationPolicy.SetOpacity(pet, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
         }
         double fleeUntil;
         int fleeDirection;
@@ -184,7 +184,7 @@ namespace ChunsikDesktop {
                 if (IntPtr.Size == 8) SetWindowLongPtr(hwnd, -20, new IntPtr(GetWindowLongPtr(hwnd, -20).ToInt64() | 0x08000080L));
                 else SetWindowLong32(hwnd, -20, GetWindowLong32(hwnd, -20) | 0x08000080);
                 ResizePet(80);
-                if (!IsTodoCompanion && PetPreferences.Current != null) Opacity = 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0;
+                if (!IsTodoCompanion && PetPreferences.Current != null) PresentationPolicy.SetOpacity(this, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
                 Rect area = WorkArea(); Left = area.Left + Rng.NextDouble() * Math.Max(0, area.Width - Width);
                 Top = area.Bottom - Height; ChooseState(); timer.Start();
             };
@@ -259,15 +259,11 @@ namespace ChunsikDesktop {
             }
         }
 
-        Rect WorkArea() {
-            IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            MONITORINFO info = new MONITORINFO(); info.Size = Marshal.SizeOf(typeof(MONITORINFO));
-            if (!GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref info)) return SystemParameters.WorkArea;
-            PresentationSource source = PresentationSource.FromVisual(this);
-            Matrix fromDevice = source == null || source.CompositionTarget == null ? Matrix.Identity : source.CompositionTarget.TransformFromDevice;
-            Point a = fromDevice.Transform(new Point(info.Work.Left, info.Work.Top));
-            Point b = fromDevice.Transform(new Point(info.Work.Right, info.Work.Bottom));
-            return new Rect(a, b);
+        Rect WorkArea() { return ScreenLayout.AreaFor(this); }
+        public void RecoverDisplay() {
+            if (!IsLoaded || closing) return;
+            falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
+            Rect area = WorkArea(); LayoutPet(); Left = Clamp(Left, area.Left, area.Right - Width); Top = Math.Max(area.Top, area.Bottom - Height);
         }
 
         void LayoutPet() {
@@ -553,9 +549,9 @@ namespace ChunsikDesktop {
             PetPreferences.Current = new PetPreferences();
             ReminderService.Current = new ReminderService();
             TodoService.Current = new TodoService();
-            app.Exit += delegate { if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); };
+            app.Exit += delegate { ScreenLayout.Stop(); if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); };
             app.Startup += delegate {
-                SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController();
+                ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController();
                 if (PetPreferences.Current.Options.PaydayEnabled && PaydayCalendar.IsPayday(DateTime.Today, PetPreferences.Current.Options.PaydayDay))
                     app.Dispatcher.BeginInvoke(new Action(PreviewPayday), DispatcherPriority.Loaded);
             };

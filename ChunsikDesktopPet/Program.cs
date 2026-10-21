@@ -7,8 +7,8 @@ using System.Windows;
 [assembly: AssemblyDescription("Desktop companion, reminders and sticky notes")]
 [assembly: AssemblyCompany("kkongt2.kang")]
 [assembly: AssemblyProduct("Chunsik Desktop Pet")]
-[assembly: AssemblyVersion("1.39.0.0")]
-[assembly: AssemblyFileVersion("1.39.0.0")]
+[assembly: AssemblyVersion("1.39.1.0")]
+[assembly: AssemblyFileVersion("1.39.1.0")]
 namespace ChunsikDesktop {
     internal static class Program {
         [STAThread]

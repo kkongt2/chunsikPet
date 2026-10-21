@@ -17,6 +17,9 @@ namespace ChunsikDesktop {
         public static bool FullscreenEnabled { get; private set; }
         public static bool IsSuppressed { get; private set; }
         public static string Status { get { return indefinite ? "직접 해제할 때까지" : until > DateTime.Now ? until.ToString("HH:mm") + "까지" : IsSuppressed ? "전체 화면" : "꺼짐"; } }
+        public static void SetOpacity(Window w, double opacity) {
+            if (hidden.ContainsKey(w)) { hidden[w] = opacity; w.Opacity = 0; } else w.Opacity = opacity;
+        }
         public static void Start() {
             try { FullscreenEnabled = File.Exists(path) && File.ReadAllText(path).Trim() == "on"; } catch { }
             timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) }; timer.Tick += delegate { Refresh(); }; timer.Start();

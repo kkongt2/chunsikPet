@@ -74,7 +74,7 @@ namespace ChunsikDesktop {
             pet.Source = PetWindow.ToolPose(false); pet.Height = 108; pet.Stretch = Stretch.Uniform; pet.HorizontalAlignment = HorizontalAlignment.Center; pet.RenderTransformOrigin = new Point(0.5, 1); pet.RenderTransform = tilt; pet.Cursor = Cursors.SizeAll; pet.ToolTip = "전담 춘식이를 끌어 위치를 바꿀 수 있어요"; pet.MouseLeftButtonDown += MoveWindow; root.Children.Add(pet);
             TextBlock badge = new TextBlock { Text = countdown ? "TIMER" : "STOPWATCH", FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue, HorizontalAlignment = HorizontalAlignment.Center }; root.Children.Add(new Border { Background = Brushes.White, CornerRadius = new CornerRadius(7), Padding = new Thickness(7, 2, 7, 2), HorizontalAlignment = HorizontalAlignment.Center, Child = badge });
             Loaded += delegate {
-                Rect area = SystemParameters.WorkArea;
+                Rect area = ScreenLayout.AreaFor(this);
                 Left = Math.Max(area.Left, area.Right - Width - (countdown ? 20 : 380));
                 Top = Math.Max(area.Top, area.Bottom - ActualHeight - 12);
             };
