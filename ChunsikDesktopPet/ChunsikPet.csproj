@@ -58,6 +58,7 @@
     <Compile Include="TodoModels.cs" />
     <Compile Include="TrayController.cs" />
     <Compile Include="StartupRegistration.cs" />
+    <Compile Include="AppLifecycle.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="chunsik-notices.png"><LogicalName>Assets.chunsik-notices.png</LogicalName></EmbeddedResource>

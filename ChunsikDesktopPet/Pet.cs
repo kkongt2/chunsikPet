@@ -574,9 +574,10 @@ namespace ChunsikDesktop {
             if (exiting) return; exiting = true; Application.Current.Shutdown();
         }
         public static void Run(string folder) {
+            AppLifecycle.Prepare();
             bool first;
             using (System.Threading.Mutex instance = new System.Threading.Mutex(true, @"Local\ChunsikDesktopPet.v2", out first)) {
-                if (!first) { MessageBox.Show("춘식이가 이미 실행 중이에요. 춘식이를 우클릭해 알림을 설정해 주세요.", "춘식이"); return; }
+                if (!first) { AppLifecycle.SignalSettings(); return; }
                 try { RunApp(folder); }
                 finally { instance.ReleaseMutex(); }
             }
@@ -604,7 +605,7 @@ namespace ChunsikDesktop {
             TodoService.Current = new TodoService();
             app.Exit += delegate { ScreenLayout.Stop(); if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); };
             app.Startup += delegate {
-                ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController();
+                ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController(); AppLifecycle.Listen(app);
                 if (PetPreferences.Current.Options.PaydayEnabled && PaydayCalendar.IsPayday(DateTime.Today, PetPreferences.Current.Options.PaydayDay))
                     app.Dispatcher.BeginInvoke(new Action(PreviewPayday), DispatcherPriority.Loaded);
             };
