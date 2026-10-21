@@ -171,21 +171,24 @@ namespace ChunsikDesktop {
         public static bool OnDay(Reminder item, DateTime day) {
             return item.HasDay((int)day.DayOfWeek);
         }
-        // Check the interval (previous, now], including midnight; cap catch-up at five minutes.
+        // Recover the latest eligible occurrence per reminder after a gap, up to seven days.
         public static bool TryDue(Reminder item, DateTime previous, DateTime now, out DateTime due) {
             due = now;
             if (item.IsDate || item.IsInterval || !item.Enabled || now < previous) return false;
             TimeSpan time;
             if (!TryTime(item.Time, out time)) return false;
-            if (now - previous > TimeSpan.FromMinutes(5)) previous = now.AddMinutes(-5);
+            if (now - previous > TimeSpan.FromDays(7)) previous = now.AddDays(-7);
             due = now.Date.Add(time);
             if (due > now) due = due.AddDays(-1);
-            return OnDay(item, due) && due > previous && due <= now
-                && item.LastFired != due.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            for (int i = 0; i < 7 && due > previous; i++, due = due.AddDays(-1))
+                if (OnDay(item, due) && due <= now && item.LastFired != due.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) return true;
+            return false;
         }
     }
 
     public sealed class NoticeData {
+        public string HistoryId;
+        public bool Missed;
         public string ReminderId;
         public bool Interval;
         public string BubbleColor;
@@ -336,7 +339,7 @@ namespace ChunsikDesktop {
             return new NoticeData { BubbleColor = item.BubbleColor, ReminderId = item.Id, Interval = item.IsInterval, Kind = item.Kind, Label = (item.IsDate ? item.Date + (item.HasTime ? " " + item.Time : " · 시작할 때") : item.IsInterval ? (item.IntervalMinutes / 60) + "시간 " + (item.IntervalMinutes % 60) + "분 간격" : item.Time) + " · " + item.Title, Messages = item.GetMessages(), Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes };
         }
         void Check() {
-            DateTime now = DateTime.Now;
+            DateTime now = DateTime.Now, lastBeforeCheck = lastCheck;
             bool changed = false;
             List<NoticeData> dueNotices = new List<NoticeData>();
             foreach (Reminder item in settings.Items) {
@@ -373,7 +376,7 @@ namespace ChunsikDesktop {
             collecting = true;
             try {
                 if (changed) SaveFired();
-                foreach (NoticeData data in dueNotices) Enqueue(data, settings.Sound);
+                foreach (NoticeData data in dueNotices) { data.Missed = now - lastBeforeCheck > TimeSpan.FromMinutes(5); Enqueue(data, settings.Sound); }
             } finally { collecting = false; }
             ShowNext();
         }
@@ -387,6 +390,7 @@ namespace ChunsikDesktop {
                 foreach (NoticeData waiting in queue) if (waiting.ReminderId == data.ReminderId) return;
                 foreach (Snooze later in snoozes) if (later.Notice.ReminderId == data.ReminderId) return;
             }
+            ReminderHistory.Record(data, data.Missed ? "절전·자리 비움 후 복구" : "대기");
             queue.Enqueue(data);
             if (sound) { try { SystemSounds.Asterisk.Play(); } catch {} }
             ShowNext();
@@ -402,10 +406,13 @@ namespace ChunsikDesktop {
                 NoticeData data = queue.Dequeue();
                 List<PetWindow> assigned = concurrent ? pets.GetRange(offset, data.Messages.Count) : null;
                 offset += data.Messages.Count;
+                bool deferred = false;
+                ReminderHistory.Record(data, "표시됨");
                 NoticeGroup group = new NoticeGroup(data, delegate {
+                    deferred = true; ReminderHistory.Record(data, "다시 알림 예약");
                     snoozes.Add(new Snooze { Due = DateTime.Now.AddMinutes(data.SnoozeMinutes), Notice = data });
                 }, assigned);
-                group.Closed += delegate { active.Remove(group); if (!regrouping) ShowNext(); };
+                group.Closed += delegate { if (!regrouping && !stopping && !deferred) ReminderHistory.Record(data, "확인"); active.Remove(group); if (!regrouping) ShowNext(); };
                 active.Add(group);
             }
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Show();
@@ -415,6 +422,9 @@ namespace ChunsikDesktop {
             stopping = true; timer.Stop(); queue.Clear(); snoozes.Clear();
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
             if (editor != null) editor.Close();
+        }
+        public void Replay(NoticeData old) {
+            Enqueue(new NoticeData { Label = old.Label, Messages = new List<string>(old.Messages), Kind = old.Kind, BubbleColor = old.BubbleColor, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, false);
         }
         public void Test() {
             Enqueue(new NoticeData { Label = "말풍선 테스트", Messages = new List<string> { "첫 번째 메시지예요!", "두 번째 메시지는 다른 춘식이가 맡아요.", "남은 메시지도 자동으로 이어서 보여줘요.", "전환 간격은 알림 설정에서 바꿀 수 있어요.", "다시 알림을 누르면 전체 문구를 다시 알려드려요." }, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, settings.Sound);

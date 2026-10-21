@@ -79,6 +79,7 @@ namespace ChunsikDesktop {
             menu.Items.Add(pause);
             System.Windows.Forms.ToolStripMenuItem add = Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(PetWindow.Count + 1); });
             menu.Items.Add(add);
+            menu.Items.Add(Item("알림 이력 · 놓친 알림", ReminderHistory.Open));
             menu.Items.Add(Item("테스트 알림", delegate { ReminderService.Current.Test(); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             menu.Items.Add(Item("프로그램 정보", ShowAbout));
