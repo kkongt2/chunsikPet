@@ -1,7 +1,7 @@
 # 춘식이 데스크톱 펫
 
 Windows 작업표시줄 위의 캐릭터, 알림, 포스트잇, 타이머·스톱워치 프로그램입니다.
-만든이: **kkongt2.kang** · 현재 버전: **1.40.3**
+만든이: **kkongt2.kang** · 현재 버전: **1.40.4**
 
 ## Visual Studio에서 EXE 빌드
 
@@ -74,9 +74,9 @@ msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
 
 GitHub Actions에서 Windows Release 빌드와 스케줄 테스트를 실행하고, 성공한 실행의 **Artifacts → ChunsikPet-Windows-x64**에서 EXE를 받을 수 있습니다.
 
-### 수동으로 GitHub Release 게시
+### GitHub Release 자동·수동 게시
 
-1. **Actions → Publish latest Windows EXE → Run workflow**에서 **main**을 선택해 실행합니다.
+1. **main에 push하면 자동 실행**됩니다. **Actions → Publish latest Windows EXE → Run workflow**에서 **main**을 선택해 수동으로 실행할 수도 있습니다.
 2. 실행 시점의 `main` 최신 커밋과 `VERSION`을 읽습니다. Windows x64 EXE 빌드와 스케줄 테스트가 통과하면 `v버전` 태그, 변경 내역을 담은 Release 게시글, 첨부 파일 **ChunsikPet.exe**를 만들고 Latest로 지정합니다.
 3. 같은 태그의 Release가 이미 있으면 초안을 포함해 빌드·게시를 건너뜁니다. 기존 태그는 덮어쓰지 않으며, 태그만 존재하고 다른 커밋을 가리키면 오류로 중단합니다.
 
