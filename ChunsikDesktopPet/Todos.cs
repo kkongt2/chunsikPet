@@ -391,7 +391,7 @@ namespace ChunsikDesktop {
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             paper = new Border { CornerRadius = new CornerRadius(2, 2, 16, 2), BorderBrush = new SolidColorBrush(Color.FromRgb(190, 170, 102)), BorderThickness = new Thickness(0, 0, 1, 2), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 6, ShadowDepth = 2, Opacity = 0.2 } }; root.Children.Add(paper);
             tape = new Border { Width = 72, Height = 15, Background = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -3, 0, 0), RenderTransform = new RotateTransform(-4), IsHitTestVisible = false }; root.Children.Add(tape);
-            heading = new TextBlock { Text = "🐾 헤더 클릭으로 편집", FontSize = 10, Height = 24, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
+            heading = new TextBlock { Text = "수정/이동", FontSize = 10, Height = 24, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 0, 0, 8), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
             StackPanel noteHeader = new StackPanel(); content.Children.Add(noteHeader);
             heading.MouseLeftButtonDown += DragNote; noteHeader.Children.Add(heading);
             Button addNote = NoteButton("＋", "새 빈 포스트잇 추가", add);
@@ -414,6 +414,11 @@ namespace ChunsikDesktop {
             // Leaving the window still saves through Deactivated below.
             Deactivated += delegate { if (IsEditing) EndEdit(true); };
             WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 6) }; Grid.SetRow(buttons, 2); content.Children.Add(buttons);
+            StackPanel opacityButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 8, 0) };
+            Button moreTransparent = NoteButton("◐−", "더 투명하게 · 불투명도 10% 낮추기 (최소 30%)", delegate { ChangeOpacity(-10); });
+            Button lessTransparent = NoteButton("◐+", "더 선명하게 · 불투명도 10% 높이기 (최대 90%)", delegate { ChangeOpacity(10); });
+            moreTransparent.Background = lessTransparent.Background = BubblePalette.BrushFor("#D9EAFE");
+            opacityButtons.Children.Add(moreTransparent); opacityButtons.Children.Add(lessTransparent); buttons.Children.Add(opacityButtons);
             Button smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
             Button larger = NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }); buttons.Children.Add(larger);
             completeButton = NoteButton("✓", "이 할 일을 완료 처리", delegate {
@@ -460,11 +465,11 @@ namespace ChunsikDesktop {
             ghostHeader = new GhostNoteHeader(this, BeginEdit,
                 delegate { dragging = true; },
                 delegate { dragging = false; if (current != null) { current.Pinned = true; positionReady = true; ClampPosition(WorkingArea()); moved(Left, Top); ApplyGhostMode(); } });
-            foreach (Button original in new Button[] { addNote, smaller, larger, completeButton }) {
+            foreach (Button original in new Button[] { addNote, smaller, larger, completeButton, moreTransparent, lessTransparent }) {
                 Button source = original;
                 Button proxy = NoteButton(source.Content.ToString(), source.ToolTip.ToString(), delegate { source.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
                 proxy.Margin = new Thickness(0); proxy.Opacity = 0.7;
-                proxy.Background = BubblePalette.BrushFor("#FFE894");
+                proxy.Background = source == moreTransparent || source == lessTransparent ? source.Background : BubblePalette.BrushFor("#FFE894");
                 proxy.MouseEnter += delegate { proxy.Opacity = 1; }; proxy.MouseLeave += delegate { proxy.Opacity = 0.7; };
                 ghostAnchors.Add(source); ghostControls.Add(new GhostNoteHeader(this, proxy));
             }
@@ -497,7 +502,16 @@ namespace ChunsikDesktop {
         void SyncGhostHeader() {
             if (ghostHeader == null || disposing) return;
             bool show = IsVisible && !IsEditing && !IsCompleting && current != null;
-            if (show) ghostHeader.Align(heading, Math.Max(120, ActualWidth - 42)); else ghostHeader.Hide();
+            if (show) {
+                double headerWidth = Math.Max(1, ActualWidth - 42);
+                if (mascot.Visibility == Visibility.Visible && mascot.ActualWidth > 0) {
+                    Point textAt = heading.TranslatePoint(new Point(0, 0), this);
+                    Point petAt = mascot.TranslatePoint(new Point(0, 0), this);
+                    if (petAt.Y < textAt.Y + 24 && petAt.Y + mascot.ActualHeight > textAt.Y)
+                        headerWidth = Math.Max(1, Math.Min(headerWidth, petAt.X - textAt.X - 8));
+                }
+                ghostHeader.Align(heading, headerWidth);
+            } else ghostHeader.Hide();
             for (int i = 0; i < ghostControls.Count; i++) {
                 FrameworkElement anchor = ghostAnchors[i];
                 if (show && anchor.IsVisible && anchor.ActualWidth > 0 && anchor.ActualHeight > 0)
@@ -518,6 +532,13 @@ namespace ChunsikDesktop {
             System.Windows.Automation.AutomationProperties.SetName(button, hint);
             button.MinWidth = 28; button.MinHeight = 26;
             button.Click += delegate { action(); }; return button;
+        }
+        void ChangeOpacity(int deltaPercent) {
+            if (current == null) return;
+            double old = current.NoteOpacity;
+            current.NoteOpacity = Math.Max(30, Math.Min(90, Math.Round(old * 100) + deltaPercent)) / 100.0;
+            if (!persist()) current.NoteOpacity = old;
+            Update(current);
         }
         void ChangeFont(int delta) {
             if (current == null || !EndEdit(true)) return;
