@@ -73,7 +73,7 @@ namespace ChunsikDesktop {
                     if (item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) item.DisplaySeconds = 20;
                     if (item.Text == null) item.Text = "";
                     if (Double.IsNaN(item.NoteOpacity) || item.NoteOpacity < 0.2 || item.NoteOpacity > 1) item.NoteOpacity = 0.6;
-                    item.NoteOpacity = Math.Max(0.5, Math.Min(0.7, item.NoteOpacity));
+                    item.NoteOpacity = Math.Max(0.3, Math.Min(0.9, item.NoteOpacity));
                     if (item.FontSize < 10 || item.FontSize > 64) item.FontSize = 17;
                     if (Double.IsNaN(item.NoteWidth) || item.NoteWidth < 220 || item.NoteWidth > 1200) item.NoteWidth = 260;
                     if (Double.IsNaN(item.NoteHeight) || item.NoteHeight < 200 || item.NoteHeight > 1200) item.NoteHeight = 280;
@@ -249,7 +249,7 @@ namespace ChunsikDesktop {
                     font.Children.Add(new TextBlock { Text = item.FontSize + "", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6) });
                     font.Children.Add(Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); changed(); render(); }));
                     WrapPanel opacityRow = SettingRow(cardContent, "평소 불투명도");
-                    Slider opacitySlider = new Slider { Minimum = 50, Maximum = 70, Value = item.NoteOpacity * 100, Width = 180, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+                    Slider opacitySlider = new Slider { Minimum = 30, Maximum = 90, Value = item.NoteOpacity * 100, Width = 180, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
                     TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", Margin = new Thickness(10, 0, 0, 0) };
                     opacityRow.Children.Add(opacitySlider); opacityRow.Children.Add(opacityText);
                     opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); };
@@ -297,7 +297,7 @@ namespace ChunsikDesktop {
         public bool IsCompleting { get; private set; }
         public void AnimateComplete(Action finished) {
             if (IsCompleting || disposing) return;
-            IsCompleting = true; SyncGhostHeader(); UpdateLayout();
+            IsCompleting = true; SyncGhostHeader(); mascot.Opacity = 1; UpdateLayout();
             double oldHeight = ActualHeight; SizeToContent = SizeToContent.Manual; Height = oldHeight;
             root.IsHitTestVisible = false;
             mascot.Visibility = Visibility.Visible; mascot.Source = peekArt;
@@ -360,6 +360,8 @@ namespace ChunsikDesktop {
         readonly Grid noteContent;
         readonly TextBlock heading;
         readonly GhostNoteHeader ghostHeader;
+        readonly GhostNoteHeader ghostMascot;
+        readonly Image ghostMascotImage;
         readonly Action<double, double> moved;
         TodoItem current;
         bool dragging, resizing, positionReady;
@@ -430,8 +432,8 @@ namespace ChunsikDesktop {
             ContextMenu menu = new ContextMenu(); MenuItem manage = new MenuItem { Header = "포스트잇 설정" }; manage.Click += delegate { edit(); }; menu.Items.Add(manage); ContextMenu = menu;
             MenuItem finishTask = new MenuItem { Header = "✓ 이 할 일 완료하기" };
             finishTask.Click += delegate { if (EndEdit(true)) complete(); }; menu.Items.Add(finishTask);
-            MenuItem opacityMenu = new MenuItem { Header = "평소 불투명도 (50~70%)" }; menu.Items.Add(opacityMenu);
-            Slider noteOpacity = new Slider { Minimum = 50, Maximum = 70, Width = 160, TickFrequency = 5, IsSnapToTickEnabled = true, Margin = new Thickness(8) };
+            MenuItem opacityMenu = new MenuItem { Header = "평소 불투명도 (30~90%)" }; menu.Items.Add(opacityMenu);
+            Slider noteOpacity = new Slider { Minimum = 30, Maximum = 90, Width = 160, TickFrequency = 5, IsSnapToTickEnabled = true, Margin = new Thickness(8) };
             MenuItem opacityControl = new MenuItem { Header = noteOpacity, StaysOpenOnClick = true }; opacityMenu.Items.Add(opacityControl);
             bool loadingOpacity = false;
             menu.Opened += delegate { loadingOpacity = true; noteOpacity.Value = current == null ? 100 : current.NoteOpacity * 100; loadingOpacity = false; };
@@ -439,7 +441,7 @@ namespace ChunsikDesktop {
                 if (loadingOpacity || current == null) return;
                 double old = current.NoteOpacity; current.NoteOpacity = noteOpacity.Value / 100;
                 if (!persist()) current.NoteOpacity = old;
-                Opacity = IsEditing ? 1 : Math.Max(0.5, Math.Min(0.7, current.NoteOpacity)); opacityMenu.Header = "불투명도 " + Math.Round(current.NoteOpacity * 100) + "%";
+                Opacity = IsEditing ? 1 : Math.Max(0.3, Math.Min(0.9, current.NoteOpacity)); opacityMenu.Header = "불투명도 " + Math.Round(current.NoteOpacity * 100) + "%";
             };
             System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
             grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
@@ -471,6 +473,12 @@ namespace ChunsikDesktop {
             proxyGrip.DragDelta += delegate(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e) { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(e.HorizontalChange, e.VerticalChange)); };
             proxyGrip.DragCompleted += delegate(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e) { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragCompletedEventArgs(e.HorizontalChange, e.VerticalChange, e.Canceled)); };
             ghostAnchors.Add(grip); ghostControls.Add(new GhostNoteHeader(this, proxyGrip));
+            // An owned window above the header keeps the face and paws in front of
+            // its native HWND; WPF Panel.ZIndex cannot order separate top-level HWNDs.
+            ghostMascotImage = new Image { Stretch = Stretch.Uniform, IsHitTestVisible = false };
+            RenderOptions.SetBitmapScalingMode(ghostMascotImage, BitmapScalingMode.HighQuality);
+            ghostMascot = new GhostNoteHeader(ghostHeader, ghostMascotImage);
+            ghostMascot.SourceInitialized += delegate { NativeNoteInput.SetClickThrough(ghostMascot, true); };
             SourceInitialized += delegate { ApplyGhostMode(); };
             Loaded += delegate { ApplyGhostMode(); };
             ContentRendered += delegate { SyncGhostHeader(); };
@@ -478,12 +486,12 @@ namespace ChunsikDesktop {
             LocationChanged += delegate { SyncGhostHeader(); };
             SizeChanged += delegate { SyncGhostHeader(); };
             LayoutUpdated += delegate { SyncGhostHeader(); };
-            Closed += delegate { ghostHeader.Close(); foreach (GhostNoteHeader control in ghostControls) control.Close(); };
+            Closed += delegate { ghostMascot.Close(); ghostHeader.Close(); foreach (GhostNoteHeader control in ghostControls) control.Close(); };
         }
         void ApplyGhostMode() {
             if (ghostHeader == null || disposing) return;
             NativeNoteInput.SetClickThrough(this, !IsEditing && !IsDragging);
-            Opacity = IsEditing || IsDragging ? 1 : current == null ? 0.6 : Math.Max(0.5, Math.Min(0.7, current.NoteOpacity));
+            Opacity = IsEditing || IsDragging ? 1 : current == null ? 0.6 : Math.Max(0.3, Math.Min(0.9, current.NoteOpacity));
             SyncGhostHeader();
         }
         void SyncGhostHeader() {
@@ -495,6 +503,14 @@ namespace ChunsikDesktop {
                 if (show && anchor.IsVisible && anchor.ActualWidth > 0 && anchor.ActualHeight > 0)
                     ghostControls[i].Align(anchor, anchor.ActualWidth, anchor.ActualHeight);
                 else ghostControls[i].Hide();
+            }
+            if (show && mascot.Visibility == Visibility.Visible && mascot.ActualWidth > 0 && mascot.ActualHeight > 0) {
+                ghostMascotImage.Source = mascot.Source;
+                ghostMascot.Align(mascot, mascot.ActualWidth, mascot.ActualHeight);
+                mascot.Opacity = 0;
+            } else {
+                ghostMascot.Hide();
+                if (!IsCompleting) mascot.Opacity = 1;
             }
         }
         static Button NoteButton(string text, string hint, Action action) {
@@ -542,7 +558,7 @@ namespace ChunsikDesktop {
             e.Handled = true;
         }
         public void Update(TodoItem item) {
-            Opacity = IsEditing ? 1 : Math.Max(0.5, Math.Min(0.7, item.NoteOpacity));
+            Opacity = IsEditing ? 1 : Math.Max(0.3, Math.Min(0.9, item.NoteOpacity));
             if (lastStandalone != item.Standalone) positionReady = false;
             lastStandalone = item.Standalone; current = item;
             paper.Background = BubblePalette.BrushFor(item.Color);

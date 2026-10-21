@@ -22,6 +22,13 @@ internal static class GhostNoteTests {
         Console.WriteLine("Header visible=" + header.IsVisible + ", loaded=" + header.IsLoaded + ", note loaded=" + note.IsLoaded + ", heading loaded=" + Field<TextBlock>(note, "heading").IsLoaded + ", click-through=" + NativeNoteInput.IsClickThrough(header));
         Check(header.IsVisible && !NativeNoteInput.IsClickThrough(header), "separate header remains clickable");
         Check(note.Opacity == 0.6 && note.Topmost, "ghost is translucent and topmost");
+        GhostNoteHeader mascotLayer = Field<GhostNoteHeader>(note, "ghostMascot");
+        Check(mascotLayer.IsVisible && mascotLayer.Owner == header, "mascot layer is owned by and therefore above header");
+        Check(NativeNoteInput.IsClickThrough(mascotLayer), "mascot does not intercept header clicks");
+        Check(((Button)header.Content).Content.ToString().Contains("메모 수정/이동은 여기 꾹!"), "header explains edit and move");
+        item.NoteOpacity = 0.3; note.Update(item); Pump(); Check(note.Opacity == 0.3, "30 percent opacity supported");
+        item.NoteOpacity = 0.9; note.Update(item); Pump(); Check(note.Opacity == 0.9, "90 percent opacity supported");
+        item.NoteOpacity = 0.6; note.Update(item); Pump();
         List<GhostNoteHeader> controls = Field<List<GhostNoteHeader>>(note, "ghostControls");
         Check(controls.Count == 5, "buttons and resize grip each have an interactive region");
         foreach (GhostNoteHeader control in controls) Check(control.IsVisible && !NativeNoteInput.IsClickThrough(control), "ghost action region accepts input");

@@ -42,7 +42,7 @@ namespace ChunsikDesktop {
             Width = 180; Height = 24; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true; Background = Brushes.Transparent; Topmost = true;
             ShowActivated = false; ShowInTaskbar = false;
-            Button button = new Button { Content = "🐾 메모 수정은 여기 꾹!", FontSize = 11,
+            Button button = new Button { Content = "🐾 메모 수정/이동은 여기 꾹!", FontSize = 11,
                 Background = new SolidColorBrush(Color.FromRgb(255, 232, 148)), Foreground = Brushes.SaddleBrown,
                 BorderBrush = Brushes.Tan, Padding = new Thickness(3, 1, 3, 1),
                 ToolTip = "클릭하면 선명하게 편집해요. 저장/취소하거나 다른 창을 누르면 다시 클릭이 통과해요." };
