@@ -89,6 +89,8 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("알림 이력 · 놓친 알림", ReminderHistory.Open));
             menu.Items.Add(Item("테스트 알림", delegate { ReminderService.Current.Test(); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            menu.Items.Add(Item("설정 백업 내보내기", SettingsBackup.Export));
+            menu.Items.Add(Item("설정 백업 복원", SettingsBackup.Import));
             menu.Items.Add(Item("프로그램 정보", ShowAbout));
             menu.Items.Add(Item("춘식이 모두 종료", delegate { PetWindow.Quit(); }));
             menu.Opening += delegate {

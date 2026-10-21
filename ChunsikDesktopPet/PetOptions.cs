@@ -27,6 +27,7 @@ namespace ChunsikDesktop {
         static readonly XmlSerializer Serializer = new XmlSerializer(typeof(PetOptions));
         readonly DispatcherTimer timer = new DispatcherTimer();
         Window editor;
+        public bool SettingsOpen { get { return editor != null; } }
         [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
@@ -34,7 +35,7 @@ namespace ChunsikDesktop {
             Options = Load(); RefreshIdle();
             timer.Interval = TimeSpan.FromMilliseconds(500); timer.Tick += delegate { RefreshIdle(); }; timer.Start();
         }
-        static bool Valid(PetOptions value) {
+        public static bool Valid(PetOptions value) {
             return value != null && value.IdleMinutes >= 1 && value.IdleMinutes <= 1440 && value.PetCount >= 1 && value.PetCount <= 20 && value.PaydayDay >= 1 && value.PaydayDay <= 31 && value.TransparencyPercent >= 0 && value.TransparencyPercent <= 90;
         }
         static PetOptions Read(string path) {

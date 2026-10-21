@@ -62,6 +62,8 @@ namespace ChunsikDesktop {
         readonly DispatcherTimer timer = new DispatcherTimer();
         readonly Stopwatch clock = Stopwatch.StartNew();
         Window editor;
+        public bool SettingsOpen { get { return editor != null; } }
+        public TodoSettings Snapshot() { return settings; }
         PetWindow preferredPet;
         Action renderEditor;
         Func<bool> saveEditor;

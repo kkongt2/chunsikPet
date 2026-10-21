@@ -214,6 +214,8 @@ namespace ChunsikDesktop {
         DateTime lastCheck = DateTime.Now;
         ReminderSettings settings;
         Window editor;
+        public bool SettingsOpen { get { return editor != null; } }
+        public ReminderSettings Snapshot() { return settings; }
         public string AnimationKindFor(PetWindow pet) {
             foreach (NoticeGroup group in active) if (group.Contains(pet)) return group.Kind;
             return "";
