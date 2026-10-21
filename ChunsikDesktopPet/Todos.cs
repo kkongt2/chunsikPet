@@ -208,7 +208,7 @@ namespace ChunsikDesktop {
         }
         public void OpenSettings(PetWindow preferred) {
             preferredPet = preferred;
-            if (editor != null) { editor.Activate(); return; }
+            if (editor != null) { SettingsHub.Open("포스트잇"); return; }
             Window win = new Window { Title = "춘식이 포스트잇 · 할 일", Width = 880, Height = 740, MinWidth = 800, MinHeight = 480, UseLayoutRounding = true, Background = new SolidColorBrush(Color.FromRgb(247, 249, 252)), WindowStartupLocation = WindowStartupLocation.CenterScreen }; editor = win;
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
@@ -281,8 +281,8 @@ namespace ChunsikDesktop {
                 if (settings.Items.Count == 0) list.Children.Add(new TextBlock { Text = "아직 할 일이 없어요. 위에서 하나 등록해 보세요.", Margin = new Thickness(10, 30, 10, 10), Foreground = Brushes.SlateGray });
             };
             renderEditor = render; render();
-            win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !persist()) { e.Cancel = true; MessageBox.Show(win, status.Text, "입력 확인"); } };
-            win.Closed += delegate { debounce.Stop(); editor = null; renderEditor = null; saveEditor = null; }; win.Show();
+            win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !persist()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); } };
+            win.Closed += delegate { debounce.Stop(); editor = null; renderEditor = null; saveEditor = null; }; SettingsHub.Attach(win, "포스트잇", persist);
         }
     }
     public sealed class TodoNote : Window {

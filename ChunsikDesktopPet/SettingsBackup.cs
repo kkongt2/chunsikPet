@@ -13,6 +13,7 @@ namespace ChunsikDesktop {
     public static class SettingsBackup {
         static readonly string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet");
         static bool Ready() {
+            SettingsHub.Close();
             if (ReminderService.Current.SettingsOpen || TodoService.Current.SettingsOpen || PetPreferences.Current.SettingsOpen) { MessageBox.Show("설정 창을 닫아 변경사항을 저장한 뒤 다시 실행해 주세요.", "설정 백업·복원"); return false; } return true;
         }
         static byte[] Bytes(object value) { using (MemoryStream m = new MemoryStream()) { new XmlSerializer(value.GetType()).Serialize(m, value); return m.ToArray(); } }

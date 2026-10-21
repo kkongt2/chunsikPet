@@ -40,6 +40,7 @@
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
     <Compile Include="PreviewUI.cs" />
+    <Compile Include="SettingsHub.cs" />
     <Compile Include="UndoToast.cs" />
     <Compile Include="SettingsBackup.cs" />
     <Compile Include="PresentationPolicy.cs" />

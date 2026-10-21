@@ -46,6 +46,7 @@ namespace ChunsikDesktop {
             result.Click += delegate { Dispatch(action); }; return result;
         }
         public TrayController() {
+            SettingsHub.About = ShowAbout;
             icon = MakeIcon(PetWindow.TrayImage);
             menu = new System.Windows.Forms.ContextMenuStrip();
             System.Windows.Forms.ToolStripMenuItem quiet = new System.Windows.Forms.ToolStripMenuItem("방해 금지");
@@ -55,7 +56,7 @@ namespace ChunsikDesktop {
             quiet.DropDownItems.Add(Item("방해 금지 해제", delegate { PresentationPolicy.Set(0); }));
             System.Windows.Forms.ToolStripMenuItem fullscreen = Item("전체 화면에서 자동 숨김", PresentationPolicy.ToggleFullscreen); quiet.DropDownItems.Add(fullscreen);
             menu.Items.Add(quiet);
-            menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
+            menu.Items.Add(Item("설정 열기", delegate { SettingsHub.Open("캐릭터"); }));
             menu.Items.Add(Item("알림 · 메시지 설정", delegate { ReminderService.Current.OpenSettings(); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(null); }));
@@ -107,7 +108,7 @@ namespace ChunsikDesktop {
             };
         }
         void ShowAbout() {
-            if (about != null) { about.Activate(); return; }
+            if (about != null) { SettingsHub.Open("프로그램"); return; }
             Window win = new Window {
                 Title = "프로그램 정보", Width = 460, SizeToContent = SizeToContent.Height,
                 ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen,
@@ -143,8 +144,11 @@ namespace ChunsikDesktop {
             System.Windows.Controls.Button close = new System.Windows.Controls.Button {
                 Content = "닫기", Padding = new Thickness(24, 7, 24, 7), HorizontalAlignment = HorizontalAlignment.Center
             };
-            close.Click += delegate { win.Close(); }; content.Children.Add(close);
-            win.Show();
+            close.Click += delegate { SettingsHub.Close(); }; content.Children.Add(close);
+            content.Children.Add(new System.Windows.Controls.TextBlock { Text = "버전 " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 10) });
+            System.Windows.Controls.Button export = new System.Windows.Controls.Button { Content = "설정 백업 내보내기", Padding = new Thickness(12), Margin = new Thickness(0, 4, 0, 4) }; export.Click += delegate { SettingsBackup.Export(); }; content.Children.Add(export);
+            System.Windows.Controls.Button import = new System.Windows.Controls.Button { Content = "설정 복원", Padding = new Thickness(12) }; import.Click += delegate { SettingsBackup.Import(); }; content.Children.Add(import);
+            SettingsHub.Attach(win, "프로그램", null);
         }
         public void Dispose() {
             if (disposed) return; disposed = true;

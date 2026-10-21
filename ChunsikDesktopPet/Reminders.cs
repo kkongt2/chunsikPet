@@ -447,7 +447,7 @@ namespace ChunsikDesktop {
         }
         static void Cell(Grid grid, UIElement child, int column) { Grid.SetColumn(child, column); grid.Children.Add(child); }
         public void OpenSettings() {
-            if (editor != null) { editor.Activate(); return; }
+            if (editor != null) { SettingsHub.Open("알림"); return; }
             Window win = new Window { Title = "춘식이 알림 설정", Width = 1280, Height = 670, MinWidth = 1240, MinHeight = 540, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterScreen };
             editor = win;
             List<Reminder> rows = new List<Reminder>(); foreach (Reminder item in settings.Items) rows.Add(item.Copy());
@@ -554,7 +554,7 @@ namespace ChunsikDesktop {
                         days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent, new RoutedEventHandler(delegate { changed(); })); Cell(line, days, 3);
                     }
                     Cell(line, BubblePalette.Picker(row.BubbleColor, delegate(string color) { row.BubbleColor = color; changed(); }, 3), 4);
-                    Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(win, status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; Cell(line, edit, 5);
+                    Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; Cell(line, edit, 5);
                     StackPanel actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                     actions.Children.Add(Pill("▶ 보기", delegate { PreviewUI.Reminder(win, row, delegate { return seconds.Value; }); }));
                     Button remove = Pill(row.IsBuiltin ? "기본" : "삭제", delegate { if (row.IsBuiltin) return; rows.Remove(row); render(); changed(); });
@@ -562,11 +562,12 @@ namespace ChunsikDesktop {
                 }
             };
             render();
-            win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !save()) { e.Cancel = true; MessageBox.Show(win, status.Text, "저장 확인"); } };
-            win.Closed += delegate { debounce.Stop(); editor = null; }; win.Show();
+            win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !save()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "저장 확인"); } };
+            win.Closed += delegate { debounce.Stop(); editor = null; }; SettingsHub.Attach(win, "알림", save);
         }
         sealed class MessageDraft { public string Text; }
         void EditMessages(Window owner, Reminder row, Func<bool> persist) {
+            owner = SettingsHub.OwnerFor(owner);
             Window dialog = new Window { Owner = owner, Title = "메시지 편집 — " + row.Title, Width = 650, Height = 510, MinWidth = 560, MinHeight = 350, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterOwner };
             List<MessageDraft> drafts = new List<MessageDraft>(); foreach (string text in row.GetMessages()) drafts.Add(new MessageDraft { Text = text });
             if (drafts.Count == 0) drafts.Add(new MessageDraft { Text = "" });
