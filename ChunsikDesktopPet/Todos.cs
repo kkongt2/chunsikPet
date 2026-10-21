@@ -357,7 +357,7 @@ namespace ChunsikDesktop {
             }
             nearSince = -1;
             if (bestScore < 0) { evadeAfter = now + 1; return; }
-            evadeOrigin = new Point(Left, Top); evadeTarget = best; evadeStarted = now; IsEvading = true;
+            evadeOrigin = new Point(Left, Top); evadeTarget = best; evadeStarted = now; IsEvading = true; evadeTimer.Interval = TimeSpan.FromMilliseconds(16);
             UpdateLayout();
             // Roll the actual paper towards the mascot, with a shaded cylindrical edge.
             double anchorY = current.Peek ? 0 : paper.ActualHeight;
@@ -373,7 +373,7 @@ namespace ChunsikDesktop {
         }
         void CancelEvade() {
             if (!IsEvading) return;
-            IsEvading = false; nearSince = -1;
+            IsEvading = false; nearSince = -1; evadeTimer.Interval = TimeSpan.FromMilliseconds(80);
             paper.RenderTransform = Transform.Identity; mascot.RenderTransform = Transform.Identity;
             noteContent.Opacity = tape.Opacity = 1; root.IsHitTestVisible = true;
             if (rolledPaper != null) root.Children.Remove(rolledPaper);
@@ -518,7 +518,7 @@ namespace ChunsikDesktop {
             };
             PreviewMouseDown += delegate { evadeAfter = evadeClock.Elapsed.TotalSeconds + 2; nearSince = -1; };
             IsVisibleChanged += delegate { if (IsVisible) { evadeAfter = evadeClock.Elapsed.TotalSeconds + 2; evadeTimer.Start(); } else { CancelEvade(); evadeTimer.Stop(); } };
-            evadeTimer.Interval = TimeSpan.FromMilliseconds(16); evadeTimer.Tick += delegate { EvadeTick(); };
+            evadeTimer.Interval = TimeSpan.FromMilliseconds(80); evadeTimer.Tick += delegate { EvadeTick(); };
             System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
             grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
             grip.DragStarted += delegate { resizing = true; EndEdit(true); };
