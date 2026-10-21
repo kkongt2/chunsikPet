@@ -15,6 +15,10 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
       - name: Build Release x64
         run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
+      - name: Build WPF control tests
+        run: msbuild tests/UiControlsTests.csproj /t:Rebuild /m
+      - name: Run WPF control tests
+        run: .\tests\bin\UiControlsTests.exe
       - name: Build scheduling tests
         run: msbuild tests/ScheduleTests.csproj /t:Rebuild /m
       - name: Run scheduling tests

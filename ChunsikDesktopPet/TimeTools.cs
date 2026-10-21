@@ -21,7 +21,8 @@ namespace ChunsikDesktop {
         readonly Image pet = new Image();
         readonly RotateTransform tilt = new RotateTransform();
         readonly StackPanel durationPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-        readonly TextBox hours = new TextBox(), minutes = new TextBox(), seconds = new TextBox();
+        readonly NumberField hours = new NumberField(0, 99, "타이머 시간"), minutes = new NumberField(5, 59, "타이머 분"), seconds = new NumberField(0, 59, "타이머 초");
+        readonly StackPanel presets = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         readonly ListBox laps = new ListBox();
         readonly Button start, reset, lap, acknowledge;
         NoticeData completionNotice;
@@ -63,7 +64,14 @@ namespace ChunsikDesktop {
             readout.FontSize = 36; readout.FontWeight = FontWeights.Bold; readout.FontFamily = new FontFamily("Consolas"); readout.HorizontalAlignment = HorizontalAlignment.Center; readout.Margin = new Thickness(0, 12, 0, 6); content.Children.Add(readout);
             status.Text = "시작을 눌러주세요"; status.Foreground = Brushes.SlateGray; status.HorizontalAlignment = HorizontalAlignment.Center; status.Margin = new Thickness(0, 0, 0, 12); content.Children.Add(status);
             if (countdown) {
-                AddDuration(hours, "시간", "0"); AddDuration(minutes, "분", "5"); AddDuration(seconds, "초", "0"); content.Children.Add(durationPanel);
+                AddDuration(hours, "시간"); AddDuration(minutes, "분"); AddDuration(seconds, "초"); content.Children.Add(durationPanel);
+                foreach (int value in new int[] { 5, 10, 25 }) {
+                    int selected = value; Button preset = ActionButton(value + "분");
+                    preset.ToolTip = value + "분으로 설정";
+                    preset.Click += delegate { if (started) return; hours.SetValue(0); minutes.SetValue(selected); seconds.SetValue(0); UpdateDisplay(); };
+                    presets.Children.Add(preset);
+                }
+                presets.Margin = new Thickness(0, 8, 0, 0); content.Children.Add(presets);
                 content.Children.Add(new TextBlock { Text = "최대 99시간 59분 59초", FontSize = 10, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 8) });
             }
             StackPanel controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center }; content.Children.Add(controls);
@@ -90,16 +98,13 @@ namespace ChunsikDesktop {
         void MoveWindow(object sender, MouseButtonEventArgs e) {
             if (e.LeftButton == MouseButtonState.Pressed) { DragMove(); e.Handled = true; }
         }
-        void AddDuration(TextBox box, string unit, string initial) {
-            box.Text = initial; box.Width = 40; box.Padding = new Thickness(5); box.VerticalContentAlignment = VerticalAlignment.Center;
-            System.Windows.Automation.AutomationProperties.SetName(box, "타이머 " + unit);
-            durationPanel.Children.Add(box); durationPanel.Children.Add(new TextBlock { Text = unit, Margin = new Thickness(3, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
-            box.TextChanged += delegate { if (!started) UpdateDisplay(); };
+        void AddDuration(NumberField field, string unit) {
+            durationPanel.Children.Add(field); durationPanel.Children.Add(new TextBlock { Text = unit, Margin = new Thickness(3, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center });
+            field.Changed += delegate { if (!started) UpdateDisplay(); };
         }
         bool ReadDuration(out TimeSpan value) {
-            value = TimeSpan.Zero; int h, m, s;
-            if (!Int32.TryParse(hours.Text, out h) || !Int32.TryParse(minutes.Text, out m) || !Int32.TryParse(seconds.Text, out s) || h < 0 || h > 99 || m < 0 || m > 59 || s < 0 || s > 59) return false;
-            value = TimeSpan.FromSeconds(h * 3600 + m * 60 + s); return value > TimeSpan.Zero;
+            value = TimeSpan.FromSeconds(hours.Value * 3600 + minutes.Value * 60 + seconds.Value);
+            return value > TimeSpan.Zero;
         }
         void Toggle() {
             // Refresh completion first so a delayed UI tick cannot pause an expired timer.
@@ -108,14 +113,14 @@ namespace ChunsikDesktop {
             else {
                 if (completed) Reset();
                 if (!started && countdown && !ReadDuration(out duration)) { status.Text = "1초 이상, 올바른 시간을 입력해 주세요"; return; }
-                started = true; acknowledged = false; elapsed.Start(); durationPanel.IsEnabled = false;
+                started = true; acknowledged = false; elapsed.Start(); durationPanel.IsEnabled = false; presets.IsEnabled = false;
                 status.Text = countdown ? "시간을 지켜보고 있어요" : "함께 시간을 재고 있어요";
             }
             UpdateDisplay();
         }
         void Reset() {
             completed = false; acknowledged = true; ReminderService.Current.CancelNotice(completionNotice); completionNotice = null;
-            elapsed.Reset(); started = false; lastLap = TimeSpan.Zero; lapCount = 0; laps.Items.Clear(); durationPanel.IsEnabled = true;
+            elapsed.Reset(); started = false; lastLap = TimeSpan.Zero; lapCount = 0; laps.Items.Clear(); durationPanel.IsEnabled = true; presets.IsEnabled = true;
             status.Text = "시작을 눌러주세요"; UpdateDisplay();
         }
         void Acknowledge() {

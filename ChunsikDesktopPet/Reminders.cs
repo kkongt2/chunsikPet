@@ -50,6 +50,7 @@ namespace ChunsikDesktop {
             Button down = new Button { Content = "▾", FontSize = 9, Padding = new Thickness(0), Height = 16, BorderThickness = new Thickness(0), Background = Brushes.Transparent, ToolTip = name + " 감소" };
             up.Click += delegate { Step(1); }; down.Click += delegate { Step(-1); }; arrows.Children.Add(up); arrows.Children.Add(down);
         }
+        public void SetValue(int value) { input.Text = Math.Max(0, Math.Min(maximum, value)).ToString("00"); }
         void Step(int delta) { input.Text = Math.Max(0, Math.Min(maximum, Value + delta)).ToString("00"); }
     }
     // Real toggle controls: mouse, keyboard and screen readers use the same selected state.
