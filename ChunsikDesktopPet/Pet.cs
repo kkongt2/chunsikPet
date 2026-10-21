@@ -46,6 +46,7 @@ namespace ChunsikDesktop {
         public static void ResizeAll(double value) { PetPreferences.Current.SetSize((int)value); }
         public static void SpeedAll(double value) { PetPreferences.Current.SetSpeed((int)value); }
         public static int Count { get { return Pets.Count; } }
+        public static void PreviewTransparency(int percent) { foreach (PetWindow pet in Pets) PresentationPolicy.SetOpacity(pet, 1.0 - percent / 100.0); }
         public static void ApplyAppearance() {
             if (PetPreferences.Current == null) return;
             foreach (PetWindow pet in Pets) {
