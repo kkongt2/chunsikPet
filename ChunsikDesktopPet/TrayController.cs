@@ -120,8 +120,8 @@ namespace ChunsikDesktop {
                 add.Enabled = PetWindow.Count < 20;
             };
             tray = new System.Windows.Forms.NotifyIcon { Icon = icon, Text = "춘식이 · 우클릭으로 설정", ContextMenuStrip = menu, Visible = true };
-            tray.MouseDoubleClick += delegate(object sender, System.Windows.Forms.MouseEventArgs e) {
-                if (e.Button == System.Windows.Forms.MouseButtons.Left) Dispatch(delegate { PetPreferences.Current.OpenSettings(); });
+            tray.MouseClick += delegate(object sender, System.Windows.Forms.MouseEventArgs e) {
+                if (e.Button == System.Windows.Forms.MouseButtons.Left) Dispatch(delegate { SettingsHub.Open("캐릭터"); });
             };
         }
         void ShowAbout() {
