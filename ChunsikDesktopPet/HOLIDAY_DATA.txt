@@ -1,0 +1,31 @@
+대한민국 오프라인 공휴일 데이터
+기준일: 2026-10-21
+월급일 계산 지원: 2026년 1월~2040년 12월
+내장 날짜: 2025-01-01~2040-12-31 (연초 월급일의 전년도 이동을 위해 2025년 포함)
+
+구성
+- 양력 공휴일, 한국 음력 설/부처님오신날/추석 및 현행 대체공휴일 규칙.
+- 2026년부터 노동절·제헌절 및 해당 대체공휴일 반영.
+- 정기 임기만료 선거일은 현행 임기 및 공직선거법 제34조를 기준으로 산출.
+- 임시공휴일, 조기 선거, 보궐 선거, 향후 법령·임기 변경은 반영하지 않음.
+- 2028~2040년 달력은 현재 규칙에 의한 사전 계산 데이터이며 미래의 정부 확정 공고가 아님.
+- 앱에는 날짜 CSV만 포함되며 인터넷 조회·업데이트·API키가 필요하지 않음.
+
+산출과 검증
+한국 음력 변환: korean_lunar_calendar (MIT, Jinil Lee).
+https://github.com/usingsky/korean_lunar_calendar_py
+2026·2027년 공휴일/주5일 휴일 수를 우주항공청 발표와 대조.
+2026: 일요일 포함 72일, 토요일 포함 120일.
+2027: 일요일 포함 72일, 토요일 포함 119일.
+2026~2040년 명절·고정일·대체공휴일 날짜를 별도 holidays 구현과 대조.
+정기 선거일은 라이브러리 예측 대신 법정 임기만료일 계산식을 사용.
+
+근거
+인사혁신처 공휴일제도:
+https://www.mpm.go.kr/mpm/info/infoService/BizService02/
+관공서의 공휴일에 관한 규정 제2조:
+https://law.go.kr/LSW/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1018770105
+공직선거법 제34조:
+https://law.go.kr/LSW/lsLinkCommonInfo.do?ancYnChk=&chrClsCd=010202&lsJoLnkSeq=1013464623
+우주항공청 2027년 월력요항:
+https://www.kasa.go.kr/prog/plcyBrf/brief/kor/sub01_01_04/view.do?plcyBrfNo=431

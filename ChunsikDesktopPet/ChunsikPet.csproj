@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{EE793C81-9C4D-47DC-B64E-FCE8A09963D1}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>ChunsikDesktop</RootNamespace>
+    <AssemblyName>ChunsikPet</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <StartupObject>ChunsikDesktop.Program</StartupObject>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>5</LangVersion>
+    <Deterministic>true</Deterministic>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
+    <DebugSymbols>true</DebugSymbols><DebugType>full</DebugType>
+    <Optimize>false</Optimize><OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants><WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <DebugType>pdbonly</DebugType><Optimize>true</Optimize>
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants><WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="PaydayCalendar.cs" />
+    <Compile Include="Pet.cs" />
+    <Compile Include="PetOptions.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Reminders.cs" />
+    <Compile Include="TimeTools.cs" />
+    <Compile Include="Todos.cs" />
+    <Compile Include="TrayController.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="chunsik-notices.png"><LogicalName>Assets.chunsik-notices.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-payday.png"><LogicalName>Assets.chunsik-payday.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-peek.png"><LogicalName>Assets.chunsik-peek.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-sleep.png"><LogicalName>Assets.chunsik-sleep.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-sprites.png"><LogicalName>Assets.chunsik-sprites.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-stretch.png"><LogicalName>Assets.chunsik-stretch.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-tickle.png"><LogicalName>Assets.chunsik-tickle.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-water.png"><LogicalName>Assets.chunsik-water.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="holidays-2025-2040.csv"><LogicalName>Assets.holidays-2025-2040.csv</LogicalName></EmbeddedResource>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
