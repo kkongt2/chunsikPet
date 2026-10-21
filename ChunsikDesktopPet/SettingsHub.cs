@@ -20,6 +20,7 @@ namespace ChunsikDesktop {
         public static void Open(string name) {
             Ensure(); tabs.SelectedItem = sections[name];
             if (name != "타이머·스톱워치" && sections[name].Tag == null) { Action open = OpenSection(name); if (open != null) open(); }
+            if (window.WindowState == WindowState.Minimized) window.WindowState = WindowState.Normal;
             window.Show(); window.Activate();
         }
         static void Ensure() {

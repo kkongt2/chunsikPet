@@ -12,7 +12,7 @@ namespace ChunsikDesktop {
             Show(owner, delegate { return item.GetMessages().ToArray(); }, delegate { return item.BubbleColor; }, delegate { return item.Kind; }, seconds, false);
         }
         public static void Todo(Window owner, TodoItem item) {
-            Show(owner, delegate { return new string[] { item.Text }; }, delegate { return item.Color; }, delegate { return ""; }, delegate { return item.DisplaySeconds; }, true, delegate { return item.FontSize; });
+            Show(owner, delegate { return new string[] { item.Always ? item.Text : item.ReminderText() }; }, delegate { return item.Color; }, delegate { return ""; }, delegate { return item.DisplaySeconds; }, true, delegate { return item.FontSize; });
         }
         static void Show(Window owner, Func<string[]> messages, Func<string> color, Func<string> kind, Func<int> seconds, bool postit, Func<int> fontSize = null) {
             owner = SettingsHub.OwnerFor(owner);

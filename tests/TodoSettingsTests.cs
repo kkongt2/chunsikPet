@@ -10,6 +10,7 @@ internal static class TodoSettingsTests {
         TodoSettings settings = new TodoSettings();
         settings.Items.Add(new TodoItem { Text = "", FontSize = 34, NoteWidth = 480, NoteHeight = 360 });
         settings.Items.Add(new TodoItem { Text = "첫 줄\n두 번째 줄", FontSize = 13, NoteWidth = 240, NoteHeight = 220 });
+        settings.Items[1].HasDeadline = true; settings.Items[1].DeadlineDate = "2026-10-21"; settings.Items[1].DeadlineTime = "13:30"; settings.Items[1].ReminderTemplate = "기억해요: {할일}";
         string xml;
         using (StringWriter writer = new StringWriter()) { serializer.Serialize(writer, settings); xml = writer.ToString(); }
         TodoSettings roundtrip; using (StringReader reader = new StringReader(xml)) roundtrip = (TodoSettings)serializer.Deserialize(reader);
@@ -26,6 +27,19 @@ internal static class TodoSettingsTests {
         TodoItem bad = new TodoItem { NoteWidth = Double.NaN }; Check(!TodoItem.ValidAppearance(bad), "NaN size rejected");
         bad.NoteWidth = Double.PositiveInfinity; Check(!TodoItem.ValidAppearance(bad), "infinite size rejected");
         bad.NoteWidth = 260; bad.FontSize = 65; Check(!TodoItem.ValidAppearance(bad), "font bound enforced");
+        TodoItem deadline = roundtrip.Items[1];
+        Check(deadline.DeadlineDate == "2026-10-21" && deadline.DeadlineTime == "13:30", "deadline survives restart");
+        Check(deadline.ReminderText() == "기억해요: 첫 줄\n두 번째 줄", "custom reminder template survives restart");
+        Check(!deadline.DeadlineDue(new DateTime(2026,10,21,13,29,59)), "deadline not early");
+        Check(deadline.DeadlineDue(new DateTime(2026,10,21,13,30,0)), "deadline exact boundary");
+        deadline.LastDeadline = deadline.DeadlineKey;
+        Check(!deadline.DeadlineDue(new DateTime(2026,10,21,14,0,0)), "deadline is not repeated after restart");
+        deadline.DeadlineTime = "15:00";
+        Check(deadline.DeadlineDue(new DateTime(2026,10,21,15,0,0)), "edited deadline can fire again");
+        deadline.Done = true;
+        Check(!deadline.DeadlineDue(new DateTime(2026,10,21,15,0,0)), "completed note does not alert");
+        for (int i=0; i<60; i++) roundtrip.Items.Add(new TodoItem { Done = true });
+        Check(roundtrip.ActiveCount == 1, "completed notes excluded from active cap");
         Console.WriteLine("PASS: " + count + " post-it persistence assertions");
     }
 }

@@ -47,6 +47,7 @@ namespace ChunsikDesktop {
         Func<bool> saveEditor;
         bool stopping;
         public bool Stopping { get { return stopping; } }
+        public bool FlushNotes() { foreach (Runtime run in runtimes.Values) if (!run.Note.FlushEdit()) return false; return true; }
         sealed class Runtime {
             public TodoItem Item;
             public PetWindow Pet;
@@ -72,6 +73,7 @@ namespace ChunsikDesktop {
                     if (item.EveryMinutes < 1 || item.EveryMinutes > 1440) item.EveryMinutes = 60;
                     if (item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) item.DisplaySeconds = 20;
                     if (item.Text == null) item.Text = "";
+                    if (item.ReminderTemplate == null) item.ReminderTemplate = "오늘 ‘{할일}’ 잊지 않았지?";
                     if (item.FontSize < 10 || item.FontSize > 64) item.FontSize = 17;
                     if (Double.IsNaN(item.NoteWidth) || item.NoteWidth < 220 || item.NoteWidth > 1200) item.NoteWidth = 260;
                     if (Double.IsNaN(item.NoteHeight) || item.NoteHeight < 200 || item.NoteHeight > 1200) item.NoteHeight = 280;
@@ -87,7 +89,8 @@ namespace ChunsikDesktop {
             }
         }
         bool Save() {
-            foreach (TodoItem item in settings.Items) if (item.Text == null || item.Text.Length > 160 || !TodoItem.ValidAppearance(item) || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) return false;
+            if (settings.ActiveCount > 50) return false;
+            foreach (TodoItem item in settings.Items) if (!TodoItem.ValidContent(item) || !TodoItem.ValidAppearance(item) || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) return false;
             try {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
                 string temp = FilePath + ".tmp";
@@ -117,7 +120,7 @@ namespace ChunsikDesktop {
             foreach (string id in new List<string>(runtimes.Keys)) if (!keep.Contains(id)) { DisposeRuntime(runtimes[id]); runtimes.Remove(id); }
         }
         void AddBlank(TodoItem near) {
-            if (settings.Items.Count >= 50) { MessageBox.Show("포스트잇은 최대 50개까지 저장할 수 있어요."); return; }
+            if (settings.ActiveCount >= 50) { MessageBox.Show("진행 중인 포스트잇은 최대 50개예요. 완료 항목은 제한에 포함하지 않아요."); return; }
             TodoItem item = new TodoItem { Color = near.Color, FontSize = near.FontSize, NoteWidth = near.NoteWidth, NoteHeight = near.NoteHeight };
             Runtime source;
             if (runtimes.TryGetValue(near.Id, out source)) { item.HasPosition = true; item.NoteLeft = source.Note.Left + 32; item.NoteTop = source.Note.Top + 32; }
@@ -127,6 +130,13 @@ namespace ChunsikDesktop {
             // Wait for Tick to show and place the blank note before focusing its editor.
             Tick(); Runtime run;
             if (runtimes.TryGetValue(item.Id, out run)) run.Note.Dispatcher.BeginInvoke(new Action(run.Note.BeginEdit));
+        }
+        void MoveItem(TodoItem moving, TodoItem target, bool after) {
+            if (moving == target) return;
+            List<TodoItem> previous = new List<TodoItem>(settings.Items);
+            settings.Items.Remove(moving); int index = settings.Items.IndexOf(target); settings.Items.Insert(index + (after ? 1 : 0), moving);
+            if (!Save()) settings.Items = previous;
+            if (renderEditor != null) renderEditor();
         }
         void Complete(TodoItem item) {
             Runtime run;
@@ -141,6 +151,7 @@ namespace ChunsikDesktop {
             if (!Save()) { item.Done = false; item.CompletedAt = previousDate; return; }
             UndoToast.ShowCompleted(item.Text, delegate {
                 if (!settings.Items.Contains(item) || !item.Done || item.CompletedAt != completion) return;
+                if (settings.ActiveCount >= 50) { MessageBox.Show("진행 중인 포스트잇이 50개여서 되돌릴 수 없어요."); return; }
                 item.Done = false; item.CompletedAt = null;
                 if (!Save()) { item.Done = true; item.CompletedAt = completion; }
                 if (renderEditor != null) renderEditor();
@@ -153,6 +164,10 @@ namespace ChunsikDesktop {
         }
         void Tick() {
             if (stopping) return;
+            foreach (TodoItem item in settings.Items) if (item.DeadlineDue(DateTime.Now)) {
+                string previous = item.LastDeadline; item.LastDeadline = item.DeadlineKey;
+                if (Save()) ReminderService.Current.NotifyTodoDeadline(item); else item.LastDeadline = previous;
+            }
             Sync();
             List<PetWindow> pets = PetWindow.TodoPets();
             List<Rect> occupied = new List<Rect>();
@@ -211,14 +226,16 @@ namespace ChunsikDesktop {
             DockPanel addRow = new DockPanel { Margin = new Thickness(0, 0, 0, 14) }; top.Children.Add(addRow);
             TextBox entry = new TextBox { FontSize = 16, Padding = new Thickness(10), BorderThickness = new Thickness(0), Background = Brushes.Transparent, MaxLength = 160, ToolTip = "예: 기획서 작성 · Enter로 바로 등록" };
             DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            Func<bool> persist = delegate { debounce.Stop(); bool ok = Save(); status.Text = ok ? "저장됨 · 프로그램을 다시 열어도 할 일이 남아요" : "간격을 1~1440분, 표시 시간을 1~3600초로 지정해 주세요. 저장되지 않았어요."; status.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick; return ok; };
+            Func<bool> persist = delegate { debounce.Stop(); bool ok = Save(); status.Text = ok ? "저장됨 · 프로그램을 다시 열어도 할 일이 남아요" : "마감 날짜·시각, 알림 문구(500자 이하), 간격(1~1440분), 표시 시간(1~3600초)을 확인해 주세요. 아직 저장되지 않았어요."; status.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick; return ok; };
             saveEditor = persist;
             Action changed = delegate { status.Text = "저장 중…"; debounce.Stop(); debounce.Start(); }; debounce.Tick += delegate { persist(); };
             StackPanel list = new StackPanel(); ScrollViewer scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; root.Children.Add(scroll);
+            bool collapseCompleted = true;
+            WrapPanel management = new WrapPanel { Margin = new Thickness(0, 6, 0, 10) }; top.Children.Add(management);
             Action render = null;
             Action add = delegate {
                 if (String.IsNullOrWhiteSpace(entry.Text)) { status.Text = "할 일을 먼저 입력해 주세요."; entry.Focus(); return; }
-                if (settings.Items.Count >= 50) { status.Text = "최대 50개까지 저장할 수 있어요. 완료한 항목을 삭제해 주세요."; return; }
+                if (settings.ActiveCount >= 50) { status.Text = "진행 중인 포스트잇은 최대 50개예요."; return; }
                 List<PetWindow> pets = PetWindow.TodoPets(); int index = preferredPet == null ? 0 : Math.Max(0, pets.IndexOf(preferredPet));
                 TodoItem item = new TodoItem { Text = entry.Text.Trim(), PetIndex = index, Dedicated = preferredPet != null && preferredPet.IsTodoCompanion };
                 settings.Items.Add(item); if (!persist()) { settings.Items.Remove(item); return; } entry.Clear(); render(); scroll.ScrollToBottom();
@@ -227,12 +244,32 @@ namespace ChunsikDesktop {
             top.Children.Add(Button("＋ 빈 포스트잇", delegate { AddBlank(new TodoItem()); }));
             entry.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Enter) { add(); e.Handled = true; } };
             render = delegate {
-                list.Children.Clear();
+                list.Children.Clear(); management.Children.Clear();
+                int completeCount = settings.Items.Count - settings.ActiveCount;
+                management.Children.Add(Button((collapseCompleted ? "▸" : "▾") + " 완료 항목 " + completeCount + "개", delegate { collapseCompleted = !collapseCompleted; render(); }));
+                management.Children.Add(Button("완료 항목 모두 삭제", delegate {
+                    if (completeCount == 0 || MessageBox.Show(SettingsHub.OwnerFor(win), "완료한 포스트잇을 모두 삭제할까요?", "완료 항목 삭제", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+                    List<TodoItem> previous = new List<TodoItem>(settings.Items); settings.Items.RemoveAll(delegate(TodoItem item) { return item.Done; });
+                    if (!persist()) settings.Items = previous; render();
+                }));
+                management.Children.Add(new TextBlock { Text = "진행 " + settings.ActiveCount + "/50 · ≡를 끌어 순서 변경", Margin = new Thickness(10), VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.SlateGray });
                 foreach (TodoItem item in settings.Items) {
+                    if (collapseCompleted && item.Done) continue;
                     StackPanel cardContent = new StackPanel { Margin = new Thickness(18) };
                     Border card = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), BorderBrush = new SolidColorBrush(Color.FromRgb(224, 232, 242)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 0, 14), Child = cardContent }; list.Children.Add(card);
+                    card.AllowDrop = true;
+                    card.DragOver += delegate(object sender, DragEventArgs e) { e.Effects = e.Data.GetDataPresent("ChunsikTodoId") ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; };
+                    card.Drop += delegate(object sender, DragEventArgs e) {
+                        if (!e.Data.GetDataPresent("ChunsikTodoId")) return;
+                        TodoItem moving = settings.Items.Find(delegate(TodoItem candidate) { return candidate.Id == e.Data.GetData("ChunsikTodoId") as string; });
+                        if (moving != null) MoveItem(moving, item, e.GetPosition(card).Y > card.ActualHeight / 2); e.Handled = true;
+                    };
                     DockPanel heading = new DockPanel { Margin = new Thickness(0, 0, 0, item.Done ? 0 : 10) }; cardContent.Children.Add(heading);
-                    Button done = Button(item.Done ? "✓ 완료됨" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else { item.Done = false; item.CompletedAt = null; changed(); render(); } });
+                    TextBlock grip = new TextBlock { Text = "≡", FontSize = 24, Padding = new Thickness(4), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어 순서 변경", VerticalAlignment = VerticalAlignment.Center };
+                    Point dragStart = new Point(); grip.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e) { dragStart = e.GetPosition(grip); };
+                    grip.MouseMove += delegate(object sender, System.Windows.Input.MouseEventArgs e) { if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed && (e.GetPosition(grip)-dragStart).Length > 5) DragDrop.DoDragDrop(grip, new DataObject("ChunsikTodoId", item.Id), DragDropEffects.Move); };
+                    DockPanel.SetDock(grip, Dock.Left); heading.Children.Add(grip);
+                    Button done = Button(item.Done ? "✓ 완료됨" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else { if (settings.ActiveCount >= 50) { status.Text = "진행 중 항목을 50개 미만으로 줄여주세요."; return; } item.Done = false; item.CompletedAt = null; changed(); render(); } });
                     done.ToolTip = item.Done ? "다시 할 일로 되돌리기" : "완료 처리하기";
                     if (item.Done) { done.Background = BubblePalette.BrushFor("#D5F3DF"); done.Foreground = Brushes.DarkGreen; }
                     DockPanel.SetDock(done, Dock.Left); heading.Children.Add(done);
@@ -246,9 +283,21 @@ namespace ChunsikDesktop {
                     font.Children.Add(Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); changed(); render(); }));
                     font.Children.Add(new TextBlock { Text = item.FontSize + "", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6) });
                     font.Children.Add(Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); changed(); render(); }));
+                    WrapPanel deadline = SettingRow(cardContent, "마감 알림");
+                    CheckBox deadlineEnabled = new CheckBox { Content = "날짜·시각 알림", IsChecked = item.HasDeadline, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 0, 8, 0) }; deadline.Children.Add(deadlineEnabled);
+                    DateTime parsed; DatePicker deadlineDate = new DatePicker { Width = 135 };
+                    if (DateTime.TryParse(item.DeadlineDate, out parsed)) deadlineDate.SelectedDate = parsed; deadline.Children.Add(deadlineDate);
+                    TimeSpan deadlineClock; if (!TimeSpan.TryParse(item.DeadlineTime, out deadlineClock)) deadlineClock = TimeSpan.FromHours(18);
+                    NumberField deadlineHour = new NumberField(deadlineClock.Hours, 23, "마감 시"), deadlineMinute = new NumberField(deadlineClock.Minutes, 59, "마감 분");
+                    deadline.Children.Add(deadlineHour); deadline.Children.Add(new TextBlock { Text = ":", Margin = new Thickness(4), VerticalAlignment = VerticalAlignment.Center }); deadline.Children.Add(deadlineMinute);
+                    Action updateDeadline = delegate { item.HasDeadline = deadlineEnabled.IsChecked == true; item.DeadlineDate = deadlineDate.SelectedDate.HasValue ? deadlineDate.SelectedDate.Value.ToString("yyyy-MM-dd") : ""; item.DeadlineTime = deadlineHour.Value.ToString("00") + ":" + deadlineMinute.Value.ToString("00"); changed(); };
+                    deadlineEnabled.Checked += delegate { updateDeadline(); }; deadlineEnabled.Unchecked += delegate { updateDeadline(); }; deadlineDate.SelectedDateChanged += delegate { updateDeadline(); }; deadlineHour.Changed += updateDeadline; deadlineMinute.Changed += updateDeadline;
                     WrapPanel display = SettingRow(cardContent, "표시 방식");
                     display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));
                     if (!item.Always) {
+                        WrapPanel wording = SettingRow(cardContent, "알림 문구");
+                        TextBox template = new TextBox { Text = item.ReminderTemplate, Width = 380, MaxLength = 500, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true, ToolTip = "{할일} 위치에 할 일 내용이 들어가요" };
+                        wording.Children.Add(template); template.TextChanged += delegate { item.ReminderTemplate = template.Text; changed(); };
                         NumberField interval = new NumberField(item.EveryMinutes, 1440, "리마인드 간격 분") { Margin = new Thickness(10, 0, 0, 0) }; display.Children.Add(interval);
                         display.Children.Add(new TextBlock { Text = "분마다", Foreground = Brushes.SlateGray, Margin = new Thickness(7), VerticalAlignment = VerticalAlignment.Center });
                         interval.Changed += delegate { item.EveryMinutes = interval.Value; changed(); };
@@ -468,7 +517,7 @@ namespace ChunsikDesktop {
             if (!resizing) { Width = item.NoteWidth; Height = item.NoteHeight; }
             message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize; fontLabel.Text = item.FontSize.ToString();
             bool blank = String.IsNullOrWhiteSpace(item.Text);
-            message.Text = blank ? "더블클릭해서 할 일을 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
+            message.Text = blank ? "더블클릭해서 할 일을 적어보세요" : item.Always ? item.Text : item.ReminderText();
             message.Foreground = blank ? Brushes.SlateGray : new SolidColorBrush(Color.FromRgb(64, 55, 44));
             mascot.Visibility = item.Standalone ? Visibility.Visible : Visibility.Collapsed;
             mascot.Source = item.Peek ? peekArt : PetWindow.ToolPose(false);

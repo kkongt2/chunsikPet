@@ -543,6 +543,16 @@ namespace ChunsikDesktop {
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("이 춘식이 종료", delegate { PetPreferences.Current.ChangeCount(Pets.Count - 1, this); }));
             menu.Items.Add(Item("모두 종료", delegate { Quit(); }));
+            Dictionary<string, MenuItem> existing = new Dictionary<string, MenuItem>();
+            foreach (object entry in menu.Items) { MenuItem mi = entry as MenuItem; if (mi != null) existing[(string)mi.Header] = mi; }
+            menu.Items.Clear();
+            MenuItem quiet = new MenuItem { Header = "방해 금지" };
+            quiet.Items.Add(Item("30분 동안", delegate { PresentationPolicy.Set(30); })); quiet.Items.Add(Item("1시간 동안", delegate { PresentationPolicy.Set(60); }));
+            quiet.Items.Add(Item("직접 해제할 때까지", delegate { PresentationPolicy.Set(-1); })); quiet.Items.Add(Item("방해 금지 해제", delegate { PresentationPolicy.Set(0); }));
+            MenuItem appearance = new MenuItem { Header = "모양 · 움직임" }; appearance.Items.Add(sizes); appearance.Items.Add(speeds); appearance.Items.Add(pause); appearance.Items.Add(existing["춘식이 한 마리 추가"]);
+            MenuItem tools = new MenuItem { Header = "도구" }; tools.Items.Add(Item("스톱워치 · 전담 춘식이", delegate { TimeToolWindow.OpenStopwatch(); })); tools.Items.Add(Item("알림 이력 · 놓친 알림", delegate { ReminderHistory.Open(); })); tools.Items.Add(existing["알림 설정 (점심·퇴근·사용자 지정)"]);
+            menu.Items.Add(quiet); menu.Items.Add(existing["포스트잇 · 할 일 등록/관리"]); menu.Items.Add(Item("타이머 · 전담 춘식이", delegate { TimeToolWindow.OpenTimer(); })); menu.Items.Add(existing["설정 열기"]);
+            menu.Items.Add(appearance); menu.Items.Add(tools); menu.Items.Add(new Separator()); menu.Items.Add(existing["이 춘식이 종료"]); menu.Items.Add(existing["모두 종료"]);
             return menu;
         }
         public static List<PetWindow> SpeechPets() {

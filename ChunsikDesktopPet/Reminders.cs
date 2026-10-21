@@ -402,6 +402,9 @@ namespace ChunsikDesktop {
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
             active.Clear(); queue.Clear(); snoozes.Clear(); regrouping = false; SaveSession();
         }
+        public void NotifyTodoDeadline(TodoItem item) {
+            Enqueue(new NoticeData { ReminderId = "todo:" + item.Id, Label = item.DeadlineKey + " · 할 일 마감", Messages = new List<string> { String.IsNullOrWhiteSpace(item.Text) ? "빈 포스트잇의 마감시간이에요." : item.Text }, BubbleColor = item.Color, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, settings.Sound);
+        }
         public NoticeData NotifyTimer(Action acknowledge) {
             NoticeData data = new NoticeData { Label = "타이머 완료", Kind = "timer", Messages = new List<string> { "시간이 다 됐어요! 수고했어요 ♥ 확인 버튼을 눌러주세요." }, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes, Acknowledge = acknowledge };
             Enqueue(data, settings.Sound); return data;
