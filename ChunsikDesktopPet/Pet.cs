@@ -603,7 +603,7 @@ namespace ChunsikDesktop {
             PetPreferences.Current = new PetPreferences();
             ReminderService.Current = new ReminderService();
             TodoService.Current = new TodoService();
-            app.Exit += delegate { ScreenLayout.Stop(); if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); };
+            app.Exit += delegate { ScreenLayout.Stop(); if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); ReminderHistory.Flush(); };
             app.Startup += delegate {
                 ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController(); AppLifecycle.Listen(app);
                 if (PetPreferences.Current.Options.PaydayEnabled && PaydayCalendar.IsPayday(DateTime.Today, PetPreferences.Current.Options.PaydayDay))
