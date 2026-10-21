@@ -26,11 +26,14 @@ namespace ChunsikDesktop {
         static void Ensure() {
             if (window != null) return;
             building = true;
-            window = new Window { Title = "춘식이 설정", Width = 1000, Height = 760, MinWidth = 620, MinHeight = 480, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brushes.WhiteSmoke };
-            tabs = new TabControl { Margin = new Thickness(12) }; window.Content = tabs;
+            window = new Window { Title = "춘식이 설정", Width = 1000, Height = 760, MinWidth = 620, MinHeight = 480, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Theme.Surface };
+            tabs = new TabControl { Margin = new Thickness(16), TabStripPlacement = Dock.Left, Background = Theme.Surface, BorderThickness = new Thickness(0) };
+            tabs.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='TabControl'><Grid><Grid.ColumnDefinitions><ColumnDefinition Width='155'/><ColumnDefinition Width='*'/></Grid.ColumnDefinitions><ItemsPresenter Margin='0,10,12,0'/><Border Grid.Column='1' Background='White' CornerRadius='16' BorderBrush='#D2E1F1' BorderThickness='1'><ContentPresenter ContentSource='SelectedContent'/></Border></Grid></ControlTemplate>");
+            tabs.ItemsPanel = (ItemsPanelTemplate)System.Windows.Markup.XamlReader.Parse(@"<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><StackPanel/></ItemsPanelTemplate>");
+            Style navigation = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='TabItem'><Setter Property='Foreground' Value='#546578'/><Setter Property='FontSize' Value='14'/><Setter Property='Margin' Value='0,0,0,8'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='TabItem'><Border x:Name='card' Background='Transparent' CornerRadius='11' Padding='14,14'><ContentPresenter ContentSource='Header'/></Border><ControlTemplate.Triggers><Trigger Property='IsSelected' Value='True'><Setter TargetName='card' Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/><Setter Property='FontWeight' Value='SemiBold'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='card' Property='BorderBrush' Value='#EAAE38'/><Setter TargetName='card' Property='BorderThickness' Value='2'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>");
+            tabs.ItemContainerStyle = navigation; window.Content = tabs;
             foreach (string name in new string[] { "캐릭터", "알림", "포스트잇", "타이머·스톱워치", "프로그램" }) {
                 TabItem tab = new TabItem { Header = name, Padding = new Thickness(18, 10, 18, 10) }; sections[name] = tab; tabs.Items.Add(tab);
-                string captured = name; Button load = new Button { Content = name + " 설정 열기", Padding = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; load.Click += delegate { Open(captured); }; tab.Content = load;
             }
             StackPanel tools = new StackPanel { Margin = new Thickness(28), MaxWidth = 600, HorizontalAlignment = HorizontalAlignment.Left };
             tools.Children.Add(new TextBlock { Text = "시간을 춘식이에게 맡겨요", FontSize = 24, Margin = new Thickness(0, 0, 0, 20) });
@@ -48,7 +51,7 @@ namespace ChunsikDesktop {
             Ensure(); TabItem tab = sections[name]; object content = form.Content; form.Content = null;
             FrameworkElement element = content as FrameworkElement; if (element != null && name == "알림") element.MinWidth = 0;
             tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = name == "알림" ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
-            form.Closed += delegate { forms.Remove(form); if (tab.Tag == form) { tab.Tag = null; Button reopen = new Button { Content = name + " 설정 다시 열기", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(20) }; reopen.Click += delegate { Open(name); }; tab.Content = reopen; } };
+            form.Closed += delegate { forms.Remove(form); if (tab.Tag == form) { tab.Tag = null; tab.Content = null; } };
             tabs.SelectedItem = tab; window.Activate();
         }
     }
