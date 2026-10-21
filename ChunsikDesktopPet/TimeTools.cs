@@ -23,7 +23,10 @@ namespace ChunsikDesktop {
         readonly StackPanel durationPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         readonly TextBox hours = new TextBox(), minutes = new TextBox(), seconds = new TextBox();
         readonly ListBox laps = new ListBox();
-        readonly Button start, reset, lap;
+        readonly Button start, reset, lap, acknowledge;
+        NoticeData completionNotice;
+        bool acknowledged;
+        double lastRing;
         TimeSpan duration = TimeSpan.FromMinutes(5), lastLap;
         bool started, completed;
         int lapCount;
@@ -66,6 +69,8 @@ namespace ChunsikDesktop {
             StackPanel controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center }; content.Children.Add(controls);
             start = ActionButton("시작"); reset = ActionButton("초기화"); lap = ActionButton("랩"); controls.Children.Add(start); controls.Children.Add(reset);
             start.Click += delegate { Toggle(); }; reset.Click += delegate { Reset(); };
+            acknowledge = ActionButton("완료 확인"); acknowledge.Visibility = Visibility.Collapsed;
+            acknowledge.Click += delegate { Acknowledge(); }; if (countdown) content.Children.Add(acknowledge);
             if (!countdown) {
                 controls.Children.Add(lap); lap.Click += delegate { AddLap(); };
                 laps.Height = 112; laps.Margin = new Thickness(0, 10, 0, 0); laps.BorderThickness = new Thickness(0); laps.Background = Brushes.Transparent; laps.FontFamily = new FontFamily("Consolas"); content.Children.Add(laps);
@@ -79,7 +84,7 @@ namespace ChunsikDesktop {
                 Top = Math.Max(area.Top, area.Bottom - ActualHeight - 12);
             };
             refresh.Interval = TimeSpan.FromMilliseconds(50); refresh.Tick += delegate { UpdateDisplay(); }; refresh.Start();
-            Closed += delegate { refresh.Stop(); elapsed.Stop(); animation.Stop(); if (countdown) countdownWindow = null; else stopwatchWindow = null; };
+            Closed += delegate { Acknowledge(); refresh.Stop(); elapsed.Stop(); animation.Stop(); if (countdown) countdownWindow = null; else stopwatchWindow = null; };
             UpdateDisplay();
         }
         void MoveWindow(object sender, MouseButtonEventArgs e) {
@@ -103,14 +108,20 @@ namespace ChunsikDesktop {
             else {
                 if (completed) Reset();
                 if (!started && countdown && !ReadDuration(out duration)) { status.Text = "1초 이상, 올바른 시간을 입력해 주세요"; return; }
-                started = true; elapsed.Start(); durationPanel.IsEnabled = false;
+                started = true; acknowledged = false; elapsed.Start(); durationPanel.IsEnabled = false;
                 status.Text = countdown ? "시간을 지켜보고 있어요" : "함께 시간을 재고 있어요";
             }
             UpdateDisplay();
         }
         void Reset() {
-            elapsed.Reset(); started = false; completed = false; lastLap = TimeSpan.Zero; lapCount = 0; laps.Items.Clear(); durationPanel.IsEnabled = true;
+            completed = false; acknowledged = true; ReminderService.Current.CancelNotice(completionNotice); completionNotice = null;
+            elapsed.Reset(); started = false; lastLap = TimeSpan.Zero; lapCount = 0; laps.Items.Clear(); durationPanel.IsEnabled = true;
             status.Text = "시작을 눌러주세요"; UpdateDisplay();
+        }
+        void Acknowledge() {
+            if (acknowledged) return; acknowledged = true;
+            ReminderService.Current.CancelNotice(completionNotice); completionNotice = null;
+            if (completed) status.Text = "완료를 확인했어요 ♥";
         }
         void AddLap() {
             if (!elapsed.IsRunning) return;
@@ -132,7 +143,8 @@ namespace ChunsikDesktop {
                     shown = duration - elapsed.Elapsed;
                     if (!completed && shown <= TimeSpan.Zero) {
                         elapsed.Stop(); completed = true; status.Text = "시간이 다 됐어요! 수고했어요 ♥";
-                        try { if (!PresentationPolicy.IsSuppressed) SystemSounds.Exclamation.Play(); } catch { }
+                        lastRing = animation.Elapsed.TotalSeconds;
+                        completionNotice = ReminderService.Current.NotifyTimer(Acknowledge);
                     }
                     shown = TimeSpan.FromSeconds(Math.Max(0, Math.Ceiling(shown.TotalSeconds)));
                 }
@@ -141,8 +153,12 @@ namespace ChunsikDesktop {
             start.Content = completed ? "다시 시작" : elapsed.IsRunning ? "일시정지" : started ? "재개" : "시작";
             lap.IsEnabled = elapsed.IsRunning && lapCount < 200;
             double phase = animation.Elapsed.TotalSeconds;
-            bool wave = completed || (elapsed.IsRunning && (int)(phase / 1.2) % 4 == 0);
-            pet.Source = PetWindow.ToolPose(wave); tilt.Angle = (elapsed.IsRunning || completed) ? Math.Sin(phase * (completed ? 6 : 2)) * (completed ? 7 : 2) : 0;
+            acknowledge.Visibility = completed && !acknowledged ? Visibility.Visible : Visibility.Collapsed;
+            if (completed && !acknowledged && !PresentationPolicy.IsSuppressed && phase-lastRing >= 5) {
+                lastRing = phase; try { SystemSounds.Exclamation.Play(); } catch { }
+            }
+            bool wave = (completed && !acknowledged) || (elapsed.IsRunning && (int)(phase / 1.2) % 4 == 0);
+            pet.Source = PetWindow.ToolPose(wave); tilt.Angle = (elapsed.IsRunning || (completed && !acknowledged)) ? Math.Sin(phase * (completed ? 6 : 2)) * (completed ? 7 : 2) : 0;
         }
     }
 }

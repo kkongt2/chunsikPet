@@ -116,6 +116,7 @@ namespace ChunsikDesktop {
     }
     public sealed class NoticeData {
         public string HistoryId;
+        [XmlIgnore] public Action Acknowledge;
         public bool Missed;
         public string ReminderId;
         public bool Interval;
@@ -376,7 +377,14 @@ namespace ChunsikDesktop {
                     deferred = true; ReminderHistory.Record(data, "다시 알림 예약");
                     snoozes.Add(new Snooze { Due = DateTime.Now.AddMinutes(data.SnoozeMinutes), Notice = data });
                 }, assigned);
-                group.Closed += delegate { if (!regrouping && !stopping && !deferred) ReminderHistory.Record(data, "확인"); active.Remove(group); if (!regrouping) ShowNext(); };
+                group.Closed += delegate {
+                    active.Remove(group);
+                    if (!regrouping && !stopping && !deferred) {
+                        ReminderHistory.Record(data, group.AutomaticallyAdvanced ? "다음 알림으로 전환" : "확인");
+                        if (!group.AutomaticallyAdvanced && data.Acknowledge != null) data.Acknowledge();
+                    }
+                    if (!regrouping) ShowNext();
+                };
                 active.Add(group);
             }
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Show();
@@ -386,6 +394,17 @@ namespace ChunsikDesktop {
             stopping = true; timer.Stop(); queue.Clear(); snoozes.Clear();
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
             if (editor != null) editor.Close();
+        }
+        public NoticeData NotifyTimer(Action acknowledge) {
+            NoticeData data = new NoticeData { Label = "타이머 완료", Kind = "timer", Messages = new List<string> { "시간이 다 됐어요! 수고했어요 ♥ 확인 버튼을 눌러주세요." }, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes, Acknowledge = acknowledge };
+            Enqueue(data, settings.Sound); return data;
+        }
+        public void CancelNotice(NoticeData data) {
+            if (data == null) return;
+            int count = queue.Count;
+            while (count-- > 0) { NoticeData pending = queue.Dequeue(); if (pending != data) queue.Enqueue(pending); }
+            snoozes.RemoveAll(delegate(Snooze s) { return s.Notice == data; });
+            foreach (NoticeGroup group in new List<NoticeGroup>(active)) if (group.Data == data) group.Close();
         }
         public void Replay(NoticeData old) {
             Enqueue(new NoticeData { Label = old.Label, Messages = new List<string>(old.Messages), Kind = old.Kind, BubbleColor = old.BubbleColor, Seconds = settings.MessageSeconds, SnoozeMinutes = settings.SnoozeMinutes }, false);
@@ -637,6 +656,7 @@ namespace ChunsikDesktop {
 
     public sealed class NoticeGroup {
         public string Kind { get { return data.Kind ?? ""; } }
+        public bool AutomaticallyAdvanced { get; private set; }
         readonly NoticeData data;
         public NoticeData Data { get { return data; } }
         readonly List<PetWindow> assigned;
@@ -666,7 +686,7 @@ namespace ChunsikDesktop {
                     start += shown; ShowBatch(); return;
                 }
                 // A final bubble may stay open, but must not block later scheduled alarms indefinitely.
-                if (elapsed.Elapsed.TotalSeconds >= Math.Max(3, data.Seconds) && ReminderService.Current.HasWaitingNotices) { Close(); return; }
+                if (elapsed.Elapsed.TotalSeconds >= Math.Max(3, data.Seconds) && ReminderService.Current.HasWaitingNotices) { AutomaticallyAdvanced = true; Close(); return; }
                 Layout();
             };
         }
