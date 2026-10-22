@@ -183,29 +183,27 @@ namespace ChunsikDesktop {
         }
         static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(0, 100, 168));
         static readonly ControlTemplate SoftButton = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='b' CornerRadius='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='b' Property='Opacity' Value='0.75'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#0064A8'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
-        static readonly Style ChoiceStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='Padding' Value='15,8'/><Setter Property='Margin' Value='2'/><Setter Property='Foreground' Value='#52637A'/><Setter Property='Background' Value='Transparent'/><Setter Property='FontSize' Value='12'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border x:Name='b' CornerRadius='9' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}' BorderBrush='Transparent' BorderThickness='1'><ContentPresenter HorizontalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#EAAE38'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/><Setter Property='FontWeight' Value='SemiBold'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter Property='Opacity' Value='0.8'/></Trigger></Style.Triggers></Style>");
         static Button Button(string text, Action action) {
             Button b = new Button { Content = text, Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(3), Background = BubblePalette.BrushFor("#D9EAFE"), BorderBrush = new SolidColorBrush(Color.FromRgb(210, 225, 241)), Foreground = Accent, Template = SoftButton, Cursor = System.Windows.Input.Cursors.Hand }; b.Click += delegate { action(); }; return b;
         }
-        static FrameworkElement Choices(string first, string second, bool firstSelected, Action<bool> select) {
-            StackPanel panel = new StackPanel { Orientation = Orientation.Horizontal };
-            string group = Guid.NewGuid().ToString("N");
-            RadioButton a = new RadioButton { Content = first, GroupName = group, Style = ChoiceStyle, IsChecked = firstSelected };
-            RadioButton b = new RadioButton { Content = second, GroupName = group, Style = ChoiceStyle, IsChecked = !firstSelected };
-            a.Checked += delegate { select(true); }; b.Checked += delegate { select(false); };
-            panel.Children.Add(a); panel.Children.Add(b);
-            return new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 242, 248)), Child = panel, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        static Grid SettingsTableRow() {
+            Grid row = new Grid();
+            foreach (double width in new double[] { 100, -1, 190, 160, 110, 160, 96, 110 })
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = width < 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(width), MinWidth = width < 0 ? 180 : 0 });
+            return row;
         }
-        static WrapPanel SettingRow(StackPanel parent, string label) {
-            Grid row = new Grid { Margin = new Thickness(0, 5, 0, 5) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(95) }); row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.Children.Add(new TextBlock { Text = label, Foreground = Brushes.SlateGray, FontSize = 12, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-            WrapPanel content = new WrapPanel { VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(content, 1); row.Children.Add(content); parent.Children.Add(row); return content;
+        static void SettingsCell(Grid row, UIElement child, int column) {
+            Border cell = new Border { Child = child, Padding = new Thickness(6, 8, 6, 8), VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(cell, column); row.Children.Add(cell);
+        }
+        static ComboBox SettingChoice(string[] labels, int selected, Action<int> change) {
+            ComboBox box = new ComboBox { ItemsSource = labels, SelectedIndex = selected, Padding = new Thickness(5), Margin = new Thickness(0, 3, 0, 3) };
+            box.SelectionChanged += delegate { if (box.SelectedIndex >= 0) change(box.SelectedIndex); }; return box;
         }
         public void OpenSettings(PetWindow preferred) {
             preferredPet = preferred;
             if (editor != null) { SettingsHub.Open("포스트잇"); return; }
-            Window win = new Window { Title = "춘식이 포스트잇 · 할 일", Width = 880, Height = 740, MinWidth = 800, MinHeight = 480, UseLayoutRounding = true, Background = new SolidColorBrush(Color.FromRgb(247, 249, 252)), WindowStartupLocation = WindowStartupLocation.CenterScreen }; editor = win;
+            Window win = new Window { Title = "춘식이 포스트잇 · 할 일", Width = 1280, Height = 740, MinWidth = 1240, MinHeight = 480, UseLayoutRounding = true, Background = new SolidColorBrush(Color.FromRgb(247, 249, 252)), WindowStartupLocation = WindowStartupLocation.CenterScreen }; editor = win;
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
             top.Children.Add(new TextBlock { Text = "춘식이에게 기억을 맡겨요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue });
@@ -217,7 +215,7 @@ namespace ChunsikDesktop {
             Func<bool> persist = delegate { debounce.Stop(); bool ok = Save(); status.Text = ok ? "저장됨 · 프로그램을 다시 열어도 할 일이 남아요" : "간격을 1~1440분, 표시 시간을 1~3600초로 지정해 주세요. 저장되지 않았어요."; status.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick; return ok; };
             saveEditor = persist;
             Action changed = delegate { status.Text = "저장 중…"; debounce.Stop(); debounce.Start(); }; debounce.Tick += delegate { persist(); };
-            StackPanel list = new StackPanel(); ScrollViewer scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; root.Children.Add(scroll);
+            StackPanel list = new StackPanel(); ScrollViewer scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; root.Children.Add(scroll);
             Action render = null;
             Action add = delegate {
                 if (String.IsNullOrWhiteSpace(entry.Text)) { status.Text = "할 일을 먼저 입력해 주세요."; entry.Focus(); return; }
@@ -231,58 +229,65 @@ namespace ChunsikDesktop {
             entry.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Enter) { add(); e.Handled = true; } };
             render = delegate {
                 list.Children.Clear();
+                Grid header = SettingsTableRow(); int column = 0;
+                foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "모양 · 이동", "글자 크기", "불투명도", "색상", "관리" })
+                    SettingsCell(header, new TextBlock { Text = label, Foreground = Brushes.SlateGray, FontWeight = FontWeights.SemiBold }, column++);
+                list.Children.Add(header);
                 foreach (TodoItem item in settings.Items) {
-                    StackPanel cardContent = new StackPanel { Margin = new Thickness(18) };
-                    Border card = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(18), BorderBrush = new SolidColorBrush(Color.FromRgb(224, 232, 242)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 0, 14), Child = cardContent }; list.Children.Add(card);
-                    DockPanel heading = new DockPanel { Margin = new Thickness(0, 0, 0, item.Done ? 0 : 10) }; cardContent.Children.Add(heading);
+                    Grid line = SettingsTableRow(); line.MinHeight = 96;
+                    Border card = new Border { Background = item.Done ? BubblePalette.BrushFor("#FFFDF2") : Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(224, 232, 242)), BorderThickness = new Thickness(0, 0, 0, 1), Child = line }; list.Children.Add(card);
                     Button done = Button(item.Done ? "✓ 완료됨" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else { item.Done = false; item.CompletedAt = null; changed(); render(); } });
+                    done.Padding = new Thickness(5, 7, 5, 7);
                     done.ToolTip = item.Done ? "다시 할 일로 되돌리기" : "완료 처리하기";
                     if (item.Done) { done.Background = BubblePalette.BrushFor("#D5F3DF"); done.Foreground = Brushes.DarkGreen; }
-                    DockPanel.SetDock(done, Dock.Left); heading.Children.Add(done);
+                    SettingsCell(line, done, 0);
+                    StackPanel textArea = new StackPanel();
+                    TextBox title = new TextBox { Text = item.Text, FontSize = 14, Padding = new Thickness(6), MaxLength = 160, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 52, MaxHeight = 110, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, BorderBrush = Brushes.LightSteelBlue, Foreground = item.Done ? Brushes.Gray : Brushes.DarkSlateGray, ToolTip = "메모 내용 · 변경사항 자동 저장" };
+                    title.TextChanged += delegate { item.Text = title.Text; changed(); }; textArea.Children.Add(title);
+                    if (item.Done) textArea.Children.Add(new TextBlock { Text = item.CompletedAt.HasValue ? "완료 · " + item.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm") : "완료 · 날짜 기록 없음", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
+                    SettingsCell(line, textArea, 1);
+                    StackPanel management = new StackPanel();
+                    if (!item.Done) management.Children.Add(Button("미리보기", delegate { PreviewUI.Todo(win, item); }));
                     Button delete = Button("삭제", delegate { int i = settings.Items.IndexOf(item); settings.Items.Remove(item); if (!persist()) settings.Items.Insert(i, item); render(); });
-                    delete.Background = Brushes.White; delete.Foreground = Brushes.SlateGray; DockPanel.SetDock(delete, Dock.Right); heading.Children.Add(delete);
-                    TextBox title = new TextBox { Text = item.Text, FontSize = 17, FontWeight = FontWeights.SemiBold, Padding = new Thickness(10, 8, 5, 8), MaxLength = 160, BorderThickness = new Thickness(0), Foreground = item.Done ? Brushes.Gray : new SolidColorBrush(Color.FromRgb(41, 53, 72)) }; heading.Children.Add(title);
-                    title.TextChanged += delegate { item.Text = title.Text; changed(); };
-                    if (item.Done) { cardContent.Children.Add(new TextBlock { Text = item.CompletedAt.HasValue ? "완료 · " + item.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm") : "완료 · 날짜 기록 없음", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 6, 0, 0) }); continue; }
-                    cardContent.Children.Add(Button("▶ 표시 미리보기", delegate { PreviewUI.Todo(win, item); }));
-                    WrapPanel font = SettingRow(cardContent, "글자 크기");
-                    font.Children.Add(Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); changed(); render(); }));
-                    font.Children.Add(new TextBlock { Text = item.FontSize + "", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6) });
-                    font.Children.Add(Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); changed(); render(); }));
-                    WrapPanel opacityRow = SettingRow(cardContent, "메모 불투명도");
-                    Slider opacitySlider = new Slider { Minimum = 10, Maximum = 100, Value = item.NoteOpacity * 100, Width = 180, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
-                    TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", Margin = new Thickness(10, 0, 0, 0) };
-                    opacityRow.Children.Add(opacitySlider); opacityRow.Children.Add(opacityText);
-                    opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); };
-                    WrapPanel display = SettingRow(cardContent, "표시 방식");
-                    display.Children.Add(Choices("항상 보여주기", "가끔 알려주기", item.Always, delegate(bool value) { item.Always = value; changed(); render(); }));
+                    delete.Background = Brushes.White; delete.Foreground = Brushes.SlateGray; management.Children.Add(delete); SettingsCell(line, management, 7);
+                    if (item.Done) continue;
+                    StackPanel display = new StackPanel();
+                    display.Children.Add(SettingChoice(new string[] { "항상 보여주기", "가끔 알려주기" }, item.Always ? 0 : 1, delegate(int value) { item.Always = value == 0; changed(); render(); }));
                     if (!item.Always) {
-                        NumberField interval = new NumberField(item.EveryMinutes, 1440, "리마인드 간격 분") { Margin = new Thickness(10, 0, 0, 0) }; display.Children.Add(interval);
-                        display.Children.Add(new TextBlock { Text = "분마다", Foreground = Brushes.SlateGray, Margin = new Thickness(7), VerticalAlignment = VerticalAlignment.Center });
+                        StackPanel intervalRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+                        NumberField interval = new NumberField(item.EveryMinutes, 1440, "리마인드 간격 분"); intervalRow.Children.Add(interval);
+                        intervalRow.Children.Add(new TextBlock { Text = "분마다", Foreground = Brushes.SlateGray, Margin = new Thickness(5), VerticalAlignment = VerticalAlignment.Center }); display.Children.Add(intervalRow);
                         interval.Changed += delegate { item.EveryMinutes = interval.Value; changed(); };
-                        WrapPanel duration = SettingRow(cardContent, "표시 시간");
+                        StackPanel duration = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
                         NumberField seconds = new NumberField(item.DisplaySeconds, 3600, "포스트잇 표시 시간 초"); duration.Children.Add(seconds);
-                        duration.Children.Add(new TextBlock { Text = "초 동안 표시", Foreground = Brushes.SlateGray, Margin = new Thickness(7), VerticalAlignment = VerticalAlignment.Center });
+                        duration.Children.Add(new TextBlock { Text = "초 표시", Foreground = Brushes.SlateGray, Margin = new Thickness(5), VerticalAlignment = VerticalAlignment.Center }); display.Children.Add(duration);
                         seconds.ToolTip = "1~3600초 · 표시 시간이 알림 간격보다 길면 숨긴 후 1초 뒤 다시 표시해요.";
                         seconds.Changed += delegate { item.DisplaySeconds = seconds.Value; changed(); };
                     }
-                    WrapPanel appearance = SettingRow(cardContent, "춘식이 모양");
-                    appearance.Children.Add(Choices("빼꼼 · 작고 귀엽게", "전신 · 온몸이 보이게", item.Peek, delegate(bool value) { item.Peek = value; changed(); render(); }));
-                    WrapPanel placement = SettingRow(cardContent, "이동 방식");
-                    placement.Children.Add(Choices("놓은 자리에 고정", "중력 켜기", item.Pinned, delegate(bool value) { item.Pinned = value; changed(); render(); }));
+                    SettingsCell(line, display, 2);
+                    StackPanel placement = new StackPanel();
+                    ComboBox shape = SettingChoice(new string[] { "빼꼼 춘식이", "전신 춘식이" }, item.Peek ? 0 : 1, delegate(int value) { item.Peek = value == 0; changed(); render(); }); shape.ToolTip = "춘식이 모양"; placement.Children.Add(shape);
+                    ComboBox movement = SettingChoice(new string[] { "놓은 자리에 고정", "중력 켜기" }, item.Pinned ? 0 : 1, delegate(int value) { item.Pinned = value == 0; changed(); render(); }); movement.ToolTip = "이동 방식"; placement.Children.Add(movement);
                     if (item.Standalone) placement.Children.Add(Button("위치 초기화", delegate { item.HasPosition = false; Runtime run; if (runtimes.TryGetValue(item.Id, out run)) run.Note.ResetPosition(); changed(); }));
-                    if (!item.Standalone) {
-                        WrapPanel assignment = SettingRow(cardContent, "담당 춘식이");
-                        assignment.Children.Add(Choices("기존 춘식이", "새 전담 춘식이", !item.Dedicated, delegate(bool value) { item.Dedicated = !value; changed(); render(); }));
+                    else {
+                        placement.Children.Add(SettingChoice(new string[] { "기존 춘식이", "새 전담 춘식이" }, item.Dedicated ? 1 : 0, delegate(int value) { item.Dedicated = value == 1; changed(); render(); }));
                         if (!item.Dedicated) {
                             List<string> petNames = new List<string>(); for (int i = 0; i < Math.Max(1, PetWindow.Count); i++) petNames.Add("춘식이 " + (i + 1));
-                            ComboBox target = new ComboBox { ItemsSource = petNames, SelectedIndex = Math.Max(0, Math.Min(petNames.Count - 1, item.PetIndex)), Width = 104, Margin = new Thickness(10, 0, 0, 0), Padding = new Thickness(5), VerticalAlignment = VerticalAlignment.Center };
-                            target.SelectionChanged += delegate { item.PetIndex = target.SelectedIndex; changed(); }; assignment.Children.Add(target);
+                            placement.Children.Add(SettingChoice(petNames.ToArray(), Math.Max(0, Math.Min(petNames.Count - 1, item.PetIndex)), delegate(int value) { item.PetIndex = value; changed(); }));
                         }
                     }
-                    WrapPanel colors = SettingRow(cardContent, "메모 색상"); colors.Children.Add(BubblePalette.Picker(item.Color, delegate(string color) { item.Color = color; changed(); }, 6));
-                    string explanation = item.Pinned ? "제목이나 춘식이를 끌어 옮기세요. 놓은 위치를 기억해요." : item.Peek ? "끌어 놓으면 포스트잇과 춘식이가 함께 아래로 내려와요." : "담당 춘식이 머리 위에서 메모를 보여줘요.";
-                    cardContent.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(247, 249, 252)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 10, 0, 0), Child = new TextBlock { Text = explanation, FontSize = 12, Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap } });
+                    SettingsCell(line, placement, 3);
+                    StackPanel font = new StackPanel();
+                    TextBlock fontValue = new TextBlock { Text = item.FontSize.ToString(), HorizontalAlignment = HorizontalAlignment.Center, Foreground = Brushes.SlateGray }; font.Children.Add(fontValue);
+                    StackPanel fontButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+                    Button smaller = Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); fontValue.Text = item.FontSize.ToString(); changed(); }); smaller.Padding = new Thickness(7);
+                    Button larger = Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); fontValue.Text = item.FontSize.ToString(); changed(); }); larger.Padding = new Thickness(7);
+                    fontButtons.Children.Add(smaller); fontButtons.Children.Add(larger); font.Children.Add(fontButtons); SettingsCell(line, font, 4);
+                    StackPanel opacity = new StackPanel();
+                    TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6), Foreground = Brushes.SlateGray }; opacity.Children.Add(opacityText);
+                    Slider opacitySlider = new Slider { Minimum = 10, Maximum = 100, Value = item.NoteOpacity * 100, TickFrequency = 5, IsSnapToTickEnabled = true, ToolTip = "메모 불투명도 10~100%" }; opacity.Children.Add(opacitySlider);
+                    opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); }; SettingsCell(line, opacity, 5);
+                    SettingsCell(line, BubblePalette.Picker(item.Color, delegate(string color) { item.Color = color; changed(); }, 3), 6);
                 }
                 if (settings.Items.Count == 0) list.Children.Add(new TextBlock { Text = "아직 할 일이 없어요. 위에서 하나 등록해 보세요.", Margin = new Thickness(10, 30, 10, 10), Foreground = Brushes.SlateGray });
             };
