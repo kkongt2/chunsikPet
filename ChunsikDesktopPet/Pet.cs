@@ -38,6 +38,10 @@ namespace ChunsikDesktop {
             return frames[tick % 2 == 0 ? 4 : 7];
         }
         public static BitmapSource ToolPose(bool wave) { return frames[wave ? 7 : 4]; }
+        public static BitmapSource ToolCelebrationPose(double seconds) {
+            int pose = (int)(seconds / 0.24) % 3 == 2 ? 7 : 5;
+            return reactionFrames == null ? ToolPose(true) : reactionFrames[pose];
+        }
         public static BitmapSource TrayImage { get { return frames[4]; } }
         public static bool AllPaused {
             get { if (Pets.Count == 0) return false; foreach (PetWindow pet in Pets) if (!pet.paused) return false; return true; }
