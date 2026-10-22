@@ -135,6 +135,14 @@ internal static class GhostNoteTests {
         using (System.IO.StringReader reader = new System.IO.StringReader("<PetOptions><Placements><PetPlacement><Size>80</Size><CenterX>100</CenterX><BottomY>800</BottomY></PetPlacement></Placements></PetOptions>")) restored = (PetOptions)serializer.Deserialize(reader);
         Check(!restored.Placements[0].Paused && restored.Placements[0].IsValid(), "legacy placement defaults to walking mode");
         Check(!new PetPlacement { Size = 80, CenterX = Double.NaN }.IsValid(), "invalid saved coordinates rejected");
+        int undoCount = 0;
+        UndoToast.ShowCompleted("긴 메모 내용이 있어도 되돌리기 버튼은 잘리지 않아야 합니다.\n두 번째 줄", delegate { undoCount++; }); Pump();
+        UndoToast toast = (UndoToast)typeof(UndoToast).GetField("current", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        Button undoButton = (Button)typeof(UndoToast).GetField("undoButton", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(toast);
+        Point undoAt = undoButton.TranslatePoint(new Point(), toast);
+        Check(toast.SizeToContent == SizeToContent.Height && undoButton.ActualHeight >= 38 && undoAt.Y + undoButton.ActualHeight <= toast.ActualHeight - 10, "undo action is fully visible in content-sized toast");
+        undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
+        Check(undoCount == 1 && !toast.IsVisible, "undo action fires once and dismisses toast");
         Console.WriteLine("PASS: " + count + " normal mode assertions"); app.Shutdown();
     }
 }
