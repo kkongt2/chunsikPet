@@ -102,7 +102,7 @@ namespace ChunsikDesktop {
             Slider count = new Slider { Minimum = 1, Maximum = 20, TickFrequency = 1, IsSnapToTickEnabled = true, TickPlacement = System.Windows.Controls.Primitives.TickPlacement.BottomRight, Value = Options.PetCount };
             countLabel.Text = "캐릭터 수: " + Options.PetCount + "마리";
             count.ValueChanged += delegate { countLabel.Text = "캐릭터 수: " + (int)Math.Round(count.Value) + "마리"; }; root.Children.Add(count);
-            root.Children.Add(new TextBlock { Text = "다른 프로그램에서 입력해도 깨어나요.\n저장하면 즉시 적용되며 다음 실행에도 유지됩니다.\n잠든 중에도 시간 알림 말풍선은 표시됩니다.", Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 16, 0, 16) });
+            root.Children.Add(new TextBlock { Text = "다른 프로그램에서 입력해도 깨어나요.\n변경사항은 자동으로 저장·적용되며 다음 실행에도 유지됩니다.\n잠든 중에도 시간 알림 말풍선은 표시됩니다.", Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 16, 0, 16) });
             Border appearanceCard = new Border { Background = new SolidColorBrush(Color.FromRgb(242, 247, 253)), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 16) };
             StackPanel appearance = new StackPanel(); appearanceCard.Child = appearance; root.Children.Add(appearanceCard);
             TextBlock transparencyLabel = new TextBlock { Text = "돌아다니는 춘식이 투명도: " + Options.TransparencyPercent + "%", FontWeight = FontWeights.SemiBold }; appearance.Children.Add(transparencyLabel);
@@ -127,17 +127,39 @@ namespace ChunsikDesktop {
             TextBlock paydayDates = new TextBlock { Text = PaydayCalendar.Describe(DateTime.Today, Options.PaydayDay), Foreground = new SolidColorBrush(Color.FromRgb(0, 100, 168)), Margin = new Thickness(0, 10, 0, 8) }; paydayPanel.Children.Add(paydayDates);
             payday.SelectionChanged += delegate { if (payday.SelectedItem != null) paydayDates.Text = PaydayCalendar.Describe(DateTime.Today, (int)payday.SelectedItem); };
             paydayPanel.Children.Add(new TextBlock { Text = "토·일·공휴일이면 직전 평일로 앞당겨요. 없는 날짜는 말일 기준이에요.\n공휴일·대체공휴일 달력: 2040년까지 내장 / 임시공휴일 제외\n월급날에는 실행할 때마다 12초간 재생돼요. 인터넷은 사용하지 않아요.", FontSize = 11, Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap });
-            StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right }; root.Children.Add(buttons);
-            Button cancel = new Button { Content = "취소", Padding = new Thickness(18, 6, 18, 6) }; cancel.Content = "저장값 다시 불러오기"; cancel.Click += delegate { win.Close(); OpenSettings(); }; buttons.Children.Add(cancel);
-            Button save = new Button { Content = "저장 · 적용", Padding = new Thickness(18, 6, 18, 6), Margin = new Thickness(8, 0, 0, 0) };
+            TextBlock saveStatus = new TextBlock { Text = "모든 변경사항 저장됨", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap }; root.Children.Add(saveStatus);
+            DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            bool dirty = false;
             Func<bool> apply = delegate {
+                debounce.Stop();
+                if (!dirty) return true;
                 int delay;
                 if (!Int32.TryParse(minutes.Text.Trim(), out delay) || delay < 1 || delay > 1440) {
-                    MessageBox.Show(SettingsHub.OwnerFor(win), "수면 대기 시간은 1~1440분의 정수로 입력해 주세요.", "입력 확인"); return false;
+                    saveStatus.Text = "수면 대기 시간을 1~1440분의 정수로 입력해 주세요. 아직 저장되지 않았어요.";
+                    saveStatus.Foreground = Brushes.Firebrick; return false;
                 }
                 PetOptions value = new PetOptions { TransparencyPercent = (int)Math.Round(transparency.Value), AvoidCursor = avoid.IsChecked == true, SleepEnabled = enabled.IsChecked == true, IdleMinutes = delay, PetCount = (int)Math.Round(count.Value), PaydayDay = (int)payday.SelectedItem, PaydayEnabled = paydayEnabled.IsChecked == true };
-                return Apply(value);
-            }; save.Click += delegate { apply(); }; buttons.Children.Add(save); SettingsHub.Attach(win, "캐릭터", apply);
+                bool ok = Apply(value);
+                if (ok) dirty = false;
+                saveStatus.Text = ok ? "자동 저장 · 적용 완료" : "저장하지 못했어요. 설정을 다시 변경해 재시도해 주세요.";
+                saveStatus.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick;
+                return ok;
+            };
+            Action changed = delegate {
+                dirty = true; saveStatus.Text = "저장 중…"; saveStatus.Foreground = Brushes.SlateGray;
+                debounce.Stop(); debounce.Start();
+            };
+            debounce.Tick += delegate { apply(); };
+            minutes.TextChanged += delegate { changed(); };
+            count.ValueChanged += delegate { changed(); };
+            transparency.ValueChanged += delegate { changed(); };
+            enabled.Checked += delegate { changed(); }; enabled.Unchecked += delegate { changed(); };
+            avoid.Checked += delegate { changed(); }; avoid.Unchecked += delegate { changed(); };
+            paydayEnabled.Checked += delegate { changed(); }; paydayEnabled.Unchecked += delegate { changed(); };
+            payday.SelectionChanged += delegate { changed(); };
+            win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!apply()) e.Cancel = true; };
+            win.Closed += delegate { debounce.Stop(); };
+            SettingsHub.Attach(win, "캐릭터", apply);
         }
         public void Stop() { timer.Stop(); if (editor != null) editor.Close(); }
     }
