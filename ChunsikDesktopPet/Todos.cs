@@ -298,11 +298,11 @@ namespace ChunsikDesktop {
         public bool IsCompleting { get; private set; }
         public void AnimateComplete(Action finished) {
             if (IsCompleting || disposing) return;
-            IsCompleting = true; SyncNoteLayers(); mascot.Opacity = 1; UpdateLayout();
+            IsCompleting = true; SyncNoteLayers(); dragSurface.Visibility = Visibility.Hidden; mascot.Opacity = 1; UpdateLayout();
             double oldHeight = ActualHeight; SizeToContent = SizeToContent.Manual; Height = oldHeight;
             root.IsHitTestVisible = false;
             mascot.Visibility = Visibility.Visible; mascot.Source = peekArt;
-            mascot.Width = 86; mascot.Height = 66; mascot.HorizontalAlignment = HorizontalAlignment.Right; mascot.VerticalAlignment = VerticalAlignment.Top; mascot.Margin = new Thickness(0, 0, 7, 0);
+            mascot.Width = current != null && current.Peek ? 43 : 86; mascot.Height = current != null && current.Peek ? 33 : 66; mascot.HorizontalAlignment = HorizontalAlignment.Right; mascot.VerticalAlignment = VerticalAlignment.Top; mascot.Margin = new Thickness(0, 0, 7, 0);
             UpdateLayout();
             // Anchor below the white muzzle in the cropped sprite; account for Uniform letterboxing.
             double artScale = Math.Min(mascot.ActualWidth / peekArt.PixelWidth, mascot.ActualHeight / peekArt.PixelHeight);
@@ -359,15 +359,13 @@ namespace ChunsikDesktop {
         readonly Border tape;
         readonly Image mascot;
         readonly Grid noteContent;
-        readonly TextBlock heading;
-        readonly GhostNoteHeader ghostHeader;
+        readonly Grid dragSurface;
+        readonly Border dragBar;
         readonly GhostNoteHeader restoreTab;
         readonly Button restoreButton, moreTransparent, lessTransparent, addNote, smaller, larger, minimizeButton;
         readonly System.Windows.Controls.Primitives.Thumb grip;
         readonly TextBlock opacityFeedback;
         readonly DispatcherTimer feedbackTimer;
-        readonly GhostNoteHeader ghostMascot;
-        readonly Image ghostMascotImage;
         readonly Action<double, double> moved;
         TodoItem current;
         bool dragging, resizing, positionReady;
@@ -395,16 +393,23 @@ namespace ChunsikDesktop {
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             paper = new Border { CornerRadius = new CornerRadius(2, 2, 16, 2), BorderBrush = new SolidColorBrush(Color.FromRgb(190, 170, 102)), BorderThickness = new Thickness(0, 0, 1, 2), Child = content, Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 6, ShadowDepth = 2, Opacity = 0.2 } }; root.Children.Add(paper);
             tape = new Border { Width = 72, Height = 15, Background = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, -3, 0, 0), RenderTransform = new RotateTransform(-4), IsHitTestVisible = false }; root.Children.Add(tape);
-            heading = new TextBlock { Text = "수정/이동", FontSize = 10, Height = 24, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 2, 0, 2), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
-            DockPanel noteHeader = new DockPanel { LastChildFill = true }; content.Children.Add(noteHeader);
-            heading.MouseLeftButtonDown += DragNote;
-            addNote = NoteButton("＋", "새 빈 포스트잇 추가", add);
-            minimizeButton = NoteButton("−", "메모 최소화 · 작은 탭을 누르면 복원", ToggleMinimized);
-            StackPanel topActions = new StackPanel { Orientation = Orientation.Horizontal };
-            topActions.Children.Add(addNote); topActions.Children.Add(minimizeButton);
-            DockPanel.SetDock(topActions, Dock.Right); noteHeader.Children.Add(topActions); noteHeader.Children.Add(heading);
+            // One continuous hit area includes the blank space to the left of the pet.
+            // The visible strip sits behind its paws, like the top of a little wall.
+            dragSurface = new Grid { Height = 48, VerticalAlignment = VerticalAlignment.Top, Background = new SolidColorBrush(Color.FromArgb(1, 255, 232, 148)), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "윗부분을 끌어서 이동" };
+            dragBar = new Border { Height = 24, VerticalAlignment = VerticalAlignment.Bottom, Background = BubblePalette.BrushFor("#FFE894"), BorderBrush = Brushes.Tan, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(3), Child = new TextBlock { Text = "···", FontSize = 16, Foreground = Brushes.SaddleBrown, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false } };
+            dragSurface.Children.Add(dragBar); root.Children.Add(dragSurface);
+            dragSurface.MouseLeftButtonDown += DragNote;
+            dragSurface.MouseEnter += delegate { dragBar.Background = Brushes.Khaki; };
+            dragSurface.MouseLeave += delegate { if (!dragging) dragBar.Background = BubblePalette.BrushFor("#FFE894"); };
+            Grid noteHeader = new Grid(); content.Children.Add(noteHeader);
+            addNote = NoteButton("＋ 메모", "새 빈 포스트잇 추가", add);
+            addNote.HorizontalAlignment = HorizontalAlignment.Left;
+            minimizeButton = NoteButton("▾ 접기", "메모 최소화 · 작은 탭을 누르면 복원", ToggleMinimized);
+            minimizeButton.HorizontalAlignment = HorizontalAlignment.Right;
+            minimizeButton.Background = BubblePalette.BrushFor("#FFFDF2");
+            noteHeader.Children.Add(addNote); noteHeader.Children.Add(minimizeButton);
             message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(64, 55, 44)) };
-            message.ToolTip = "본문을 더블클릭하거나 상단 헤더를 눌러 편집하세요.";
+            message.ToolTip = "본문을 더블클릭해서 편집하세요.";
             message.Cursor = System.Windows.Input.Cursors.IBeam;
             messageScroll = new ScrollViewer { Background = Brushes.Transparent, Content = message, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             Grid.SetRow(messageScroll, 1); content.Children.Add(messageScroll);
@@ -440,7 +445,7 @@ namespace ChunsikDesktop {
             root.Children.Add(opacityFeedback);
             feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.4) };
             feedbackTimer.Tick += delegate { feedbackTimer.Stop(); opacityFeedback.Visibility = Visibility.Collapsed; };
-            mascot = new Image { Stretch = Stretch.Uniform, Width = 86, Height = 66, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "포스트잇과 함께 끌어 옮기기" };
+            mascot = new Image { Stretch = Stretch.Uniform, Width = 43, Height = 33, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "포스트잇과 함께 끌어 옮기기" };
             // Match the wandering pet: high-quality downsampling for the large transparent source.
             RenderOptions.SetBitmapScalingMode(mascot, BitmapScalingMode.HighQuality);
             mascot.SnapsToDevicePixels = true; mascot.UseLayoutRounding = true;
@@ -473,15 +478,6 @@ namespace ChunsikDesktop {
                 if (!persist()) { current.NoteWidth = oldWidth; current.NoteHeight = oldHeight; Update(current); }
                 ClampPosition(WorkingArea()); ApplyAppearance();
             }; root.Children.Add(grip);
-            ghostHeader = new GhostNoteHeader(this, BeginEdit,
-                delegate { dragging = true; },
-                delegate { dragging = false; if (current != null) { current.Pinned = true; positionReady = true; ClampPosition(WorkingArea()); moved(Left, Top); ApplyAppearance(); } });
-            // An owned window above the header keeps the face and paws in front of
-            // its native HWND; WPF Panel.ZIndex cannot order separate top-level HWNDs.
-            ghostMascotImage = new Image { Stretch = Stretch.Uniform, IsHitTestVisible = false };
-            RenderOptions.SetBitmapScalingMode(ghostMascotImage, BitmapScalingMode.HighQuality);
-            ghostMascot = new GhostNoteHeader(ghostHeader, ghostMascotImage);
-            ghostMascot.SourceInitialized += delegate { NativeNoteInput.SetClickThrough(ghostMascot, true); };
             restoreButton = NoteButton("▣ 메모", "클릭해서 메모 복원", ToggleMinimized);
             restoreButton.Margin = new Thickness(0); restoreButton.Background = BubblePalette.BrushFor("#FFE894");
             restoreTab = new GhostNoteHeader(this, restoreButton);
@@ -492,10 +488,10 @@ namespace ChunsikDesktop {
             LocationChanged += delegate { SyncNoteLayers(); };
             SizeChanged += delegate { SyncNoteLayers(); };
             LayoutUpdated += delegate { SyncNoteLayers(); };
-            Closed += delegate { feedbackTimer.Stop(); restoreTab.Close(); ghostMascot.Close(); ghostHeader.Close(); };
+            Closed += delegate { feedbackTimer.Stop(); restoreTab.Close(); };
         }
         void ApplyAppearance() {
-            if (ghostHeader == null || disposing) return;
+            if (restoreTab == null || disposing) return;
             // The hidden full-size owner must not block the desktop behind its restore tab.
             NativeNoteInput.SetClickThrough(this, current != null && current.Minimized);
             Opacity = 1;
@@ -506,27 +502,8 @@ namespace ChunsikDesktop {
             SyncNoteLayers();
         }
         void SyncNoteLayers() {
-            if (ghostHeader == null || disposing) return;
-            bool show = IsVisible && !IsEditing && !IsCompleting && current != null && !current.Minimized;
+            if (restoreTab == null || disposing) return;
             if (IsVisible && current != null && current.Minimized && !IsCompleting) restoreTab.Align(root, Math.Min(180, Width - 10), 28); else restoreTab.Hide();
-            if (show) {
-                double headerWidth = Math.Max(1, heading.ActualWidth);
-                if (mascot.Visibility == Visibility.Visible && mascot.ActualWidth > 0) {
-                    Point textAt = heading.TranslatePoint(new Point(0, 0), this);
-                    Point petAt = mascot.TranslatePoint(new Point(0, 0), this);
-                    if (petAt.Y < textAt.Y + 24 && petAt.Y + mascot.ActualHeight > textAt.Y)
-                        headerWidth = Math.Max(1, Math.Min(headerWidth, petAt.X - textAt.X - 8));
-                }
-                ghostHeader.Align(heading, headerWidth);
-            } else ghostHeader.Hide();
-            if (show && mascot.Visibility == Visibility.Visible && mascot.ActualWidth > 0 && mascot.ActualHeight > 0) {
-                ghostMascotImage.Source = mascot.Source;
-                ghostMascot.Align(mascot, mascot.ActualWidth, mascot.ActualHeight);
-                mascot.Opacity = 0;
-            } else {
-                ghostMascot.Hide();
-                if (!IsCompleting) mascot.Opacity = 1;
-            }
         }
         static Button NoteButton(string text, string hint, Action action) {
             Button button = new Button { Content = text, ToolTip = hint, Padding = new Thickness(4, 3, 4, 3), Margin = new Thickness(2), FontSize = 11, Background = Brushes.Transparent, BorderBrush = Brushes.Tan, Cursor = System.Windows.Input.Cursors.Hand };
@@ -585,8 +562,9 @@ namespace ChunsikDesktop {
             if (current == null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed || !EndEdit(true)) return;
             // Dragging a legacy following note switches it to a detached, fixed companion.
             if (!current.Standalone) current.Pinned = true; lastStandalone = true; positionReady = true; dragging = true; ApplyAppearance();
+            dragBar.Background = Brushes.Goldenrod;
             try { DragMove(); }
-            finally { dragging = false; Rect area = WorkingArea(); ClampPosition(area); moved(Left, Top); ApplyAppearance(); }
+            finally { dragging = false; dragBar.Background = BubblePalette.BrushFor("#FFE894"); Rect area = WorkingArea(); ClampPosition(area); moved(Left, Top); ApplyAppearance(); }
             e.Handled = true;
         }
         public void Update(TodoItem item) {
@@ -602,19 +580,19 @@ namespace ChunsikDesktop {
             if (!resizing) { Width = item.NoteWidth; Height = Math.Max(MinHeight, item.NoteHeight); }
             message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize;
             bool blank = String.IsNullOrWhiteSpace(item.Text);
-            message.Text = blank ? "위쪽 헤더를 눌러 할 일을 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
+            message.Text = blank ? "여기를 더블클릭해 메모를 적어보세요" : item.Always ? item.Text : "오늘 ‘" + item.Text + "’ 잊지 않았지?";
             message.Foreground = blank ? Brushes.SlateGray : new SolidColorBrush(Color.FromRgb(64, 55, 44));
             mascot.Visibility = item.Standalone ? Visibility.Visible : Visibility.Collapsed;
             mascot.Source = item.Peek ? peekArt : PetWindow.ToolPose(false);
-            mascot.Width = item.Peek ? 86 : 76; mascot.Height = item.Peek ? 66 : 88;
+            mascot.Width = item.Peek ? 43 : 76; mascot.Height = item.Peek ? 33 : 88;
             mascot.VerticalAlignment = item.Peek ? VerticalAlignment.Top : VerticalAlignment.Bottom;
             mascot.HorizontalAlignment = item.Peek ? HorizontalAlignment.Right : HorizontalAlignment.Center;
             mascot.Margin = item.Peek ? new Thickness(0, 0, 7, 0) : new Thickness(0, 3, 0, 0);
-            paper.Margin = new Thickness(0, item.Peek ? 20 : 0, 0, item.Pinned && !item.Peek ? 94 : 0);
-            tape.Margin = new Thickness(0, item.Peek ? 17 : -3, 0, 0);
-            noteContent.Margin = new Thickness(10, item.Peek ? 48 : 18, 10, 8);
-            heading.MaxWidth = double.PositiveInfinity;
-            heading.HorizontalAlignment = HorizontalAlignment.Stretch;
+            paper.Margin = new Thickness(0, item.Peek ? 24 : 0, 0, item.Pinned && !item.Peek ? 94 : 0);
+            tape.Visibility = Visibility.Collapsed;
+            dragSurface.Height = item.Peek ? 48 : 24;
+            dragSurface.Visibility = IsCompleting ? Visibility.Hidden : Visibility.Visible;
+            noteContent.Margin = new Thickness(10, item.Peek ? 28 : 30, 10, 8);
             ApplyAppearance();
         }
         double NoteHeight { get { return ActualHeight > 0 ? ActualHeight : 200; } }
