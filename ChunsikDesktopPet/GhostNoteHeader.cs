@@ -45,7 +45,7 @@ namespace ChunsikDesktop {
             Button button = new Button { Content = "⠿ 수정/이동", FontSize = 11, HorizontalContentAlignment = HorizontalAlignment.Left,
                 Background = new SolidColorBrush(Color.FromRgb(255, 232, 148)), Foreground = Brushes.SaddleBrown,
                 BorderBrush = Brushes.Tan, Padding = new Thickness(6, 1, 3, 1),
-                ToolTip = "클릭해서 메모 수정 · 끌어서 이동. 저장/취소하거나 다른 창을 누르면 다시 클릭이 통과해요." };
+                ToolTip = "클릭해서 메모 수정 · 끌어서 이동. 저장/취소하거나 다른 창을 누르면 편집을 마쳐요." };
             bool dragging = false; Point down = new Point(), origin = new Point();
             button.PreviewMouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e) {
                 button.Background = Brushes.Khaki;

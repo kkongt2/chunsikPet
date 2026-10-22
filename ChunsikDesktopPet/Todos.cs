@@ -298,7 +298,7 @@ namespace ChunsikDesktop {
         public bool IsCompleting { get; private set; }
         public void AnimateComplete(Action finished) {
             if (IsCompleting || disposing) return;
-            IsCompleting = true; SyncGhostHeader(); mascot.Opacity = 1; UpdateLayout();
+            IsCompleting = true; SyncNoteLayers(); mascot.Opacity = 1; UpdateLayout();
             double oldHeight = ActualHeight; SizeToContent = SizeToContent.Manual; Height = oldHeight;
             root.IsHitTestVisible = false;
             mascot.Visibility = Visibility.Visible; mascot.Source = peekArt;
@@ -362,7 +362,8 @@ namespace ChunsikDesktop {
         readonly TextBlock heading;
         readonly GhostNoteHeader ghostHeader;
         readonly GhostNoteHeader restoreTab;
-        readonly Button modeButton, restoreButton, moreTransparent, lessTransparent;
+        readonly Button restoreButton, moreTransparent, lessTransparent, addNote, smaller, larger, minimizeButton;
+        readonly System.Windows.Controls.Primitives.Thumb grip;
         readonly TextBlock opacityFeedback;
         readonly DispatcherTimer feedbackTimer;
         readonly GhostNoteHeader ghostMascot;
@@ -377,8 +378,6 @@ namespace ChunsikDesktop {
         double completeAllowedAfter;
         readonly ScrollViewer messageScroll;
         readonly Func<bool> persist;
-        readonly List<GhostNoteHeader> ghostControls = new List<GhostNoteHeader>();
-        readonly List<FrameworkElement> ghostAnchors = new List<FrameworkElement>();
         bool lastStandalone;
         public void ResetPosition() { positionReady = false; }
         readonly Border paper;
@@ -399,14 +398,13 @@ namespace ChunsikDesktop {
             heading = new TextBlock { Text = "수정/이동", FontSize = 10, Height = 24, Foreground = Brushes.DarkSlateGray, Margin = new Thickness(0, 2, 0, 2), Cursor = System.Windows.Input.Cursors.SizeAll, ToolTip = "끌어서 위치 이동 · 고정 옵션을 켜면 중력 없이 유지" };
             DockPanel noteHeader = new DockPanel { LastChildFill = true }; content.Children.Add(noteHeader);
             heading.MouseLeftButtonDown += DragNote;
-            Button addNote = NoteButton("＋", "새 빈 포스트잇 추가", add);
-            modeButton = NoteButton("클릭 통과 ON", "본문 클릭을 뒤쪽 프로그램으로 통과시키기", ToggleGhost);
-            Button minimizeButton = NoteButton("−", "메모 최소화 · 작은 탭을 누르면 복원", ToggleMinimized);
+            addNote = NoteButton("＋", "새 빈 포스트잇 추가", add);
+            minimizeButton = NoteButton("−", "메모 최소화 · 작은 탭을 누르면 복원", ToggleMinimized);
             StackPanel topActions = new StackPanel { Orientation = Orientation.Horizontal };
             topActions.Children.Add(addNote); topActions.Children.Add(minimizeButton);
             DockPanel.SetDock(topActions, Dock.Right); noteHeader.Children.Add(topActions); noteHeader.Children.Add(heading);
             message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 17, Foreground = new SolidColorBrush(Color.FromRgb(64, 55, 44)) };
-            message.ToolTip = "평소에는 클릭이 뒤로 통과해요. 상단 헤더를 눌러 편집하세요.";
+            message.ToolTip = "본문을 더블클릭하거나 상단 헤더를 눌러 편집하세요.";
             message.Cursor = System.Windows.Input.Cursors.IBeam;
             messageScroll = new ScrollViewer { Background = Brushes.Transparent, Content = message, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             Grid.SetRow(messageScroll, 1); content.Children.Add(messageScroll);
@@ -422,15 +420,14 @@ namespace ChunsikDesktop {
             Deactivated += delegate { if (IsEditing) EndEdit(true); };
             StackPanel footer = new StackPanel { Margin = new Thickness(0, 4, 0, 0) }; Grid.SetRow(footer, 2); content.Children.Add(footer);
             DockPanel status = new DockPanel(); footer.Children.Add(status);
-            DockPanel.SetDock(modeButton, Dock.Left); status.Children.Add(modeButton);
             WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; footer.Children.Add(buttons);
             StackPanel opacityButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 8, 0) };
             moreTransparent = NoteButton("◐−", "더 투명하게 · 불투명도 10% 낮추기 (최소 10%)", delegate { ChangeOpacity(-10); });
             lessTransparent = NoteButton("◐+", "더 선명하게 · 불투명도 10% 높이기 (최대 100%)", delegate { ChangeOpacity(10); });
             moreTransparent.Background = lessTransparent.Background = BubblePalette.BrushFor("#D9EAFE");
             opacityButtons.Children.Add(moreTransparent); opacityButtons.Children.Add(lessTransparent); opacityButtons.HorizontalAlignment = HorizontalAlignment.Right; status.Children.Add(opacityButtons);
-            Button smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
-            Button larger = NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }); buttons.Children.Add(larger);
+            smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
+            larger = NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }); buttons.Children.Add(larger);
             completeButton = NoteButton("✓", "이 할 일을 완료 처리", delegate {
                 if (IsEditing || interactionClock.Elapsed.TotalSeconds < completeAllowedAfter) return;
                 complete();
@@ -462,7 +459,7 @@ namespace ChunsikDesktop {
                 if (!persist()) current.NoteOpacity = old;
                 Update(current); ShowOpacityFeedback();
             };
-            System.Windows.Controls.Primitives.Thumb grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
+            grip = new System.Windows.Controls.Primitives.Thumb { Width = 18, Height = 18, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Cursor = System.Windows.Input.Cursors.SizeNWSE, ToolTip = "끌어서 이 포스트잇 크기 조절" };
             grip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent'><TextBlock Text='◢' Foreground='#927845' HorizontalAlignment='Right' VerticalAlignment='Bottom'/></Border></ControlTemplate>");
             grip.DragStarted += delegate { resizing = true; EndEdit(true); };
             grip.DragDelta += delegate(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e) {
@@ -474,23 +471,11 @@ namespace ChunsikDesktop {
                 double oldWidth = current.NoteWidth, oldHeight = current.NoteHeight;
                 current.NoteWidth = Width; current.NoteHeight = Height;
                 if (!persist()) { current.NoteWidth = oldWidth; current.NoteHeight = oldHeight; Update(current); }
-                ClampPosition(WorkingArea()); ApplyGhostMode();
+                ClampPosition(WorkingArea()); ApplyAppearance();
             }; root.Children.Add(grip);
             ghostHeader = new GhostNoteHeader(this, BeginEdit,
                 delegate { dragging = true; },
-                delegate { dragging = false; if (current != null) { current.Pinned = true; positionReady = true; ClampPosition(WorkingArea()); moved(Left, Top); ApplyGhostMode(); } });
-            foreach (Button original in new Button[] { addNote, smaller, larger, completeButton, moreTransparent, lessTransparent, modeButton, minimizeButton }) {
-                Button source = original;
-                Button proxy = NoteButton(source.Content.ToString(), source.ToolTip.ToString(), delegate { source.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); });
-                proxy.Margin = new Thickness(0);
-                proxy.Background = source == moreTransparent || source == lessTransparent ? source.Background : BubblePalette.BrushFor("#FFE894");
-                ghostAnchors.Add(source); ghostControls.Add(new GhostNoteHeader(this, proxy));
-            }
-            System.Windows.Controls.Primitives.Thumb proxyGrip = new System.Windows.Controls.Primitives.Thumb { Template = grip.Template, Cursor = grip.Cursor, ToolTip = grip.ToolTip };
-            proxyGrip.DragStarted += delegate { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragStartedEventArgs(0, 0)); };
-            proxyGrip.DragDelta += delegate(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e) { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragDeltaEventArgs(e.HorizontalChange, e.VerticalChange)); };
-            proxyGrip.DragCompleted += delegate(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e) { grip.RaiseEvent(new System.Windows.Controls.Primitives.DragCompletedEventArgs(e.HorizontalChange, e.VerticalChange, e.Canceled)); };
-            ghostAnchors.Add(grip); ghostControls.Add(new GhostNoteHeader(this, proxyGrip));
+                delegate { dragging = false; if (current != null) { current.Pinned = true; positionReady = true; ClampPosition(WorkingArea()); moved(Left, Top); ApplyAppearance(); } });
             // An owned window above the header keeps the face and paws in front of
             // its native HWND; WPF Panel.ZIndex cannot order separate top-level HWNDs.
             ghostMascotImage = new Image { Stretch = Stretch.Uniform, IsHitTestVisible = false };
@@ -500,26 +485,27 @@ namespace ChunsikDesktop {
             restoreButton = NoteButton("▣ 메모", "클릭해서 메모 복원", ToggleMinimized);
             restoreButton.Margin = new Thickness(0); restoreButton.Background = BubblePalette.BrushFor("#FFE894");
             restoreTab = new GhostNoteHeader(this, restoreButton);
-            SourceInitialized += delegate { ApplyGhostMode(); };
-            Loaded += delegate { ApplyGhostMode(); };
-            ContentRendered += delegate { SyncGhostHeader(); };
-            IsVisibleChanged += delegate { SyncGhostHeader(); if (IsVisible) ApplyGhostMode(); };
-            LocationChanged += delegate { SyncGhostHeader(); };
-            SizeChanged += delegate { SyncGhostHeader(); };
-            LayoutUpdated += delegate { SyncGhostHeader(); };
-            Closed += delegate { feedbackTimer.Stop(); restoreTab.Close(); ghostMascot.Close(); ghostHeader.Close(); foreach (GhostNoteHeader control in ghostControls) control.Close(); };
+            SourceInitialized += delegate { ApplyAppearance(); };
+            Loaded += delegate { ApplyAppearance(); };
+            ContentRendered += delegate { SyncNoteLayers(); };
+            IsVisibleChanged += delegate { SyncNoteLayers(); if (IsVisible) ApplyAppearance(); };
+            LocationChanged += delegate { SyncNoteLayers(); };
+            SizeChanged += delegate { SyncNoteLayers(); };
+            LayoutUpdated += delegate { SyncNoteLayers(); };
+            Closed += delegate { feedbackTimer.Stop(); restoreTab.Close(); ghostMascot.Close(); ghostHeader.Close(); };
         }
-        void ApplyGhostMode() {
+        void ApplyAppearance() {
             if (ghostHeader == null || disposing) return;
-            NativeNoteInput.SetClickThrough(this, current != null && (current.Minimized || (current.GhostEnabled && !IsEditing && !IsDragging)));
+            // The hidden full-size owner must not block the desktop behind its restore tab.
+            NativeNoteInput.SetClickThrough(this, current != null && current.Minimized);
             Opacity = 1;
             double memoOpacity = IsEditing || IsDragging ? 1 : current == null ? 0.6 : Math.Max(0.1, Math.Min(1, current.NoteOpacity));
             if (paper.Background != null) { Brush background = paper.Background.Clone(); background.Opacity = memoOpacity; paper.Background = background; }
             messageScroll.Opacity = memoOpacity;
             root.Visibility = current != null && current.Minimized ? Visibility.Hidden : Visibility.Visible;
-            SyncGhostHeader();
+            SyncNoteLayers();
         }
-        void SyncGhostHeader() {
+        void SyncNoteLayers() {
             if (ghostHeader == null || disposing) return;
             bool show = IsVisible && !IsEditing && !IsCompleting && current != null && !current.Minimized;
             if (IsVisible && current != null && current.Minimized && !IsCompleting) restoreTab.Align(root, Math.Min(180, Width - 10), 28); else restoreTab.Hide();
@@ -533,17 +519,6 @@ namespace ChunsikDesktop {
                 }
                 ghostHeader.Align(heading, headerWidth);
             } else ghostHeader.Hide();
-            for (int i = 0; i < ghostControls.Count; i++) {
-                FrameworkElement anchor = ghostAnchors[i];
-                Button sourceButton = anchor as Button, proxyButton = ghostControls[i].Content as Button;
-                if (sourceButton != null && proxyButton != null) {
-                    proxyButton.Content = sourceButton.Content; proxyButton.IsEnabled = sourceButton.IsEnabled;
-                    proxyButton.Background = sourceButton.Background;
-                }
-                if (show && current.GhostEnabled && anchor.IsVisible && anchor.ActualWidth > 0 && anchor.ActualHeight > 0)
-                    ghostControls[i].Align(anchor, anchor.ActualWidth, anchor.ActualHeight);
-                else ghostControls[i].Hide();
-            }
             if (show && mascot.Visibility == Visibility.Visible && mascot.ActualWidth > 0 && mascot.ActualHeight > 0) {
                 ghostMascotImage.Source = mascot.Source;
                 ghostMascot.Align(mascot, mascot.ActualWidth, mascot.ActualHeight);
@@ -558,12 +533,6 @@ namespace ChunsikDesktop {
             System.Windows.Automation.AutomationProperties.SetName(button, hint);
             button.MinWidth = 28; button.MinHeight = 26;
             button.Click += delegate { action(); }; return button;
-        }
-        void ToggleGhost() {
-            if (current == null) return;
-            bool old = current.GhostEnabled; current.GhostEnabled = !old;
-            if (!persist()) current.GhostEnabled = old;
-            Update(current);
         }
         void ToggleMinimized() {
             if (current == null || IsCompleting || !EndEdit(true)) return;
@@ -590,7 +559,7 @@ namespace ChunsikDesktop {
         }
         public void BeginEdit() {
             if (current == null || current.Minimized || IsCompleting || IsEditing) return;
-            IsEditing = true; ApplyGhostMode(); inlineEditor.Text = current.Text;
+            IsEditing = true; ApplyAppearance(); inlineEditor.Text = current.Text;
             completeButton.Visibility = Visibility.Collapsed;
             saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Visible;
             inlineEditor.FontSize = current.FontSize; messageScroll.Visibility = Visibility.Collapsed; inlineEditor.Visibility = Visibility.Visible;
@@ -603,29 +572,27 @@ namespace ChunsikDesktop {
             IsEditing = false;
             if (save) {
                 current.Text = inlineEditor.Text;
-                if (!persist()) { current.Text = old; IsEditing = true; ApplyGhostMode(); inlineEditor.Focus(); return false; }
+                if (!persist()) { current.Text = old; IsEditing = true; ApplyAppearance(); inlineEditor.Focus(); return false; }
             }
             inlineEditor.Visibility = Visibility.Collapsed; messageScroll.Visibility = Visibility.Visible;
             saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Collapsed;
             completeButton.Visibility = Visibility.Visible;
             // A second click of a Save double-click must never complete the task.
             completeAllowedAfter = interactionClock.Elapsed.TotalSeconds + System.Windows.Forms.SystemInformation.DoubleClickTime / 1000.0 + 0.1;
-            Update(current); ApplyGhostMode(); return true;
+            Update(current); ApplyAppearance(); return true;
         }
         void DragNote(object sender, System.Windows.Input.MouseButtonEventArgs e) {
             if (current == null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed || !EndEdit(true)) return;
             // Dragging a legacy following note switches it to a detached, fixed companion.
-            if (!current.Standalone) current.Pinned = true; lastStandalone = true; positionReady = true; dragging = true; ApplyGhostMode();
+            if (!current.Standalone) current.Pinned = true; lastStandalone = true; positionReady = true; dragging = true; ApplyAppearance();
             try { DragMove(); }
-            finally { dragging = false; Rect area = WorkingArea(); ClampPosition(area); moved(Left, Top); ApplyGhostMode(); }
+            finally { dragging = false; Rect area = WorkingArea(); ClampPosition(area); moved(Left, Top); ApplyAppearance(); }
             e.Handled = true;
         }
         public void Update(TodoItem item) {
             Opacity = 1;
             if (lastStandalone != item.Standalone) positionReady = false;
             lastStandalone = item.Standalone; current = item;
-            modeButton.Content = item.GhostEnabled ? "클릭 통과 ON" : "클릭 통과 OFF";
-            modeButton.Background = item.GhostEnabled ? BubblePalette.BrushFor("#D5F3DF") : BubblePalette.BrushFor("#E6E6E6");
             moreTransparent.IsEnabled = item.NoteOpacity > 0.1; lessTransparent.IsEnabled = item.NoteOpacity < 1;
             string firstLine = (item.Text ?? "").Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
             restoreButton.Content = new TextBlock { Text = "▣ " + (String.IsNullOrWhiteSpace(firstLine) ? "빈 메모" : firstLine.Trim()), TextTrimming = TextTrimming.CharacterEllipsis };
@@ -648,7 +615,7 @@ namespace ChunsikDesktop {
             noteContent.Margin = new Thickness(10, item.Peek ? 48 : 18, 10, 8);
             heading.MaxWidth = double.PositiveInfinity;
             heading.HorizontalAlignment = HorizontalAlignment.Stretch;
-            ApplyGhostMode();
+            ApplyAppearance();
         }
         double NoteHeight { get { return ActualHeight > 0 ? ActualHeight : 200; } }
         Rect WorkingArea() { return ScreenLayout.AreaFor(this); }
