@@ -23,6 +23,10 @@ jobs:
         run: msbuild tests/NoticePlacementTests.csproj /t:Rebuild /m
       - name: Run multi-monitor placement tests
         run: .\tests\bin\NoticePlacementTests.exe
+      - name: Build ghost note UI tests
+        run: msbuild tests/GhostNoteTests.csproj /t:Rebuild /m
+      - name: Run ghost note UI tests
+        run: .\tests\bin\GhostNoteTests.exe
       - name: Build post-it settings tests
         run: msbuild tests/TodoSettingsTests.csproj /t:Rebuild /m
       - name: Run post-it settings tests

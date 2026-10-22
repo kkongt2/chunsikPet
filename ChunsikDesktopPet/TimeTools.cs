@@ -20,6 +20,10 @@ namespace ChunsikDesktop {
         readonly TextBlock status = new TextBlock();
         readonly Image pet = new Image();
         readonly RotateTransform tilt = new RotateTransform();
+        readonly ScaleTransform bounceScale = new ScaleTransform(1, 1);
+        readonly TranslateTransform hop = new TranslateTransform();
+        readonly TranslateTransform messageMotion = new TranslateTransform();
+        double completionStartedAt;
         readonly StackPanel durationPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         readonly TextBox hours = new TextBox(), minutes = new TextBox(), seconds = new TextBox();
         readonly ListBox laps = new ListBox();
@@ -52,7 +56,9 @@ namespace ChunsikDesktop {
             Topmost = true; ShowInTaskbar = false;
             StackPanel root = new StackPanel { Margin = new Thickness(6) }; Content = root;
             StackPanel content = new StackPanel { Margin = new Thickness(16) };
-            Border card = new Border { Background = new SolidColorBrush(Color.FromRgb(255, 253, 243)), BorderBrush = new SolidColorBrush(Color.FromRgb(112, 88, 63)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(20), Child = content }; root.Children.Add(card);
+            StackPanel bubble = new StackPanel { RenderTransform = messageMotion };
+            root.Children.Add(bubble);
+            Border card = new Border { Background = new SolidColorBrush(Color.FromRgb(255, 253, 243)), BorderBrush = new SolidColorBrush(Color.FromRgb(112, 88, 63)), BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(20), Child = content }; bubble.Children.Add(card);
             Grid header = new Grid(); header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); content.Children.Add(header);
             TextBlock heading = new TextBlock { Text = countdown ? "타이머 담당 춘식이" : "스톱워치 담당 춘식이", FontSize = 17, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.SizeAll, ToolTip = "끌어서 위치 이동" };
             header.Children.Add(heading); heading.MouseLeftButtonDown += MoveWindow;
@@ -70,8 +76,10 @@ namespace ChunsikDesktop {
                 controls.Children.Add(lap); lap.Click += delegate { AddLap(); };
                 laps.Height = 112; laps.Margin = new Thickness(0, 10, 0, 0); laps.BorderThickness = new Thickness(0); laps.Background = Brushes.Transparent; laps.FontFamily = new FontFamily("Consolas"); content.Children.Add(laps);
             }
-            TextBlock tail = new TextBlock { Text = "▼", FontSize = 24, Foreground = new SolidColorBrush(Color.FromRgb(112, 88, 63)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, -7, 0, -6) }; root.Children.Add(tail);
-            pet.Source = PetWindow.ToolPose(false); pet.Height = 108; pet.Stretch = Stretch.Uniform; pet.HorizontalAlignment = HorizontalAlignment.Center; pet.RenderTransformOrigin = new Point(0.5, 1); pet.RenderTransform = tilt; pet.Cursor = Cursors.SizeAll; pet.ToolTip = "전담 춘식이를 끌어 위치를 바꿀 수 있어요"; pet.MouseLeftButtonDown += MoveWindow; root.Children.Add(pet);
+            TextBlock tail = new TextBlock { Text = "▼", FontSize = 24, Foreground = new SolidColorBrush(Color.FromRgb(112, 88, 63)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, -7, 0, -6) }; bubble.Children.Add(tail);
+            TransformGroup petMotion = new TransformGroup(); petMotion.Children.Add(bounceScale); petMotion.Children.Add(tilt); petMotion.Children.Add(hop);
+            pet.Margin = new Thickness(0, 14, 0, 8);
+            pet.Source = PetWindow.ToolPose(false); pet.Height = 108; pet.Stretch = Stretch.Uniform; pet.HorizontalAlignment = HorizontalAlignment.Center; pet.RenderTransformOrigin = new Point(0.5, 1); pet.RenderTransform = petMotion; pet.Cursor = Cursors.SizeAll; pet.ToolTip = "전담 춘식이를 끌어 위치를 바꿀 수 있어요"; pet.MouseLeftButtonDown += MoveWindow; root.Children.Add(pet);
             TextBlock badge = new TextBlock { Text = countdown ? "TIMER" : "STOPWATCH", FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue, HorizontalAlignment = HorizontalAlignment.Center }; root.Children.Add(new Border { Background = Brushes.White, CornerRadius = new CornerRadius(7), Padding = new Thickness(7, 2, 7, 2), HorizontalAlignment = HorizontalAlignment.Center, Child = badge });
             Loaded += delegate {
                 Rect area = ScreenLayout.AreaFor(this);
@@ -131,7 +139,7 @@ namespace ChunsikDesktop {
                 else {
                     shown = duration - elapsed.Elapsed;
                     if (!completed && shown <= TimeSpan.Zero) {
-                        elapsed.Stop(); completed = true; status.Text = "시간이 다 됐어요! 수고했어요 ♥";
+                        elapsed.Stop(); completed = true; completionStartedAt = animation.Elapsed.TotalSeconds; status.Text = "시간이 다 됐어요! 수고했어요 ♥";
                         try { if (!PresentationPolicy.IsSuppressed) SystemSounds.Exclamation.Play(); } catch { }
                     }
                     shown = TimeSpan.FromSeconds(Math.Max(0, Math.Ceiling(shown.TotalSeconds)));
@@ -141,8 +149,28 @@ namespace ChunsikDesktop {
             start.Content = completed ? "다시 시작" : elapsed.IsRunning ? "일시정지" : started ? "재개" : "시작";
             lap.IsEnabled = elapsed.IsRunning && lapCount < 200;
             double phase = animation.Elapsed.TotalSeconds;
-            bool wave = completed || (elapsed.IsRunning && (int)(phase / 1.2) % 4 == 0);
-            pet.Source = PetWindow.ToolPose(wave); tilt.Angle = (elapsed.IsRunning || completed) ? Math.Sin(phase * (completed ? 6 : 2)) * (completed ? 7 : 2) : 0;
+            if (completed) {
+                double celebration = phase - completionStartedAt;
+                // Match the repeated-click laugh: quick squirm, two laughing poses,
+                // little jumps and squash/stretch, with a gentler matching bubble.
+                double wave = Math.Sin(celebration * 25);
+                double jump = Math.Abs(Math.Sin(celebration * 12));
+                pet.Source = PetWindow.ToolCelebrationPose(celebration);
+                tilt.Angle = wave * 10;
+                hop.X = wave * 108 * 0.035; hop.Y = -jump * 108 * 0.12;
+                bounceScale.ScaleX = 1 + 0.025 * wave;
+                bounceScale.ScaleY = 1 - 0.06 * Math.Abs(wave);
+                messageMotion.X = hop.X * 0.45;
+                messageMotion.Y = hop.Y * 0.25;
+            } else {
+                bool wave = elapsed.IsRunning && (int)(phase / 1.2) % 4 == 0;
+                pet.Source = PetWindow.ToolPose(wave);
+                tilt.Angle = elapsed.IsRunning ? Math.Sin(phase * 2) * 2 : 0;
+                hop.X = hop.Y = messageMotion.X = messageMotion.Y = 0;
+                bounceScale.ScaleX = bounceScale.ScaleY = 1;
+            }
+            TimeSpan frameInterval = TimeSpan.FromMilliseconds(completed ? 25 : 50);
+            if (refresh.Interval != frameInterval) refresh.Interval = frameInterval;
         }
     }
 }

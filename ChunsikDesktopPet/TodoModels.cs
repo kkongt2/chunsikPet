@@ -8,7 +8,8 @@ namespace ChunsikDesktop {
         public bool Done { get; set; }
         public DateTime? CompletedAt { get; set; }
         public bool Dedicated { get; set; }
-        public bool Pinned { get; set; }
+        // Legacy files may contain Pinned=false; notes are now always fixed.
+        [XmlIgnore] public bool Pinned { get { return true; } set { } }
         public bool Peek { get; set; }
         public bool HasPosition { get; set; }
         public double NoteLeft { get; set; }
@@ -20,11 +21,13 @@ namespace ChunsikDesktop {
         public int DisplaySeconds { get; set; }
         public string Color { get; set; }
         public int FontSize { get; set; }
+        public bool Minimized { get; set; }
+        public double NoteOpacity { get; set; }
         public double NoteWidth { get; set; }
         public double NoteHeight { get; set; }
-        public TodoItem() { Id = Guid.NewGuid().ToString("N"); Text = ""; Pinned = true; Peek = true; Always = true; EveryMinutes = 60; DisplaySeconds = 20; Color = "#FFE894"; FontSize = 17; NoteWidth = 260; NoteHeight = 280; }
+        public TodoItem() { Id = Guid.NewGuid().ToString("N"); Text = ""; Pinned = true; Peek = true; Always = true; EveryMinutes = 60; DisplaySeconds = 20; Color = "#FFE894"; FontSize = 17; NoteOpacity = 0.6; NoteWidth = 260; NoteHeight = 280; }
         public static bool ValidAppearance(TodoItem item) {
-            return item.FontSize >= 10 && item.FontSize <= 64 && item.NoteWidth >= 220 && item.NoteWidth <= 1200 && item.NoteHeight >= 200 && item.NoteHeight <= 1200;
+            return item.NoteOpacity >= 0.1 && item.NoteOpacity <= 1 && item.FontSize >= 10 && item.FontSize <= 64 && item.NoteWidth >= 220 && item.NoteWidth <= 1200 && item.NoteHeight >= 100 && item.NoteHeight <= 1200;
         }
     }
     public class TodoSettings {
