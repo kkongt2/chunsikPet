@@ -196,9 +196,17 @@ namespace ChunsikDesktop {
             Border cell = new Border { Child = child, Padding = new Thickness(6, 8, 6, 8), VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(cell, column); row.Children.Add(cell);
         }
-        static ComboBox SettingChoice(string[] labels, int selected, Action<int> change) {
-            ComboBox box = new ComboBox { ItemsSource = labels, SelectedIndex = selected, Padding = new Thickness(5), Margin = new Thickness(0, 3, 0, 3) };
-            box.SelectionChanged += delegate { if (box.SelectedIndex >= 0) change(box.SelectedIndex); }; return box;
+        static readonly Style SettingSegmentStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='FontSize' Value='11'/><Setter Property='Padding' Value='4,7'/><Setter Property='Margin' Value='1'/><Setter Property='Background' Value='Transparent'/><Setter Property='Foreground' Value='#52637A'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border x:Name='box' Background='{TemplateBinding Background}' BorderBrush='Transparent' BorderThickness='1' CornerRadius='7' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='box' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='box' Property='BorderBrush' Value='#EAAE38'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/><Setter Property='FontWeight' Value='SemiBold'/></Trigger></Style.Triggers></Style>");
+        static Border SettingChoice(string[] labels, int selected, Action<int> change) {
+            string group = Guid.NewGuid().ToString("N");
+            System.Windows.Controls.Primitives.UniformGrid segments = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Min(2, Math.Max(1, labels.Length)) };
+            for (int i = 0; i < labels.Length; i++) {
+                int index = i;
+                RadioButton segment = new RadioButton { Content = labels[i], ToolTip = labels[i], GroupName = group, IsChecked = i == selected, Style = SettingSegmentStyle };
+                System.Windows.Automation.AutomationProperties.SetName(segment, labels[i]);
+                segment.Checked += delegate { change(index); }; segments.Children.Add(segment);
+            }
+            return new Border { Background = new SolidColorBrush(Color.FromRgb(237, 242, 248)), CornerRadius = new CornerRadius(9), Padding = new Thickness(2), Margin = new Thickness(0, 3, 0, 3), Child = segments };
         }
         public void OpenSettings(PetWindow preferred) {
             preferredPet = preferred;
@@ -252,7 +260,7 @@ namespace ChunsikDesktop {
                     delete.Background = Brushes.White; delete.Foreground = Brushes.SlateGray; management.Children.Add(delete); SettingsCell(line, management, 7);
                     if (item.Done) continue;
                     StackPanel display = new StackPanel();
-                    display.Children.Add(SettingChoice(new string[] { "항상 보여주기", "가끔 알려주기" }, item.Always ? 0 : 1, delegate(int value) { item.Always = value == 0; changed(); render(); }));
+                    display.Children.Add(SettingChoice(new string[] { "항상 표시", "가끔 알림" }, item.Always ? 0 : 1, delegate(int value) { item.Always = value == 0; changed(); render(); }));
                     if (!item.Always) {
                         StackPanel intervalRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
                         NumberField interval = new NumberField(item.EveryMinutes, 1440, "리마인드 간격 분"); intervalRow.Children.Add(interval);
@@ -266,11 +274,11 @@ namespace ChunsikDesktop {
                     }
                     SettingsCell(line, display, 2);
                     StackPanel placement = new StackPanel();
-                    ComboBox shape = SettingChoice(new string[] { "빼꼼 춘식이", "전신 춘식이" }, item.Peek ? 0 : 1, delegate(int value) { item.Peek = value == 0; changed(); render(); }); shape.ToolTip = "춘식이 모양"; placement.Children.Add(shape);
-                    ComboBox movement = SettingChoice(new string[] { "놓은 자리에 고정", "중력 켜기" }, item.Pinned ? 0 : 1, delegate(int value) { item.Pinned = value == 0; changed(); render(); }); movement.ToolTip = "이동 방식"; placement.Children.Add(movement);
+                    Border shape = SettingChoice(new string[] { "빼꼼", "전신" }, item.Peek ? 0 : 1, delegate(int value) { item.Peek = value == 0; changed(); render(); }); shape.ToolTip = "춘식이 모양"; placement.Children.Add(shape);
+                    Border movement = SettingChoice(new string[] { "고정", "중력" }, item.Pinned ? 0 : 1, delegate(int value) { item.Pinned = value == 0; changed(); render(); }); movement.ToolTip = "이동 방식"; placement.Children.Add(movement);
                     if (item.Standalone) placement.Children.Add(Button("위치 초기화", delegate { item.HasPosition = false; Runtime run; if (runtimes.TryGetValue(item.Id, out run)) run.Note.ResetPosition(); changed(); }));
                     else {
-                        placement.Children.Add(SettingChoice(new string[] { "기존 춘식이", "새 전담 춘식이" }, item.Dedicated ? 1 : 0, delegate(int value) { item.Dedicated = value == 1; changed(); render(); }));
+                        placement.Children.Add(SettingChoice(new string[] { "기존", "새 전담" }, item.Dedicated ? 1 : 0, delegate(int value) { item.Dedicated = value == 1; changed(); render(); }));
                         if (!item.Dedicated) {
                             List<string> petNames = new List<string>(); for (int i = 0; i < Math.Max(1, PetWindow.Count); i++) petNames.Add("춘식이 " + (i + 1));
                             placement.Children.Add(SettingChoice(petNames.ToArray(), Math.Max(0, Math.Min(petNames.Count - 1, item.PetIndex)), delegate(int value) { item.PetIndex = value; changed(); }));
