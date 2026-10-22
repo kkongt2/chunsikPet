@@ -465,8 +465,8 @@ namespace ChunsikDesktop {
             }
             if (now >= fleeUntil) { StopSeatedScoot(); return false; }
             direction = fleeDirection;
-            // Seated pets scoot slowly instead of switching to the walking animation.
-            double escapeSpeed = seated ? Math.Max(48, Math.Min(90, size * 0.65)) : Math.Max(240, speed * 4);
+            // Use the same escape speed in both poses; seated pets keep their scoot animation.
+            double escapeSpeed = Math.Max(240, speed * 4);
             Left = Clamp(Left + direction * escapeSpeed * dt, area.Left, area.Right - Width);
             Top = area.Bottom - Height;
             if (seated) { state = 2; stateEnd = now + 0.8; ShowSeatedScoot(now); return true; }
