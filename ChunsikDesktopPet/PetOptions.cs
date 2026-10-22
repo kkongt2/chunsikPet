@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,7 +9,16 @@ using System.Windows.Threading;
 using System.Xml.Serialization;
 
 namespace ChunsikDesktop {
+    public class PetPlacement {
+        public bool Paused { get; set; }
+        public double Size { get; set; }
+        public double CenterX { get; set; }
+        public double BottomY { get; set; }
+        public bool IsValid() { return Size >= 50 && Size <= 500 && !Double.IsNaN(CenterX) && !Double.IsInfinity(CenterX) && !Double.IsNaN(BottomY) && !Double.IsInfinity(BottomY) && Math.Abs(CenterX) < 1000000 && Math.Abs(BottomY) < 1000000; }
+        public PetPlacement Copy() { return (PetPlacement)MemberwiseClone(); }
+    }
     public class PetOptions {
+        public List<PetPlacement> Placements { get; set; }
         public int TransparencyPercent { get; set; }
         public bool AvoidCursor { get; set; }
         public bool SleepEnabled { get; set; }
@@ -16,8 +26,12 @@ namespace ChunsikDesktop {
         public int PetCount { get; set; }
         public int PaydayDay { get; set; }
         public bool PaydayEnabled { get; set; }
-        public PetOptions() { SleepEnabled = true; IdleMinutes = 5; PetCount = 1; PaydayDay = 20; PaydayEnabled = true; }
-        public PetOptions Copy() { return (PetOptions)MemberwiseClone(); }
+        public PetOptions() { Placements = new List<PetPlacement>(); SleepEnabled = true; IdleMinutes = 5; PetCount = 1; PaydayDay = 20; PaydayEnabled = true; }
+        public PetOptions Copy() {
+            PetOptions copy = (PetOptions)MemberwiseClone(); copy.Placements = new List<PetPlacement>();
+            if (Placements != null) foreach (PetPlacement place in Placements) copy.Placements.Add(place == null ? null : place.Copy());
+            return copy;
+        }
     }
     public sealed class PetPreferences {
         public static PetPreferences Current;
@@ -28,13 +42,14 @@ namespace ChunsikDesktop {
         static readonly XmlSerializer Serializer = new XmlSerializer(typeof(PetOptions));
         readonly DispatcherTimer timer = new DispatcherTimer();
         Window editor;
+        DateTime nextLayoutSave = DateTime.UtcNow;
         public bool SettingsOpen { get { return editor != null; } }
         [StructLayout(LayoutKind.Sequential)] struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
         public PetPreferences() {
             Options = Load(); RefreshIdle();
-            timer.Interval = TimeSpan.FromMilliseconds(500); timer.Tick += delegate { RefreshIdle(); }; timer.Start();
+            timer.Interval = TimeSpan.FromMilliseconds(500); timer.Tick += delegate { RefreshIdle(); if (DateTime.UtcNow >= nextLayoutSave) { nextLayoutSave = DateTime.UtcNow.AddSeconds(5); SaveLayout(); } }; timer.Start();
         }
         public static bool Valid(PetOptions value) {
             return value != null && value.IdleMinutes >= 1 && value.IdleMinutes <= 1440 && value.PetCount >= 1 && value.PetCount <= 20 && value.PaydayDay >= 1 && value.PaydayDay <= 31 && value.TransparencyPercent >= 0 && value.TransparencyPercent <= 90;
@@ -64,7 +79,7 @@ namespace ChunsikDesktop {
             InputIdleSeconds = elapsed / 1000.0;
             IsIdle = Options.SleepEnabled && elapsed >= (uint)Options.IdleMinutes * 60000U;
         }
-        bool Apply(PetOptions value, PetWindow remove = null) {
+        bool Write(PetOptions value, bool notify) {
             if (!Valid(value)) return false;
             try {
                 Directory.CreateDirectory(Path.GetDirectoryName(PathName));
@@ -75,11 +90,28 @@ namespace ChunsikDesktop {
                     else File.Move(temp, PathName);
                 } finally { if (File.Exists(temp)) File.Delete(temp); }
             } catch (Exception ex) {
-                MessageBox.Show("설정을 저장하지 못했어요.\n" + ex.Message, "춘식이 설정"); return false;
+                if (notify) MessageBox.Show("설정을 저장하지 못했어요.\n" + ex.Message, "춘식이 설정"); return false;
             }
+            return true;
+        }
+        public void SaveLayout() {
+            List<PetPlacement> positions = PetWindow.CapturePlacements();
+            if (positions == null || positions.Count == 0) return;
+            bool same = Options.PetCount == positions.Count && Options.Placements != null && Options.Placements.Count == positions.Count;
+            if (same) for (int i = 0; i < positions.Count; i++) {
+                PetPlacement a = Options.Placements[i], b = positions[i];
+                if (a == null || a.Size != b.Size || a.Paused != b.Paused || Math.Abs(a.CenterX - b.CenterX) > 0.5 || Math.Abs(a.BottomY - b.BottomY) > 0.5) { same = false; break; }
+            }
+            if (same) return;
+            PetOptions value = Options.Copy(); value.PetCount = positions.Count; value.Placements = positions;
+            if (Write(value, false)) Options = value;
+        }
+        bool Apply(PetOptions value, PetWindow remove = null) {
+            value.Placements = Options.Copy().Placements;
+            if (!Write(value, true)) return false;
             Options = value.Copy(); RefreshIdle();
             if (remove != null && PetWindow.Count > value.PetCount) remove.Close();
-            PetWindow.SetCount(value.PetCount); PetWindow.ApplyAppearance(); return true;
+            PetWindow.SetCount(value.PetCount); PetWindow.ApplyAppearance(); SaveLayout(); return true;
         }
         public void SetTransparency(int percent) { PetOptions value = Options.Copy(); value.TransparencyPercent = percent; Apply(value); }
         public void SetCursorAvoidance(bool enabled) { PetOptions value = Options.Copy(); value.AvoidCursor = enabled; Apply(value); }

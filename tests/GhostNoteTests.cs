@@ -117,6 +117,32 @@ internal static class GhostNoteTests {
         note.Hide(); Pump(); Check(!drag.IsVisible, "strip hides with note");
         note.Show(); Pump(); Check(drag.IsVisible, "strip returns with note");
         note.DisposeNote(); Pump(); Check(!note.IsVisible, "note closes");
+        PetOptions preferences = new PetOptions { PetCount = 2 };
+        preferences.Placements.Add(new PetPlacement { Paused = true, Size = 50, CenterX = -400, BottomY = 1080 });
+        preferences.Placements.Add(new PetPlacement { Size = 180, CenterX = 1500, BottomY = 900 });
+        System.Xml.Serialization.XmlSerializer serializer = new System.Xml.Serialization.XmlSerializer(typeof(PetOptions));
+        string xml;
+        using (System.IO.StringWriter writer = new System.IO.StringWriter()) { serializer.Serialize(writer, preferences); xml = writer.ToString(); }
+        PetOptions restored;
+        using (System.IO.StringReader reader = new System.IO.StringReader(xml)) restored = (PetOptions)serializer.Deserialize(reader);
+        Check(restored.PetCount == 2 && restored.Placements.Count == 2, "pet count and individual placements persist");
+        Check(restored.Placements[0].Size == 50 && restored.Placements[0].CenterX == -400 && restored.Placements[1].Size == 180 && restored.Placements[1].BottomY == 900, "per-pet sizes and negative monitor coordinates survive reload");
+        Check(restored.Placements[0].Paused && !restored.Placements[1].Paused, "individual resting and walking modes survive reload");
+        PetOptions copy = restored.Copy(); copy.Placements[0].Size = 500;
+        Check(restored.Placements[0].Size == 50, "settings copies do not mutate saved placement");
+        using (System.IO.StringReader reader = new System.IO.StringReader("<PetOptions><PetCount>3</PetCount></PetOptions>")) restored = (PetOptions)serializer.Deserialize(reader);
+        Check(restored.PetCount == 3 && restored.Placements.Count == 0 && PetPreferences.Valid(restored), "old count-only settings remain valid");
+        using (System.IO.StringReader reader = new System.IO.StringReader("<PetOptions><Placements><PetPlacement><Size>80</Size><CenterX>100</CenterX><BottomY>800</BottomY></PetPlacement></Placements></PetOptions>")) restored = (PetOptions)serializer.Deserialize(reader);
+        Check(!restored.Placements[0].Paused && restored.Placements[0].IsValid(), "legacy placement defaults to walking mode");
+        Check(!new PetPlacement { Size = 80, CenterX = Double.NaN }.IsValid(), "invalid saved coordinates rejected");
+        int undoCount = 0;
+        UndoToast.ShowCompleted("긴 메모 내용이 있어도 되돌리기 버튼은 잘리지 않아야 합니다.\n두 번째 줄", delegate { undoCount++; }); Pump();
+        UndoToast toast = (UndoToast)typeof(UndoToast).GetField("current", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        Button undoButton = (Button)typeof(UndoToast).GetField("undoButton", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(toast);
+        Point undoAt = undoButton.TranslatePoint(new Point(), toast);
+        Check(toast.SizeToContent == SizeToContent.Height && undoButton.ActualHeight >= 38 && undoAt.Y + undoButton.ActualHeight <= toast.ActualHeight - 10, "undo action is fully visible in content-sized toast");
+        undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
+        Check(undoCount == 1 && !toast.IsVisible, "undo action fires once and dismisses toast");
         Console.WriteLine("PASS: " + count + " normal mode assertions"); app.Shutdown();
     }
 }
