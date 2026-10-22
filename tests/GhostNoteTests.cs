@@ -39,6 +39,15 @@ internal static class GhostNoteTests {
         Check(Field<ScrollViewer>(note, "messageScroll").ActualHeight >= 68, "bottom mascot layout reserves text space");
         item.Peek = true; note.Update(item); Pump();
         item.NoteWidth = savedWidth; note.Update(item); Pump();
+        double savedHeight = item.NoteHeight;
+        item.NoteHeight = 100; note.Update(item); Pump();
+        double compactHeight = note.MinHeight;
+        ScrollViewer body = Field<ScrollViewer>(note, "messageScroll");
+        double lineHeight = Field<TextBlock>(note, "message").FontFamily.LineSpacing * item.FontSize;
+        Check(compactHeight < 200 && body.ActualHeight >= lineHeight && body.ActualHeight < lineHeight + 12, "minimum height reserves approximately one text line");
+        item.FontSize = 40; note.Update(item); Pump();
+        Check(note.MinHeight > compactHeight, "minimum height follows note font size");
+        item.FontSize = 17; item.NoteHeight = savedHeight; note.Update(item); Pump();
         item.NoteOpacity = 0.1; note.Update(item); Pump(); Check(Field<ScrollViewer>(note, "messageScroll").Opacity == 0.1, "10 percent opacity supported");
         item.NoteOpacity = 1; note.Update(item); Pump(); Check(note.Opacity == 1, "100 percent opacity supported");
         item.NoteOpacity = 0.6; note.Update(item); Pump();

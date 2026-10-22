@@ -77,7 +77,7 @@ namespace ChunsikDesktop {
                     item.NoteOpacity = Math.Max(0.1, Math.Min(1, item.NoteOpacity));
                     if (item.FontSize < 10 || item.FontSize > 64) item.FontSize = 17;
                     if (Double.IsNaN(item.NoteWidth) || item.NoteWidth < 220 || item.NoteWidth > 1200) item.NoteWidth = 260;
-                    if (Double.IsNaN(item.NoteHeight) || item.NoteHeight < 200 || item.NoteHeight > 1200) item.NoteHeight = 280;
+                    if (Double.IsNaN(item.NoteHeight) || item.NoteHeight < 100 || item.NoteHeight > 1200) item.NoteHeight = 280;
                 }
                 return data;
             }
@@ -238,7 +238,7 @@ namespace ChunsikDesktop {
             render = delegate {
                 list.Children.Clear();
                 Grid header = SettingsTableRow(); int column = 0;
-                foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "모양 · 이동", "글자 크기", "불투명도", "색상", "관리" })
+                foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "춘식이 모양", "글자 크기", "불투명도", "색상", "관리" })
                     SettingsCell(header, new TextBlock { Text = label, Foreground = Brushes.SlateGray, FontWeight = FontWeights.SemiBold }, column++);
                 list.Children.Add(header);
                 foreach (TodoItem item in settings.Items) {
@@ -275,7 +275,6 @@ namespace ChunsikDesktop {
                     SettingsCell(line, display, 2);
                     StackPanel placement = new StackPanel();
                     Border shape = SettingChoice(new string[] { "빼꼼", "전신" }, item.Peek ? 0 : 1, delegate(int value) { item.Peek = value == 0; changed(); render(); }); shape.ToolTip = "춘식이 모양"; placement.Children.Add(shape);
-                    Border movement = SettingChoice(new string[] { "고정", "중력" }, item.Pinned ? 0 : 1, delegate(int value) { item.Pinned = value == 0; changed(); render(); }); movement.ToolTip = "이동 방식"; placement.Children.Add(movement);
                     if (item.Standalone) placement.Children.Add(Button("위치 초기화", delegate { item.HasPosition = false; Runtime run; if (runtimes.TryGetValue(item.Id, out run)) run.Note.ResetPosition(); changed(); }));
                     else {
                         placement.Children.Add(SettingChoice(new string[] { "기존", "새 전담" }, item.Dedicated ? 1 : 0, delegate(int value) { item.Dedicated = value == 1; changed(); render(); }));
@@ -397,7 +396,7 @@ namespace ChunsikDesktop {
             moved = positionChanged; persist = save;
             Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!disposing && TodoService.Current != null && !TodoService.Current.Stopping && !PetWindow.IsExiting) { e.Cancel = true; Hide(); } };
             UseLayoutRounding = true; SnapsToDevicePixels = true;
-            Title = "춘식이 포스트잇"; Width = 260; Height = 280; MinWidth = 220; MinHeight = 260; MaxWidth = 1200; MaxHeight = 1200; SizeToContent = SizeToContent.Manual; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            Title = "춘식이 포스트잇"; Width = 260; Height = 280; MinWidth = 220; MinHeight = 100; MaxWidth = 1200; MaxHeight = 1200; SizeToContent = SizeToContent.Manual; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             AllowsTransparency = true; Background = Brushes.Transparent; Topmost = true; ShowActivated = false; ShowInTaskbar = false;
             root = new Grid { Margin = new Thickness(5) }; Content = root;
             Grid content = new Grid { Margin = new Thickness(16, 23, 16, 12) }; noteContent = content;
@@ -560,6 +559,7 @@ namespace ChunsikDesktop {
             completeButton.Visibility = Visibility.Collapsed;
             saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Visible;
             inlineEditor.FontSize = current.FontSize; messageScroll.Visibility = Visibility.Collapsed; inlineEditor.Visibility = Visibility.Visible;
+            UpdateMinimumHeight();
             Activate(); inlineEditor.Focus(); System.Windows.Input.Keyboard.Focus(inlineEditor); inlineEditor.CaretIndex = inlineEditor.Text.Length;
         }
         public bool FlushEdit() { return EndEdit(true); }
@@ -596,7 +596,6 @@ namespace ChunsikDesktop {
             restoreButton.Content = new TextBlock { Text = "▣ " + (String.IsNullOrWhiteSpace(firstLine) ? "빈 메모" : firstLine.Trim()), TextTrimming = TextTrimming.CharacterEllipsis };
             restoreButton.ToolTip = (item.Text ?? "") + "\n클릭해서 복원";
             paper.Background = BubblePalette.BrushFor(item.Color);
-            MinHeight = item.Pinned && !item.Peek ? 330 : 260;
             if (!resizing) { Width = item.NoteWidth; Height = Math.Max(MinHeight, item.NoteHeight); }
             message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize;
             bool blank = String.IsNullOrWhiteSpace(item.Text);
@@ -613,7 +612,23 @@ namespace ChunsikDesktop {
             dragSurface.Height = item.Peek ? 48 : 24;
             dragSurface.Visibility = IsCompleting ? Visibility.Hidden : Visibility.Visible;
             noteContent.Margin = new Thickness(10, item.Peek ? 28 : 30, 10, 8);
+            UpdateMinimumHeight();
             ApplyAppearance();
+        }
+        void UpdateMinimumHeight() {
+            if (current == null) return;
+            double chrome = root.Margin.Top + root.Margin.Bottom + paper.Margin.Top + paper.Margin.Bottom
+                + paper.BorderThickness.Top + paper.BorderThickness.Bottom + noteContent.Margin.Top + noteContent.Margin.Bottom;
+            double width = Math.Max(1, Width - root.Margin.Left - root.Margin.Right - noteContent.Margin.Left - noteContent.Margin.Right - 2);
+            foreach (UIElement child in noteContent.Children) {
+                if (Grid.GetRow(child) == 1) continue;
+                child.Measure(new Size(width, double.PositiveInfinity));
+                chrome += child.DesiredSize.Height;
+            }
+            // Reserve a single text line, plus editor padding while editing.
+            double line = Math.Ceiling(message.FontFamily.LineSpacing * current.FontSize) + (IsEditing ? 12 : 4);
+            MinHeight = Math.Max(100, Math.Ceiling(chrome + line));
+            if (!resizing) Height = Math.Max(MinHeight, current.NoteHeight);
         }
         double NoteHeight { get { return ActualHeight > 0 ? ActualHeight : 200; } }
         Rect WorkingArea() { return ScreenLayout.AreaFor(this); }
@@ -641,7 +656,6 @@ namespace ChunsikDesktop {
                 ClampPosition(area); positionReady = true;
             }
             Rect workArea = WorkingArea();
-            if (!item.Pinned) Top = Math.Min(workArea.Bottom - NoteHeight, Top + 24);
             ClampPosition(workArea);
             return new Rect(Left, Top, Width, NoteHeight);
         }

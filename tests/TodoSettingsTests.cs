@@ -22,13 +22,15 @@ internal static class TodoSettingsTests {
         Check(roundtrip.Items[0].FontSize == 34 && roundtrip.Items[1].FontSize == 13, "font size is per note");
         Check(roundtrip.Items[0].NoteWidth == 480 && roundtrip.Items[1].NoteHeight == 220, "dimensions are per note");
         Check(roundtrip.Items[1].Text == "첫 줄\n두 번째 줄", "inline multiline text retained");
-        using (StringReader reader = new StringReader("<TodoSettings><Items><TodoItem><AvoidCursor>true</AvoidCursor><GhostEnabled>true</GhostEnabled><Id>legacy</Id><Text>예전 메모</Text></TodoItem></Items></TodoSettings>")) {
+        using (StringReader reader = new StringReader("<TodoSettings><Items><TodoItem><Pinned>false</Pinned><AvoidCursor>true</AvoidCursor><GhostEnabled>true</GhostEnabled><Id>legacy</Id><Text>예전 메모</Text></TodoItem></Items></TodoSettings>")) {
             TodoItem old = ((TodoSettings)serializer.Deserialize(reader)).Items[0];
             Check(!old.Minimized, "legacy minimized default");
+            Check(old.Pinned && old.Standalone, "legacy gravity notes become fixed");
             Check(old.NoteOpacity == 0.6, "legacy opacity defaults");
             Check(old.FontSize == 17 && old.NoteWidth == 260 && old.NoteHeight == 280, "old settings receive defaults");
             Check(TodoItem.ValidAppearance(old), "legacy note passes backup validation");
         }
+        Check(TodoItem.ValidAppearance(new TodoItem { NoteHeight = 150 }), "compact height survives persistence validation");
         TodoItem bad = new TodoItem { NoteWidth = Double.NaN }; Check(!TodoItem.ValidAppearance(bad), "NaN size rejected");
         bad.NoteWidth = Double.PositiveInfinity; Check(!TodoItem.ValidAppearance(bad), "infinite size rejected");
         bad.NoteWidth = 260; bad.FontSize = 65; Check(!TodoItem.ValidAppearance(bad), "font bound enforced");
