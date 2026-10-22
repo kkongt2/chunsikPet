@@ -16,7 +16,7 @@ namespace ChunsikDesktop {
         static readonly List<PetWindow> Pets = new List<PetWindow>();
         static BitmapSource[] frames;
         static ImageSource[] seatedScootFrames;
-        bool scooting;
+        bool scooting, placementReady;
         static BitmapSource[] reactionFrames;
         static BitmapSource[] noticeFrames;
         static BitmapSource[] waterFrames;
@@ -189,6 +189,24 @@ namespace ChunsikDesktop {
             sleeping = false; timer.Interval = TimeSpan.FromMilliseconds(40); flip.ScaleY = 1; sleepMark.Visibility = Visibility.Collapsed;
             state = 1; stateEnd = clock.Elapsed.TotalSeconds + 0.8; SetFrame(4);
         }
+        public static List<PetPlacement> CapturePlacements() {
+            List<PetPlacement> result = new List<PetPlacement>();
+            foreach (PetWindow pet in Pets) {
+                if (!pet.placementReady || pet.closing) return null;
+                Rect bounds = ScreenLayout.BoundsPixels(pet); if (bounds.IsEmpty) return null;
+                result.Add(new PetPlacement { Size = pet.size, CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom });
+            }
+            return result;
+        }
+        void RestorePlacement(PetPlacement place) {
+            // Stored positions are physical pixels, so mixed-DPI and negative monitor
+            // coordinates do not get interpreted in the primary monitor's scale.
+            System.Drawing.Rectangle work = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)place.CenterX, (int)place.BottomY - 1)).WorkingArea;
+            ScreenLayout.MovePixels(this, work.Left + 1, work.Top + 1);
+            UpdateLayout();
+            Rect bounds = ScreenLayout.BoundsPixels(this);
+            ScreenLayout.MovePixels(this, Clamp(place.CenterX - bounds.Width / 2, work.Left, work.Right - bounds.Width), Clamp(place.BottomY - bounds.Height, work.Top, work.Bottom - bounds.Height));
+        }
         public static void SetCount(int desired) {
             desired = Math.Max(1, Math.Min(20, desired));
             while (Pets.Count > desired) Pets[Pets.Count - 1].Close();
@@ -221,10 +239,18 @@ namespace ChunsikDesktop {
                 // Tool window + no activation: walking never steals keyboard focus.
                 if (IntPtr.Size == 8) SetWindowLongPtr(hwnd, -20, new IntPtr(GetWindowLongPtr(hwnd, -20).ToInt64() | 0x08000080L));
                 else SetWindowLong32(hwnd, -20, GetWindowLong32(hwnd, -20) | 0x08000080);
-                ResizePet(80);
+                PetPlacement saved = null;
+                if (!IsTodoCompanion && PetPreferences.Current != null) {
+                    List<PetPlacement> positions = PetPreferences.Current.Options.Placements;
+                    int index = Pets.IndexOf(this);
+                    if (positions != null && index >= 0 && index < positions.Count && positions[index] != null && positions[index].IsValid()) saved = positions[index];
+                }
+                ResizePet(saved == null ? 80 : saved.Size);
                 if (!IsTodoCompanion && PetPreferences.Current != null) PresentationPolicy.SetOpacity(this, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
                 Rect area = WorkArea(); Left = area.Left + Rng.NextDouble() * Math.Max(0, area.Width - Width);
-                Top = area.Bottom - Height; ChooseState(); timer.Start();
+                Top = area.Bottom - Height;
+                if (saved != null) RestorePlacement(saved);
+                placementReady = true; ChooseState(); timer.Start();
             };
             Closed += delegate { closing = true; timer.Stop(); Pets.Remove(this); if (!IsTodoCompanion && Pets.Count == 0) Quit(); };
             timer.Interval = TimeSpan.FromMilliseconds(40); timer.Tick += Tick;
@@ -327,6 +353,7 @@ namespace ChunsikDesktop {
             double feet = Top + Height;
             size = value; LayoutPet(); SetFrame(frame);
             if (falling) { Top = Math.Min(feet, fallArea.Bottom) - Height; fallCenter = Left + Width / 2; }
+            if (placementReady && !IsTodoCompanion && PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
         void StartTickle() {
             double now = clock.Elapsed.TotalSeconds;
@@ -507,6 +534,7 @@ namespace ChunsikDesktop {
         void FinishDrag() {
             pressed = false; dragging = false; ReleaseMouseCapture();
             Rect area = WorkArea(); Left = Clamp(Left, area.Left, area.Right - Width);
+            if (!IsTodoCompanion && PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
             if (Top + Height < area.Bottom - 12) { StartFall(); return; }
             Top = area.Bottom - Height;
             if (reactionKind == 0) { state = 1; stateEnd = clock.Elapsed.TotalSeconds + 1; SetFrame(4); }
@@ -568,7 +596,9 @@ namespace ChunsikDesktop {
             }
         }
         public static void Quit() {
-            if (exiting) return; exiting = true; Application.Current.Shutdown();
+            if (exiting) return;
+            if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
+            exiting = true; Application.Current.Shutdown();
         }
         public static void Run(string folder) {
             bool first;
@@ -599,6 +629,7 @@ namespace ChunsikDesktop {
             PetPreferences.Current = new PetPreferences();
             ReminderService.Current = new ReminderService();
             TodoService.Current = new TodoService();
+            app.SessionEnding += delegate { PetPreferences.Current.SaveLayout(); };
             app.Exit += delegate { ScreenLayout.Stop(); if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); };
             app.Startup += delegate {
                 ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController();

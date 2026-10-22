@@ -117,6 +117,21 @@ internal static class GhostNoteTests {
         note.Hide(); Pump(); Check(!drag.IsVisible, "strip hides with note");
         note.Show(); Pump(); Check(drag.IsVisible, "strip returns with note");
         note.DisposeNote(); Pump(); Check(!note.IsVisible, "note closes");
+        PetOptions preferences = new PetOptions { PetCount = 2 };
+        preferences.Placements.Add(new PetPlacement { Size = 50, CenterX = -400, BottomY = 1080 });
+        preferences.Placements.Add(new PetPlacement { Size = 180, CenterX = 1500, BottomY = 900 });
+        System.Xml.Serialization.XmlSerializer serializer = new System.Xml.Serialization.XmlSerializer(typeof(PetOptions));
+        string xml;
+        using (System.IO.StringWriter writer = new System.IO.StringWriter()) { serializer.Serialize(writer, preferences); xml = writer.ToString(); }
+        PetOptions restored;
+        using (System.IO.StringReader reader = new System.IO.StringReader(xml)) restored = (PetOptions)serializer.Deserialize(reader);
+        Check(restored.PetCount == 2 && restored.Placements.Count == 2, "pet count and individual placements persist");
+        Check(restored.Placements[0].Size == 50 && restored.Placements[0].CenterX == -400 && restored.Placements[1].Size == 180 && restored.Placements[1].BottomY == 900, "per-pet sizes and negative monitor coordinates survive reload");
+        PetOptions copy = restored.Copy(); copy.Placements[0].Size = 500;
+        Check(restored.Placements[0].Size == 50, "settings copies do not mutate saved placement");
+        using (System.IO.StringReader reader = new System.IO.StringReader("<PetOptions><PetCount>3</PetCount></PetOptions>")) restored = (PetOptions)serializer.Deserialize(reader);
+        Check(restored.PetCount == 3 && restored.Placements.Count == 0 && PetPreferences.Valid(restored), "old count-only settings remain valid");
+        Check(!new PetPlacement { Size = 80, CenterX = Double.NaN }.IsValid(), "invalid saved coordinates rejected");
         Console.WriteLine("PASS: " + count + " normal mode assertions"); app.Shutdown();
     }
 }
