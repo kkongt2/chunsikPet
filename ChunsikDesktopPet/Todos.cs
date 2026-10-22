@@ -249,7 +249,7 @@ namespace ChunsikDesktop {
                     font.Children.Add(Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); changed(); render(); }));
                     font.Children.Add(new TextBlock { Text = item.FontSize + "", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6) });
                     font.Children.Add(Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); changed(); render(); }));
-                    WrapPanel opacityRow = SettingRow(cardContent, "평소 불투명도");
+                    WrapPanel opacityRow = SettingRow(cardContent, "메모 불투명도");
                     Slider opacitySlider = new Slider { Minimum = 10, Maximum = 100, Value = item.NoteOpacity * 100, Width = 180, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
                     TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", Margin = new Thickness(10, 0, 0, 0) };
                     opacityRow.Children.Add(opacitySlider); opacityRow.Children.Add(opacityText);
@@ -631,6 +631,7 @@ namespace ChunsikDesktop {
             restoreButton.Content = new TextBlock { Text = "▣ " + (String.IsNullOrWhiteSpace(firstLine) ? "빈 메모" : firstLine.Trim()), TextTrimming = TextTrimming.CharacterEllipsis };
             restoreButton.ToolTip = (item.Text ?? "") + "\n클릭해서 복원";
             paper.Background = BubblePalette.BrushFor(item.Color);
+            MinHeight = item.Pinned && !item.Peek ? 330 : 260;
             if (!resizing) { Width = item.NoteWidth; Height = Math.Max(MinHeight, item.NoteHeight); }
             message.FontSize = item.FontSize; inlineEditor.FontSize = item.FontSize;
             bool blank = String.IsNullOrWhiteSpace(item.Text);

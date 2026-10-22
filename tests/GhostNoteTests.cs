@@ -31,6 +31,9 @@ internal static class GhostNoteTests {
         item.NoteWidth = 220; note.Update(item); Pump();
         Check(ScreenLayout.BoundsPixels(header).Top >= ScreenLayout.BoundsPixels(mascotLayer).Bottom, "header avoids mascot even at minimum width");
         Check(Field<ScrollViewer>(note, "messageScroll").ActualHeight >= 68, "minimum layout reserves text space");
+        item.Peek = false; note.Update(item); Pump();
+        Check(Field<ScrollViewer>(note, "messageScroll").ActualHeight >= 68, "bottom mascot layout reserves text space");
+        item.Peek = true; note.Update(item); Pump();
         item.NoteWidth = savedWidth; note.Update(item); Pump();
         item.NoteOpacity = 0.1; note.Update(item); Pump(); Check(Field<ScrollViewer>(note, "messageScroll").Opacity == 0.1, "10 percent opacity supported");
         item.NoteOpacity = 1; note.Update(item); Pump(); Check(note.Opacity == 1, "100 percent opacity supported");
