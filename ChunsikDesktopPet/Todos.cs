@@ -428,24 +428,31 @@ namespace ChunsikDesktop {
             // Moving focus to Save/Cancel must not implicitly save before Click runs.
             // Leaving the window still saves through Deactivated below.
             Deactivated += delegate { if (IsEditing) EndEdit(true); };
-            StackPanel footer = new StackPanel { Margin = new Thickness(0, 4, 0, 0) }; Grid.SetRow(footer, 2); content.Children.Add(footer);
-            DockPanel status = new DockPanel(); footer.Children.Add(status);
-            WrapPanel buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; footer.Children.Add(buttons);
-            StackPanel opacityButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 8, 0) };
+            Grid footer = new Grid { Margin = new Thickness(0, 4, 0, 0) }; Grid.SetRow(footer, 2); content.Children.Add(footer);
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            footer.ColumnDefinitions.Add(new ColumnDefinition());
+            footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            footer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            footer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            StackPanel fontButtons = new StackPanel { Orientation = Orientation.Horizontal }; footer.Children.Add(fontButtons);
+            StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right }; Grid.SetColumn(buttons, 2); footer.Children.Add(buttons);
+            StackPanel opacityButtons = new StackPanel { Orientation = Orientation.Horizontal };
             moreTransparent = NoteButton("◐−", "더 투명하게 · 불투명도 10% 낮추기 (최소 10%)", delegate { ChangeOpacity(-10); });
             lessTransparent = NoteButton("◐+", "더 선명하게 · 불투명도 10% 높이기 (최대 100%)", delegate { ChangeOpacity(10); });
             moreTransparent.Background = lessTransparent.Background = BubblePalette.BrushFor("#D9EAFE");
-            opacityButtons.Children.Add(moreTransparent); opacityButtons.Children.Add(lessTransparent); opacityButtons.HorizontalAlignment = HorizontalAlignment.Right; status.Children.Add(opacityButtons);
-            smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); buttons.Children.Add(smaller);
-            larger = NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }); buttons.Children.Add(larger);
+            opacityButtons.Children.Add(moreTransparent); opacityButtons.Children.Add(lessTransparent); buttons.Children.Add(opacityButtons);
+            smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); fontButtons.Children.Add(smaller);
+            larger = NoteButton("A+", "글자 크게", delegate { ChangeFont(2); }); fontButtons.Children.Add(larger);
             completeButton = NoteButton("✓", "이 할 일을 완료 처리", delegate {
                 if (IsEditing || interactionClock.Elapsed.TotalSeconds < completeAllowedAfter) return;
                 complete();
-            }); completeButton.Margin = new Thickness(18, 2, 2, 2); completeButton.Background = BubblePalette.BrushFor("#D5F3DF"); buttons.Children.Add(completeButton);
+            }); completeButton.Margin = new Thickness(8, 2, 2, 2); completeButton.Background = BubblePalette.BrushFor("#D5F3DF"); buttons.Children.Add(completeButton);
             saveEditButton = NoteButton("저장", "메시지만 저장 · Ctrl+Enter", delegate { EndEdit(true); });
             cancelEditButton = NoteButton("취소", "변경사항 취소 · Esc", delegate { EndEdit(false); });
             saveEditButton.Visibility = cancelEditButton.Visibility = Visibility.Collapsed;
-            buttons.Children.Add(saveEditButton); buttons.Children.Add(cancelEditButton);
+            StackPanel editButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            Grid.SetRow(editButtons, 1); Grid.SetColumnSpan(editButtons, 3); footer.Children.Add(editButtons);
+            editButtons.Children.Add(saveEditButton); editButtons.Children.Add(cancelEditButton);
             opacityFeedback = new TextBlock { Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Background = Brushes.DarkSlateGray, Foreground = Brushes.White, Padding = new Thickness(8, 4, 8, 4), IsHitTestVisible = false };
             root.Children.Add(opacityFeedback);
             feedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.4) };
