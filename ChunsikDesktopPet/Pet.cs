@@ -46,7 +46,10 @@ namespace ChunsikDesktop {
         public static bool AllPaused {
             get { if (Pets.Count == 0) return false; foreach (PetWindow pet in Pets) if (!pet.paused) return false; return true; }
         }
-        public static void PauseAll(bool value) { foreach (PetWindow pet in Pets) { pet.EndReaction(); pet.paused = value; } }
+        public static void PauseAll(bool value) {
+            foreach (PetWindow pet in Pets) { pet.EndReaction(); pet.paused = value; if (value) pet.SetFrame(6); }
+            if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
+        }
         public static void ResizeAll(double value) { foreach (PetWindow pet in Pets) pet.ResizePet(value); }
         public static void SpeedAll(double value) { foreach (PetWindow pet in Pets) pet.speed = value; }
         public static int Count { get { return Pets.Count; } }
@@ -194,7 +197,7 @@ namespace ChunsikDesktop {
             foreach (PetWindow pet in Pets) {
                 if (!pet.placementReady || pet.closing) return null;
                 Rect bounds = ScreenLayout.BoundsPixels(pet); if (bounds.IsEmpty) return null;
-                result.Add(new PetPlacement { Size = pet.size, CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom });
+                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.size, CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom });
             }
             return result;
         }
@@ -250,7 +253,10 @@ namespace ChunsikDesktop {
                 Rect area = WorkArea(); Left = area.Left + Rng.NextDouble() * Math.Max(0, area.Width - Width);
                 Top = area.Bottom - Height;
                 if (saved != null) RestorePlacement(saved);
-                placementReady = true; ChooseState(); timer.Start();
+                paused = saved != null && saved.Paused;
+                placementReady = true;
+                if (paused) { state = 2; SetFrame(6); } else ChooseState();
+                timer.Start();
             };
             Closed += delegate { closing = true; timer.Stop(); Pets.Remove(this); if (!IsTodoCompanion && Pets.Count == 0) Quit(); };
             timer.Interval = TimeSpan.FromMilliseconds(40); timer.Tick += Tick;
@@ -548,6 +554,7 @@ namespace ChunsikDesktop {
             if (IsTodoCompanion) return menu;
             MenuItem pause = Item("잠깐 쉬기", delegate(object s, RoutedEventArgs e) {
                 paused = !paused; ((MenuItem)s).Header = paused ? "다시 걷기" : "잠깐 쉬기"; if (paused) SetFrame(6);
+                if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
             }); menu.Items.Add(pause);
             menu.Opened += delegate { pause.Header = paused ? "다시 걷기" : "잠깐 쉬기"; };
             MenuItem sizes = new MenuItem(); sizes.Header = "크기";
