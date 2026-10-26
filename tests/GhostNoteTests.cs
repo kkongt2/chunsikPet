@@ -9,6 +9,8 @@ internal static class GhostNoteTests {
     static int count;
     static void Check(bool ok, string name) { count++; if (!ok) throw new Exception("FAIL: " + name); }
     static T Field<T>(TodoNote note, string name) { return (T)typeof(TodoNote).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(note); }
+    static void PetField(PetWindow pet, string name, object value) { typeof(PetWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(pet, value); }
+    static void PetCall(PetWindow pet, string name, params object[] args) { typeof(PetWindow).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(pet, args); }
     static void Pump() { Application.Current.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(delegate {})); }
     [STAThread] public static void Main() {
         Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -25,6 +27,29 @@ internal static class GhostNoteTests {
         Check(InputAvoidance.TryEscape(new Rect(-1900, 900, 100, 100), new Rect(-1920, 0, 1920, 1080), new Rect(-1950, 880, 200, 160), out escapeTarget) && escapeTarget == -1748, "negative monitor coordinates supported");
         Check(InputAvoidance.TryEscape(new Rect(0, 0, 80, 100), new Rect(0, 0, 100, 100), new Rect(-10, 0, 130, 100), out escapeTarget) && escapeTarget == 0, "no room settles at edge instead of oscillating");
         Check(InputAvoidance.CaretPixels().IsEmpty, "disabled or absent preferences skip caret query");
+        PetWindow fallingPet = new PetWindow(true) { Left = 300, Top = 0 };
+        try {
+            PetField(fallingPet, "falling", true); PetField(fallingPet, "fallArea", new Rect(0, 0, 1920, 1080));
+            PetField(fallingPet, "fallStart", 0.0); PetField(fallingPet, "fallCenter", 355.0); PetField(fallingPet, "landedAt", -1.0);
+            PetCall(fallingPet, "AnimateFall", 1.0, 0.1);
+            double verticalX = fallingPet.Left, previousY = fallingPet.Top;
+            PetCall(fallingPet, "AnimateFall", 1.5, 0.1);
+            Check(fallingPet.Left == verticalX && fallingPet.Top > previousY, "parachute descends on a fixed vertical line");
+            PetField(fallingPet, "wingFall", true); PetField(fallingPet, "wingLegStart", 0.0); PetField(fallingPet, "wingLegDuration", 3.0);
+            PetField(fallingPet, "wingFromX", 300.0); PetField(fallingPet, "wingTargetX", 420.0); PetField(fallingPet, "wingDirection", 1);
+            PetCall(fallingPet, "AnimateFall", 0.75, 0.1); double firstDrift = fallingPet.Left; previousY = fallingPet.Top;
+            PetCall(fallingPet, "AnimateFall", 1.5, 0.1);
+            Check(firstDrift > 300 && fallingPet.Left == 360 && fallingPet.Top > previousY, "wings drift smoothly sideways while descending");
+            PetCall(fallingPet, "AnimateFall", 2.25, 0.1);
+            Check(fallingPet.Left > 360 && fallingPet.Left < 420, "wing direction stays stable within a leg");
+            PetCall(fallingPet, "AnimateFall", 3.0, 0.1);
+            double legDuration = (double)typeof(PetWindow).GetField("wingLegDuration", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet);
+            Check(legDuration >= 2.2 && legDuration < 3.8, "wing turns use a slow randomized interval");
+            PetCall(fallingPet, "AnimateFall", 3.8, 0.1);
+            Check(fallingPet.Left < 420, "next leaf-like leg reverses gradually");
+            PetCall(fallingPet, "StopFall", true);
+            Check(((Viewbox)typeof(PetWindow).GetField("wings", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet)).Visibility == Visibility.Collapsed, "landing removes wings");
+        } finally { fallingPet.Close(); }
         bool allowSave = true; int completed = 0, added = 0;
         TodoItem item = new TodoItem { Text = "원본" };
         TodoNote note = new TodoNote(delegate { completed++; }, delegate {}, delegate(double x, double y) {}, delegate { return allowSave; }, delegate { added++; });

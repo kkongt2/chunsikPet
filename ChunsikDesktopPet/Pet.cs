@@ -69,6 +69,12 @@ namespace ChunsikDesktop {
         readonly Viewbox parachute = new Viewbox { IsHitTestVisible = false, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
         readonly ScaleTransform clothScale = new ScaleTransform(1, 1);
         readonly RotateTransform clothTilt = new RotateTransform();
+        readonly Viewbox wings = new Viewbox { IsHitTestVisible = false, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
+        readonly ScaleTransform wingScale = new ScaleTransform(1, 1);
+        readonly RotateTransform wingFlap = new RotateTransform(0, 106, 98);
+        bool wingFall;
+        double wingLegStart, wingLegDuration, wingFromX, wingTargetX;
+        int wingDirection;
         bool falling;
         double fallStart, fallCenter, landedAt = -1;
         Rect fallArea;
@@ -255,7 +261,7 @@ namespace ChunsikDesktop {
             picture.RenderTransformOrigin = new Point(0.5, 1);
             TransformGroup effects = new TransformGroup(); effects.Children.Add(flip); effects.Children.Add(squirm); effects.Children.Add(hop);
             picture.RenderTransform = effects;
-            BuildParachute(); root.Children.Add(parachute); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); Content = root;
+            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); Content = root;
             RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
             MouseRightButtonDown += delegate { if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake(); EndReaction(); recentClicks.Clear(); };
             MouseLeftButtonDown += OnDown; MouseMove += OnMove; MouseLeftButtonUp += OnUp;
@@ -313,20 +319,40 @@ namespace ChunsikDesktop {
             TransformGroup transform = new TransformGroup(); transform.Children.Add(clothScale); transform.Children.Add(clothTilt);
             parachute.RenderTransform = transform;
         }
+        void BuildWings() {
+            Canvas pair = new Canvas { Width = 220, Height = 140 };
+            Geometry outline = Geometry.Parse("M 106,98 C 87,67 58,54 30,24 Q 17,10 9,9 C 4,29 14,49 29,62 Q 9,50 8,56 C 10,77 25,90 44,96 Q 23,89 26,98 C 37,116 57,120 72,114 Q 65,120 73,123 C 89,126 102,114 106,98 Z");
+            Geometry feathers = Geometry.Parse("M 24,38 Q 54,74 88,97 M 29,62 Q 53,89 84,103 M 44,96 Q 63,108 79,108");
+            for (int side = 0; side < 2; side++) {
+                Canvas wing = new Canvas { Width = 220, Height = 140 };
+                wing.Children.Add(new System.Windows.Shapes.Path { Data = outline, Fill = new LinearGradientBrush(Colors.White, Color.FromRgb(225, 236, 247), 90), Stroke = new SolidColorBrush(Color.FromRgb(154, 172, 190)), StrokeThickness = 1.8, StrokeLineJoin = PenLineJoin.Round });
+                wing.Children.Add(new System.Windows.Shapes.Path { Data = feathers, Stroke = new SolidColorBrush(Color.FromRgb(197, 212, 227)), StrokeThickness = 1.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
+                TransformGroup transform = new TransformGroup(); transform.Children.Add(wingFlap);
+                if (side == 1) transform.Children.Add(new ScaleTransform(-1, 1, 110, 0));
+                wing.RenderTransform = transform; pair.Children.Add(wing);
+            }
+            wings.Child = pair; wings.RenderTransformOrigin = new Point(0.5, 0.72); wings.RenderTransform = wingScale;
+        }
         void StartFall() {
             double feet = Top + Height, center = Left + Width / 2;
             Wake(); EndReaction(); StopNoticeAnimation();
             falling = true; fallArea = WorkArea(); fallStart = clock.Elapsed.TotalSeconds; landedAt = -1;
+            wingFall = Rng.Next(2) == 0;
             fallCenter = center; timer.Interval = TimeSpan.FromMilliseconds(25);
             LayoutPet(); Left = Clamp(center - Width / 2, fallArea.Left, fallArea.Right - Width);
             fallCenter = Left + Width / 2; Top = feet - Height;
-            SetFrame(7); parachute.Visibility = Visibility.Visible;
+            SetFrame(7); parachute.Visibility = wingFall ? Visibility.Collapsed : Visibility.Visible;
+            wings.Visibility = wingFall ? Visibility.Visible : Visibility.Collapsed;
+            wingScale.ScaleX = wingScale.ScaleY = 0.15; wings.Opacity = 0.3;
+            wingDirection = Rng.Next(2) == 0 ? -1 : 1;
+            if (wingFall) StartWingLeg(fallStart);
             clothScale.ScaleX = 0.15; clothScale.ScaleY = 0.1; parachute.Opacity = 0.3;
         }
         void StopFall(bool landed) {
             if (!falling) return;
             double feet = Top + Height, center = Left + Width / 2;
             falling = false; landedAt = -1; parachute.Visibility = Visibility.Collapsed;
+            wings.Visibility = Visibility.Collapsed; wingFall = false;
             squirm.Angle = 0; hop.X = 0; hop.Y = 0; flip.ScaleX = 1; flip.ScaleY = 1;
             timer.Interval = TimeSpan.FromMilliseconds(40); LayoutPet();
             Left = Clamp(center - Width / 2, fallArea.Left, fallArea.Right - Width);
@@ -334,6 +360,7 @@ namespace ChunsikDesktop {
             state = 1; stateEnd = clock.Elapsed.TotalSeconds + 0.7; SetFrame(4);
         }
         void AnimateFall(double now, double dt) {
+            if (wingFall) { AnimateWingFall(now, dt); return; }
             double elapsed = now - fallStart;
             double opened = Math.Min(1, elapsed / 0.4);
             double wave = Math.Sin(elapsed * 2.5);
@@ -341,7 +368,7 @@ namespace ChunsikDesktop {
             if (landedAt < 0) {
                 clothScale.ScaleX = 0.15 + 0.85 * opened; clothScale.ScaleY = 0.1 + 0.9 * opened;
                 parachute.Opacity = 0.3 + 0.7 * opened;
-                Left = Clamp(fallCenter - Width / 2 + wave * Math.Min(18, size * 0.10), fallArea.Left, fallArea.Right - Width);
+                Left = Clamp(fallCenter - Width / 2, fallArea.Left, fallArea.Right - Width);
                 double target = fallArea.Bottom - Height;
                 Top = Math.Min(target, Top + (45 + Math.Min(size * 0.25, 65)) * dt);
                 if (Top >= target) { Top = target; landedAt = now; }
@@ -353,10 +380,45 @@ namespace ChunsikDesktop {
             }
         }
 
+        void StartWingLeg(double now) {
+            wingFromX = Left; wingLegStart = now;
+            wingLegDuration = 2.2 + Rng.NextDouble() * 1.6;
+            double distance = Math.Max(55, Math.Min(180, size * (0.65 + Rng.NextDouble() * 0.65)));
+            wingTargetX = Clamp(wingFromX + wingDirection * distance, fallArea.Left, fallArea.Right - Width);
+            if (Math.Abs(wingTargetX - wingFromX) < Math.Min(20, distance * 0.3)) {
+                wingDirection = -wingDirection;
+                wingTargetX = Clamp(wingFromX + wingDirection * distance, fallArea.Left, fallArea.Right - Width);
+            }
+        }
+        void AnimateWingFall(double now, double dt) {
+            double elapsed = now - fallStart, opened = Math.Min(1, elapsed / 0.4);
+            SetFrame(7); wingFlap.Angle = -5 + 9 * Math.Sin(elapsed * 4);
+            if (landedAt < 0) {
+                wingScale.ScaleX = wingScale.ScaleY = 0.15 + 0.85 * opened;
+                wings.Opacity = 0.3 + 0.7 * opened;
+                double progress = Math.Min(1, Math.Max(0, (now - wingLegStart) / wingLegDuration));
+                // Smoothstep comes to rest at each turn, like a drifting leaf.
+                double smooth = progress * progress * (3 - 2 * progress);
+                Left = Clamp(wingFromX + (wingTargetX - wingFromX) * smooth, fallArea.Left, fallArea.Right - Width);
+                squirm.Angle = Math.Sign(wingTargetX - wingFromX) * 6 * Math.Sin(progress * Math.PI);
+                double target = fallArea.Bottom - Height;
+                Top = Math.Min(target, Top + (45 + Math.Min(size * 0.25, 65)) * (0.9 + 0.1 * Math.Cos(progress * Math.PI * 2)) * dt);
+                if (Top >= target) { Top = target; landedAt = now; }
+                else if (progress >= 1) { wingDirection = -wingDirection; StartWingLeg(now); }
+            } else {
+                double fold = Math.Max(0, 1 - (now - landedAt) / 0.35);
+                wingScale.ScaleX = wingScale.ScaleY = fold; wings.Opacity = fold;
+                squirm.Angle = 0; flip.ScaleY = 1 - 0.06 * Math.Sin((1 - fold) * Math.PI);
+                if (fold <= 0) StopFall(true);
+            }
+        }
+
         Rect WorkArea() { return ScreenLayout.AreaFor(this); }
         public void RecoverDisplay() {
             if (!IsLoaded || closing || pressed || dragging) return;
             falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
+            wings.Visibility = Visibility.Collapsed; wingFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
+            squirm.Angle = 0; flip.ScaleX = flip.ScaleY = 1;
             Rect area = WorkArea(); LayoutPet(); Left = Clamp(Left, area.Left, area.Right - Width); Top = Math.Max(area.Top, area.Bottom - Height);
         }
 
@@ -373,8 +435,14 @@ namespace ChunsikDesktop {
                 Height = Math.Max(Height, size * paydayH / paydayBodyH + 6);
             }
             if (falling) {
-                Width = Math.Max(Width, size * 1.72 + 12); Height = size * 2.05 + 6;
-                parachute.Width = size * 1.6; parachute.Height = size * 1.6;
+                if (wingFall) {
+                    Width = Math.Max(Width, size * 2.1 + 12); Height = size * 1.45 + 6;
+                    wings.Width = size * 2.1; wings.Height = size * 1.34;
+                    wings.Margin = new Thickness(0, 0, 0, size * 0.08);
+                } else {
+                    Width = Math.Max(Width, size * 1.72 + 12); Height = size * 2.05 + 6;
+                    parachute.Width = size * 1.6; parachute.Height = size * 1.6;
+                }
             }
             reactionMark.FontSize = Math.Max(11, size * 0.16);
             if (IsLoaded) { Rect area = WorkArea(); Top = area.Bottom - Height; Left = Clamp(center - Width / 2, area.Left, area.Right - Width); }
