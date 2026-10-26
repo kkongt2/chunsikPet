@@ -109,7 +109,7 @@ namespace ChunsikDesktop {
         bool Apply(PetOptions value, PetWindow remove = null) {
             value.Placements = Options.Copy().Placements;
             if (!Write(value, true)) return false;
-            Options = value.Copy(); RefreshIdle();
+            Options = value.Copy(); InputAvoidance.Clear(); RefreshIdle();
             if (remove != null && PetWindow.Count > value.PetCount) remove.Close();
             PetWindow.SetCount(value.PetCount); PetWindow.ApplyAppearance(); SaveLayout(); return true;
         }
@@ -141,10 +141,10 @@ namespace ChunsikDesktop {
             Slider transparency = new Slider { Minimum = 0, Maximum = 90, TickFrequency = 5, IsSnapToTickEnabled = true, Value = Options.TransparencyPercent, Margin = new Thickness(0, 10, 0, 5) }; appearance.Children.Add(transparency);
             transparency.ValueChanged += delegate { transparencyLabel.Text = "돌아다니는 춘식이 투명도: " + (int)Math.Round(transparency.Value) + "%"; };
             appearance.Children.Add(new TextBlock { Text = "0%: 선명하게 · 90%: 아주 연하게", Foreground = Brushes.SlateGray, FontSize = 11, Margin = new Thickness(0, 0, 0, 14) });
-            System.Windows.Controls.Primitives.ToggleButton avoid = new System.Windows.Controls.Primitives.ToggleButton { Content = "마우스가 가까워지면 빠르게 피하기", IsChecked = Options.AvoidCursor, Padding = new Thickness(12, 8, 12, 8), HorizontalContentAlignment = HorizontalAlignment.Left };
+            System.Windows.Controls.Primitives.ToggleButton avoid = new System.Windows.Controls.Primitives.ToggleButton { Content = "마우스 + 키입력 피하기", IsChecked = Options.AvoidCursor, Padding = new Thickness(12, 8, 12, 8), HorizontalContentAlignment = HorizontalAlignment.Left };
             avoid.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ToggleButton'><Border x:Name='box' CornerRadius='10' Background='#E4EAF1' Padding='{TemplateBinding Padding}'><DockPanel><TextBlock x:Name='state' Text='OFF' FontWeight='Bold' Margin='0,0,12,0'/><ContentPresenter/></DockPanel></Border><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='box' Property='Background' Value='#CDEBDE'/><Setter TargetName='state' Property='Text' Value='ON'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='box' Property='BorderBrush' Value='#0064A8'/><Setter TargetName='box' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             appearance.Children.Add(avoid);
-            appearance.Children.Add(new TextBlock { Text = "기본 OFF · 일반 춘식이에만 적용해요.\n드래그·클릭 반응·알림 표시 중에는 피하지 않아요.", Foreground = Brushes.SlateGray, FontSize = 11, Margin = new Thickness(0, 8, 0, 0) });
+            appearance.Children.Add(new TextBlock { Text = "기본 OFF · 마우스와 입력 커서 주변에서 비켜나요.\n입력 위치를 제공하지 않는 앱에서는 마우스만 피해요.\n드래그·클릭 반응·알림 표시 중에는 피하지 않아요.", Foreground = Brushes.SlateGray, FontSize = 11, Margin = new Thickness(0, 8, 0, 0) });
             Border paydayCard = new Border { Background = new SolidColorBrush(Color.FromRgb(239, 247, 255)), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 16) };
             StackPanel paydayPanel = new StackPanel(); paydayCard.Child = paydayPanel; root.Children.Add(paydayCard);
             CheckBox paydayEnabled = new CheckBox { Content = "월급날 실행 시 지폐 뿌리기", IsChecked = Options.PaydayEnabled, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10) }; paydayPanel.Children.Add(paydayEnabled);

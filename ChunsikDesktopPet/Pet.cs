@@ -495,7 +495,7 @@ namespace ChunsikDesktop {
                 if (frame != 7) SetFrame(7); return;
             }
             if (TodoService.Current != null && TodoService.Current.IsHoldingFor(this)) { if (frame != 4) SetFrame(4); return; }
-            if (EvadeCursor(now, dt, paused || state == 2)) return;
+            if (EvadeInput(now, dt, paused || state == 2)) return;
             if (paused) { if (frame != 6) SetFrame(6); return; }
             Rect area = WorkArea();
             Top = area.Bottom - Height;
@@ -507,14 +507,30 @@ namespace ChunsikDesktop {
                 if (now >= nextFrame) { SetFrame((frame + 1) % 4); nextFrame = now + 0.14; }
             } else if (state == 1) SetFrame(now % 4 > 3.65 ? 5 : 4);
         }
-        bool EvadeCursor(double now, double dt, bool seated) {
+        bool EvadeInput(double now, double dt, bool seated) {
             if (IsTodoCompanion || PresentationPolicy.IsSuppressed || PetPreferences.Current == null || !PetPreferences.Current.Options.AvoidCursor) { fleeUntil = 0; StopSeatedScoot(); return false; }
+            Rect area = WorkArea();
+            Rect caretPixels = InputAvoidance.CaretPixels();
+            if (!caretPixels.IsEmpty) {
+                Point first = PointFromScreen(caretPixels.TopLeft), last = PointFromScreen(caretPixels.BottomRight);
+                Rect protectedArea = new Rect(new Point(Left + first.X, Top + first.Y), new Point(Left + last.X, Top + last.Y));
+                protectedArea.Inflate(100, 65);
+                double target;
+                if (InputAvoidance.TryEscape(new Rect(Left, Top, Width, Height), area, protectedArea, out target)) {
+                    fleeUntil = 0;
+                    double delta = target - Left;
+                    if (Math.Abs(delta) < 0.5) { StopSeatedScoot(); return true; }
+                    direction = delta > 0 ? 1 : -1;
+                    Left += direction * Math.Min(Math.Abs(delta), Math.Max(240, speed * 4) * dt);
+                    Top = area.Bottom - Height;
+                    ShowEscapePose(now, seated); return true;
+                }
+            }
             System.Drawing.Point screen = System.Windows.Forms.Cursor.Position;
             Point cursor = PointFromScreen(new Point(screen.X, screen.Y));
             double dx = Math.Max(0, Math.Max(-cursor.X, cursor.X - Width));
             double dy = Math.Max(0, Math.Max(-cursor.Y, cursor.Y - Height));
             bool near = dx < 70 && dy < 65;
-            Rect area = WorkArea();
             if (near) {
                 if (now >= fleeUntil) fleeDirection = cursor.X < Width / 2 ? 1 : -1;
                 if (fleeDirection < 0 && Left <= area.Left + 2) fleeDirection = 1;
@@ -527,10 +543,12 @@ namespace ChunsikDesktop {
             double escapeSpeed = Math.Max(240, speed * 4);
             Left = Clamp(Left + direction * escapeSpeed * dt, area.Left, area.Right - Width);
             Top = area.Bottom - Height;
-            if (seated) { state = 2; stateEnd = now + 0.8; ShowSeatedScoot(now); return true; }
+            ShowEscapePose(now, seated); return true;
+        }
+        void ShowEscapePose(double now, bool seated) {
+            if (seated) { state = 2; stateEnd = now + 0.8; ShowSeatedScoot(now); return; }
             state = 1; stateEnd = now + 0.5;
             if (now >= nextFrame) { SetFrame(frame < 4 ? (frame + 1) % 4 : 0); nextFrame = now + 0.07; }
-            return true;
         }
         void OnDown(object sender, MouseButtonEventArgs e) {
             if (!picture.IsMouseOver) return;

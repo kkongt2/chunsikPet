@@ -86,7 +86,7 @@ namespace ChunsikDesktop {
                 transparency.DropDownItems.Add(Item(percent == 0 ? "0% · 선명하게" : percent + "%", delegate { PetPreferences.Current.SetTransparency(percent); }));
             }
             menu.Items.Add(transparency);
-            System.Windows.Forms.ToolStripMenuItem avoid = Item("마우스 피하기", delegate { PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); }); menu.Items.Add(avoid);
+            System.Windows.Forms.ToolStripMenuItem avoid = Item("마우스 + 키입력 피하기", delegate { PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); }); menu.Items.Add(avoid);
             System.Windows.Forms.ToolStripMenuItem pause = Item("모두 잠깐 쉬기", delegate { PetWindow.PauseAll(!PetWindow.AllPaused); });
             menu.Items.Add(pause);
             System.Windows.Forms.ToolStripMenuItem add = Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(PetWindow.Count + 1); });
@@ -102,7 +102,7 @@ namespace ChunsikDesktop {
                 notes.Text = TodoService.Current.AllHidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기";
                 quiet.Text = "방해 금지 · " + PresentationPolicy.Status; fullscreen.Checked = PresentationPolicy.FullscreenEnabled;
                 avoid.Checked = PetPreferences.Current.Options.AvoidCursor;
-                avoid.Text = "마우스 피하기 · " + (avoid.Checked ? "ON" : "OFF");
+                avoid.Text = "마우스 + 키입력 피하기 · " + (avoid.Checked ? "ON" : "OFF");
                 foreach (System.Windows.Forms.ToolStripMenuItem choice in transparency.DropDownItems) choice.Checked = choice.Text.StartsWith(PetPreferences.Current.Options.TransparencyPercent + "%", StringComparison.Ordinal);
                 pause.Text = PetWindow.AllPaused ? "모두 다시 걷기" : "모두 잠깐 쉬기";
                 add.Enabled = PetWindow.Count < 20;

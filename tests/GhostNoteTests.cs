@@ -15,6 +15,16 @@ internal static class GhostNoteTests {
         TodoNote.LoadArt(System.IO.Path.GetFullPath("ChunsikDesktopPet"));
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-sprites.png") });
         typeof(PetWindow).GetMethod("BuildSeatedScootFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+        double escapeTarget;
+        Rect work = new Rect(0, 0, 1920, 1080);
+        Check(InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(880, 880, 200, 160), out escapeTarget) && escapeTarget == 778, "input avoidance chooses nearest free side");
+        Check(InputAvoidance.TryEscape(new Rect(0, 900, 100, 100), work, new Rect(-50, 880, 200, 160), out escapeTarget) && escapeTarget == 152, "left edge escapes toward available space");
+        Check(InputAvoidance.TryEscape(new Rect(1820, 900, 100, 100), work, new Rect(1800, 880, 200, 160), out escapeTarget) && escapeTarget == 1698, "right edge escapes left without bouncing");
+        Check(!InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(900, 100, 200, 160), out escapeTarget), "input elsewhere vertically does not move pets");
+        Check(!InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, Rect.Empty, out escapeTarget), "unsupported caret leaves mouse behavior unchanged");
+        Check(InputAvoidance.TryEscape(new Rect(-1900, 900, 100, 100), new Rect(-1920, 0, 1920, 1080), new Rect(-1950, 880, 200, 160), out escapeTarget) && escapeTarget == -1748, "negative monitor coordinates supported");
+        Check(InputAvoidance.TryEscape(new Rect(0, 0, 80, 100), new Rect(0, 0, 100, 100), new Rect(-10, 0, 130, 100), out escapeTarget) && escapeTarget == 0, "no room settles at edge instead of oscillating");
+        Check(InputAvoidance.CaretPixels().IsEmpty, "disabled or absent preferences skip caret query");
         bool allowSave = true; int completed = 0, added = 0;
         TodoItem item = new TodoItem { Text = "원본" };
         TodoNote note = new TodoNote(delegate { completed++; }, delegate {}, delegate(double x, double y) {}, delegate { return allowSave; }, delegate { added++; });
