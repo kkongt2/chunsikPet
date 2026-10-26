@@ -117,6 +117,45 @@ internal static class GhostNoteTests {
         note.Hide(); Pump(); Check(!drag.IsVisible, "strip hides with note");
         note.Show(); Pump(); Check(drag.IsVisible, "strip returns with note");
         note.DisposeNote(); Pump(); Check(!note.IsVisible, "note closes");
+        // Isolated settings avoid touching the user's saved todos during visibility tests.
+        TodoSettings visibilitySettings = new TodoSettings();
+        TodoItem visibleItem = new TodoItem { Text = "visible", HasPosition = true, NoteLeft = 100, NoteTop = 100 };
+        TodoItem minimizedItem = new TodoItem { Text = "minimized", Minimized = true, HasPosition = true, NoteLeft = 450, NoteTop = 100 };
+        visibilitySettings.Items.Add(visibleItem); visibilitySettings.Items.Add(minimizedItem);
+        TodoService service = (TodoService)Activator.CreateInstance(typeof(TodoService), BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { visibilitySettings }, null);
+        MethodInfo tick = typeof(TodoService).GetMethod("Tick", BindingFlags.Instance | BindingFlags.NonPublic);
+        try {
+            tick.Invoke(service, null); Pump();
+            System.Collections.IDictionary runs = (System.Collections.IDictionary)typeof(TodoService).GetField("runtimes", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(service);
+            object firstRun = runs[visibleItem.Id], secondRun = runs[minimizedItem.Id];
+            TodoNote firstNote = (TodoNote)firstRun.GetType().GetField("Note").GetValue(firstRun);
+            TodoNote secondNote = (TodoNote)secondRun.GetType().GetField("Note").GetValue(secondRun);
+            GhostNoteHeader tab = Field<GhostNoteHeader>(secondNote, "restoreTab");
+            Check(firstNote.IsVisible && tab.IsVisible, "both full note and minimized tab initially visible");
+            double left = firstNote.Left, top = firstNote.Top, width = firstNote.Width, height = firstNote.Height;
+            service.ToggleAllVisibility(); Pump();
+            Check(service.AllHidden && !firstNote.IsVisible && !secondNote.IsVisible && !tab.IsVisible, "global hide includes minimized restore tab");
+            System.Diagnostics.Stopwatch visibilityClock = (System.Diagnostics.Stopwatch)typeof(TodoService).GetField("clock", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(service);
+            Check(!visibilityClock.IsRunning, "scheduled note countdown pauses while hidden");
+            tick.Invoke(service, null); Pump();
+            Check(!firstNote.IsVisible && !tab.IsVisible, "timer cannot reshow hidden notes");
+            TodoItem hiddenNewItem = new TodoItem { Text = "added while hidden" }; visibilitySettings.Items.Add(hiddenNewItem);
+            typeof(TodoService).GetMethod("Sync", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(service, null);
+            object newRun = runs[hiddenNewItem.Id];
+            TodoNote newNote = (TodoNote)newRun.GetType().GetField("Note").GetValue(newRun);
+            tick.Invoke(service, null); Check(!newNote.IsVisible, "new notes stay hidden until explicit restore");
+            service.ToggleAllVisibility(); Pump();
+            Check(!service.AllHidden && firstNote.IsVisible && tab.IsVisible && newNote.IsVisible, "restore shows notes and minimized tab");
+            Check(minimizedItem.Minimized && firstNote.Left == left && firstNote.Top == top && firstNote.Width == width && firstNote.Height == height, "restore preserves position size and minimized state");
+            Check(visibilityClock.IsRunning, "scheduled note countdown resumes");
+            service.ToggleAllVisibility(); service.ToggleAllVisibility(); Pump();
+            Check(firstNote.IsVisible && tab.IsVisible, "repeated toggles remain reversible");
+        } finally { service.Stop(); }
+        using (TodoHotKey hotKey = new TodoHotKey(delegate {})) {
+            Check(hotKey.Registered, "global hotkey registers on a window independent of notes");
+            using (TodoHotKey duplicate = new TodoHotKey(delegate {})) Check(!duplicate.Registered, "hotkey conflict is reported without throwing");
+        }
+        using (TodoHotKey released = new TodoHotKey(delegate {})) Check(released.Registered, "disposed hotkey can be registered again");
         PetOptions preferences = new PetOptions { PetCount = 2 };
         preferences.Placements.Add(new PetPlacement { Paused = true, Size = 50, CenterX = -400, BottomY = 1080 });
         preferences.Placements.Add(new PetPlacement { Size = 180, CenterX = 1500, BottomY = 900 });

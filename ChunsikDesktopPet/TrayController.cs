@@ -9,6 +9,7 @@ namespace ChunsikDesktop {
         readonly System.Windows.Forms.NotifyIcon tray;
         readonly System.Windows.Forms.ContextMenuStrip menu;
         readonly System.Drawing.Icon icon;
+        readonly TodoHotKey todoHotKey;
         bool disposed;
         Window about;
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
@@ -60,6 +61,9 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("알림 · 메시지 설정", delegate { ReminderService.Current.OpenSettings(); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(null); }));
+            System.Windows.Forms.ToolStripMenuItem notes = Item("포스트잇 전체 숨기기", delegate { TodoService.Current.ToggleAllVisibility(); });
+            notes.ShortcutKeyDisplayString = TodoHotKey.Label;
+            menu.Items.Add(notes);
             menu.Items.Add(Item("타이머 · 전담 춘식이", TimeToolWindow.OpenTimer));
             menu.Items.Add(Item("스톱워치 · 전담 춘식이", TimeToolWindow.OpenStopwatch));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
@@ -95,6 +99,7 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("프로그램 정보", ShowAbout));
             menu.Items.Add(Item("춘식이 모두 종료", delegate { PetWindow.Quit(); }));
             menu.Opening += delegate {
+                notes.Text = TodoService.Current.AllHidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기";
                 quiet.Text = "방해 금지 · " + PresentationPolicy.Status; fullscreen.Checked = PresentationPolicy.FullscreenEnabled;
                 avoid.Checked = PetPreferences.Current.Options.AvoidCursor;
                 avoid.Text = "마우스 피하기 · " + (avoid.Checked ? "ON" : "OFF");
@@ -106,6 +111,11 @@ namespace ChunsikDesktop {
             tray.MouseDoubleClick += delegate(object sender, System.Windows.Forms.MouseEventArgs e) {
                 if (e.Button == System.Windows.Forms.MouseButtons.Left) Dispatch(delegate { PetPreferences.Current.OpenSettings(); });
             };
+            todoHotKey = new TodoHotKey(delegate { TodoService.Current.ToggleAllVisibility(); });
+            if (!todoHotKey.Registered) {
+                notes.ShortcutKeyDisplayString = TodoHotKey.Label + " (사용 불가)";
+                tray.ShowBalloonTip(6000, "포스트잇 단축키 등록 실패", TodoHotKey.Label + " 단축키를 등록하지 못했어요. 다른 프로그램이 사용 중일 수 있어요. 트레이 메뉴의 전체 숨기기/보이기를 이용해 주세요.", System.Windows.Forms.ToolTipIcon.Warning);
+            }
         }
         void ShowAbout() {
             if (about != null) { SettingsHub.Open("프로그램"); return; }
@@ -151,6 +161,7 @@ namespace ChunsikDesktop {
         }
         public void Dispose() {
             if (disposed) return; disposed = true;
+            todoHotKey.Dispose();
             if (about != null) about.Close();
             tray.Visible = false; tray.Dispose(); menu.Dispose(); icon.Dispose();
         }
