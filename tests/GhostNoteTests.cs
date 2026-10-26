@@ -132,7 +132,7 @@ internal static class GhostNoteTests {
             TodoNote secondNote = (TodoNote)secondRun.GetType().GetField("Note").GetValue(secondRun);
             GhostNoteHeader tab = Field<GhostNoteHeader>(secondNote, "restoreTab");
             Check(firstNote.IsVisible && tab.IsVisible, "both full note and minimized tab initially visible");
-            double left = firstNote.Left, top = firstNote.Top, width = firstNote.Width, height = firstNote.Height;
+            double left = firstNote.Left, top = firstNote.Top, restoredWidth = firstNote.Width, restoredHeight = firstNote.Height;
             service.ToggleAllVisibility(); Pump();
             Check(service.AllHidden && !firstNote.IsVisible && !secondNote.IsVisible && !tab.IsVisible, "global hide includes minimized restore tab");
             System.Diagnostics.Stopwatch visibilityClock = (System.Diagnostics.Stopwatch)typeof(TodoService).GetField("clock", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(service);
@@ -146,7 +146,7 @@ internal static class GhostNoteTests {
             tick.Invoke(service, null); Check(!newNote.IsVisible, "new notes stay hidden until explicit restore");
             service.ToggleAllVisibility(); Pump();
             Check(!service.AllHidden && firstNote.IsVisible && tab.IsVisible && newNote.IsVisible, "restore shows notes and minimized tab");
-            Check(minimizedItem.Minimized && firstNote.Left == left && firstNote.Top == top && firstNote.Width == width && firstNote.Height == height, "restore preserves position size and minimized state");
+            Check(minimizedItem.Minimized && firstNote.Left == left && firstNote.Top == top && firstNote.Width == restoredWidth && firstNote.Height == restoredHeight, "restore preserves position size and minimized state");
             Check(visibilityClock.IsRunning, "scheduled note countdown resumes");
             service.ToggleAllVisibility(); service.ToggleAllVisibility(); Pump();
             Check(firstNote.IsVisible && tab.IsVisible, "repeated toggles remain reversible");
