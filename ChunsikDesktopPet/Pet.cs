@@ -35,7 +35,7 @@ namespace ChunsikDesktop {
         public static BitmapSource PreviewPose(string kind, int tick) {
             if (kind == "water") return waterFrames[tick % waterFrames.Length];
             if (kind == "stretch") return stretchFrames[tick % stretchFrames.Length];
-            if (kind == "lunch") return noticeFrames[tick % 4];
+            if (kind == "lunch" || kind == "dinner") return noticeFrames[tick % 4];
             if (kind == "home") return noticeFrames[4 + tick % 4];
             return frames[tick % 2 == 0 ? 4 : 7];
         }
@@ -535,7 +535,7 @@ namespace ChunsikDesktop {
         void AnimateNotice(string kind, double now) {
             noticeAnimating = true;
             if (stretching != (kind == "stretch")) { stretching = kind == "stretch"; LayoutPet(); }
-            bool lunch = kind == "lunch";
+            bool lunch = kind == "lunch" || kind == "dinner";
             int index = (int)(now / (lunch ? 0.4 : 0.18)) % 4 + (lunch ? 0 : 4);
             BitmapSource sprite = kind == "stretch" ? stretchFrames[(int)(now / 0.45) % 8] : kind == "water" ? waterFrames[(int)(now / 0.38) % 8] : noticeFrames[index];
             frame = 4; picture.Source = sprite;
@@ -550,7 +550,7 @@ namespace ChunsikDesktop {
             if (closing || pressed || dragging || (ContextMenu != null && ContextMenu.IsOpen)) return;
             if (falling) { AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
-            bool specialNotice = noticeKind == "lunch" || noticeKind == "home" || noticeKind == "water" || noticeKind == "stretch";
+            bool specialNotice = noticeKind == "lunch" || noticeKind == "dinner" || noticeKind == "home" || noticeKind == "water" || noticeKind == "stretch";
             if (paydayPlaying) { AnimatePayday(now, dt); return; }
             if (!specialNotice) StopNoticeAnimation();
             if (!specialNotice && PetPreferences.Current != null && PetPreferences.Current.IsIdle) { EndReaction(); recentClicks.Clear(); ShowSleep(now); return; }

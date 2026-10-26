@@ -50,6 +50,16 @@ internal static class GhostNoteTests {
             PetCall(fallingPet, "StopFall", true);
             Check(((Viewbox)typeof(PetWindow).GetField("wings", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet)).Visibility == Visibility.Collapsed, "landing removes wings");
         } finally { fallingPet.Close(); }
+        // Built-in migration must preserve the user's OFF switch, time and messages.
+        ReminderService migrationService = (ReminderService)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(ReminderService));
+        MethodInfo ensureBuiltins = typeof(ReminderService).GetMethod("EnsureBuiltins", BindingFlags.Instance | BindingFlags.NonPublic);
+        ReminderSettings migrated = new ReminderSettings();
+        ensureBuiltins.Invoke(migrationService, new object[] { migrated });
+        Reminder dinner = migrated.Items.Find(delegate(Reminder r) { return r.Kind == "dinner"; });
+        Check(dinner != null && dinner.IsBuiltin && dinner.Enabled && dinner.Time == "19:00" && dinner.SelectedDays == 62, "dinner default is enabled at 19:00 on weekdays");
+        dinner.Enabled = false; dinner.Time = "20:30"; dinner.Messages = new List<string> { "custom dinner" };
+        ensureBuiltins.Invoke(migrationService, new object[] { migrated });
+        Check(migrated.Items.FindAll(delegate(Reminder r) { return r.Kind == "dinner"; }).Count == 1 && !dinner.Enabled && dinner.Time == "20:30" && dinner.Messages[0] == "custom dinner", "migration is idempotent and preserves dinner settings");
         bool allowSave = true; int completed = 0, added = 0;
         TodoItem item = new TodoItem { Text = "원본" };
         TodoNote note = new TodoNote(delegate { completed++; }, delegate {}, delegate(double x, double y) {}, delegate { return allowSave; }, delegate { added++; });

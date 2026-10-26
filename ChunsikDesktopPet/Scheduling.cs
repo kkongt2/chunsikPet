@@ -7,7 +7,7 @@ namespace ChunsikDesktop {
         public string Id { get; set; }
         public string Kind { get; set; }
         public string BubbleColor { get; set; }
-        [XmlIgnore] public bool IsBuiltin { get { return Kind == "lunch" || Kind == "home" || Kind == "water" || Kind == "stretch"; } }
+        [XmlIgnore] public bool IsBuiltin { get { return Kind == "lunch" || Kind == "dinner" || Kind == "home" || Kind == "water" || Kind == "stretch"; } }
         public string ScheduleType { get; set; }
         public int IntervalMinutes { get; set; }
         public bool ActivityEnabled { get; set; }
