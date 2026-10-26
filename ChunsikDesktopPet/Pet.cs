@@ -16,6 +16,8 @@ namespace ChunsikDesktop {
         static readonly List<PetWindow> Pets = new List<PetWindow>();
         static BitmapSource[] frames;
         static ImageSource[] seatedScootFrames;
+        static ImageSource pausedSeatedFrame;
+        static ImageSource[] pausedScootFrames;
         bool scooting, placementReady;
         static BitmapSource[] reactionFrames;
         static BitmapSource[] noticeFrames;
@@ -47,7 +49,7 @@ namespace ChunsikDesktop {
             get { if (Pets.Count == 0) return false; foreach (PetWindow pet in Pets) if (!pet.paused) return false; return true; }
         }
         public static void PauseAll(bool value) {
-            foreach (PetWindow pet in Pets) { pet.EndReaction(); pet.paused = value; if (value) pet.SetFrame(6); }
+            foreach (PetWindow pet in Pets) { pet.EndReaction(); pet.paused = value; pet.SetFrame(value ? 6 : pet.frame); }
             if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
         public static void ResizeAll(double value) { foreach (PetWindow pet in Pets) pet.ResizePet(value); }
@@ -129,6 +131,8 @@ namespace ChunsikDesktop {
         static void BuildSeatedScootFrames() {
             BitmapSource seated = frames[6]; double w = seated.PixelWidth, h = seated.PixelHeight;
             seatedScootFrames = new ImageSource[12];
+            pausedSeatedFrame = WithRestHeadband(seated, w, h);
+            pausedScootFrames = new ImageSource[seatedScootFrames.Length];
             for (int i = 0; i < seatedScootFrames.Length; i++) {
                 double wave = Math.Sin(i * Math.PI * 2 / seatedScootFrames.Length);
                 DrawingGroup drawing = new DrawingGroup();
@@ -148,10 +152,30 @@ namespace ChunsikDesktop {
                     dc.DrawImage(seated, full); dc.Pop();
                 }
                 drawing.Freeze(); DrawingImage image = new DrawingImage(drawing); image.Freeze(); seatedScootFrames[i] = image;
+                pausedScootFrames[i] = WithRestHeadband(image, w, h);
             }
         }
+        // Draw in the seated sprite's own coordinates so the band scales with the
+        // pet and stays on its forehead while its feet scoot. Original art is intact.
+        static ImageSource WithRestHeadband(ImageSource sprite, double width, double height) {
+            DrawingGroup drawing = new DrawingGroup();
+            using (DrawingContext dc = drawing.Open()) {
+                dc.DrawImage(sprite, new Rect(0, 0, width, height));
+                dc.PushTransform(new ScaleTransform(width, height));
+                Pen edge = new Pen(new SolidColorBrush(Color.FromRgb(133, 125, 110)), 0.007);
+                edge.LineJoin = PenLineJoin.Round;
+                // Two short cloth tails and a knot at the right temple.
+                dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.26 Q 0.94,0.28 0.985,0.37 L 0.94,0.36 0.92,0.40 Q 0.90,0.33 0.85,0.30 Z"));
+                dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.27 Q 0.92,0.34 0.90,0.44 L 0.87,0.41 0.84,0.43 Q 0.87,0.35 0.83,0.29 Z"));
+                // Curved white cloth sits above the eyes, leaving ears and face visible.
+                dc.DrawGeometry(Brushes.White, edge, Geometry.Parse("M 0.14,0.21 Q 0.50,0.26 0.86,0.21 L 0.91,0.31 Q 0.50,0.36 0.09,0.31 Z"));
+                dc.DrawEllipse(Brushes.White, edge, new Point(0.88, 0.28), 0.028, 0.035);
+                dc.Pop();
+            }
+            drawing.Freeze(); DrawingImage result = new DrawingImage(drawing); result.Freeze(); return result;
+        }
         void ShowSeatedScoot(double now) {
-            SetFrame(6); picture.Source = seatedScootFrames[(int)(now * 18) % seatedScootFrames.Length];
+            SetFrame(6); picture.Source = (paused ? pausedScootFrames : seatedScootFrames)[(int)(now * 18) % seatedScootFrames.Length];
             scooting = true; flip.ScaleX = flip.ScaleY = 1; squirm.Angle = 0; hop.X = hop.Y = 0;
         }
         void StopSeatedScoot() { if (scooting) SetFrame(6); }
@@ -397,6 +421,7 @@ namespace ChunsikDesktop {
         void SetFrame(int index) {
             scooting = false; frame = index;
             picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
+            if (paused && index == 6 && pausedSeatedFrame != null) picture.Source = pausedSeatedFrame;
             picture.Width = size * frames[index].PixelWidth / maxH;
             picture.Height = size * frames[index].PixelHeight / maxH;
             flip.ScaleX = index < 4 ? direction : 1;
@@ -553,7 +578,7 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(this); }));
             if (IsTodoCompanion) return menu;
             MenuItem pause = Item("잠깐 쉬기", delegate(object s, RoutedEventArgs e) {
-                paused = !paused; ((MenuItem)s).Header = paused ? "다시 걷기" : "잠깐 쉬기"; if (paused) SetFrame(6);
+                paused = !paused; ((MenuItem)s).Header = paused ? "다시 걷기" : "잠깐 쉬기"; SetFrame(paused ? 6 : frame);
                 if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
             }); menu.Items.Add(pause);
             menu.Opened += delegate { pause.Header = paused ? "다시 걷기" : "잠깐 쉬기"; };
