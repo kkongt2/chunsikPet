@@ -320,7 +320,8 @@ namespace ChunsikDesktop {
             parachute.RenderTransform = transform;
         }
         void BuildWings() {
-            Canvas pair = new Canvas { Width = 220, Height = 140 };
+            // Leave room around the feather tips throughout the flap rotation.
+            Canvas pair = new Canvas { Width = 260, Height = 170 };
             Geometry outline = Geometry.Parse("M 106,98 C 87,67 58,54 30,24 Q 17,10 9,9 C 4,29 14,49 29,62 Q 9,50 8,56 C 10,77 25,90 44,96 Q 23,89 26,98 C 37,116 57,120 72,114 Q 65,120 73,123 C 89,126 102,114 106,98 Z");
             Geometry feathers = Geometry.Parse("M 24,38 Q 54,74 88,97 M 29,62 Q 53,89 84,103 M 44,96 Q 63,108 79,108");
             for (int side = 0; side < 2; side++) {
@@ -329,7 +330,7 @@ namespace ChunsikDesktop {
                 wing.Children.Add(new System.Windows.Shapes.Path { Data = feathers, Stroke = new SolidColorBrush(Color.FromRgb(197, 212, 227)), StrokeThickness = 1.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
                 TransformGroup transform = new TransformGroup(); transform.Children.Add(wingFlap);
                 if (side == 1) transform.Children.Add(new ScaleTransform(-1, 1, 110, 0));
-                wing.RenderTransform = transform; pair.Children.Add(wing);
+                wing.RenderTransform = transform; Canvas.SetLeft(wing, 20); Canvas.SetTop(wing, 15); pair.Children.Add(wing);
             }
             wings.Child = pair; wings.RenderTransformOrigin = new Point(0.5, 0.72); wings.RenderTransform = wingScale;
         }
