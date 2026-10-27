@@ -58,6 +58,26 @@ internal static class ProductivityTests {
         List<TodoItem> done = TodoService.QueryItems(items, "", 2);
         Check(done.Count == 3 && done[0] == items[2] && done[2] == items[3], "completion sorted newest first with undated last");
         Check(TodoService.QueryItems(items, "없는검색", 0).Count == 0 && items.Count == 4, "search never mutates records");
+        string todosPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "todos.xml");
+        byte[] oldTodos = File.Exists(todosPath) ? File.ReadAllBytes(todosPath) : null;
+        byte[] oldBackup = File.Exists(todosPath + ".bak") ? File.ReadAllBytes(todosPath + ".bak") : null;
+        TodoSettings data = new TodoSettings(); TodoItem restoredItem = new TodoItem { Text = "복원 시험", Done = true, CompletedAt = DateTime.Today };
+        data.Items.Add(restoredItem);
+        TodoService service = (TodoService)Activator.CreateInstance(typeof(TodoService), BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { data }, null);
+        try {
+            restoredItem.NoteOpacity = 0;
+            Check(!(bool)Call(service, "RestoreItem", restoredItem) && restoredItem.Done && restoredItem.CompletedAt.HasValue, "failed restore rolls back completion state");
+            restoredItem.NoteOpacity = 0.6;
+            Check((bool)Call(service, "RestoreItem", restoredItem) && !restoredItem.Done && !restoredItem.CompletedAt.HasValue, "completion restore commits immediately");
+            using (FileStream input = File.OpenRead(todosPath)) {
+                TodoSettings saved = (TodoSettings)new System.Xml.Serialization.XmlSerializer(typeof(TodoSettings)).Deserialize(input);
+                Check(!saved.Items[0].Done && !saved.Items[0].CompletedAt.HasValue, "restored item remains active after reload");
+            }
+        } finally {
+            service.Stop();
+            if (oldTodos == null) File.Delete(todosPath); else File.WriteAllBytes(todosPath, oldTodos);
+            if (oldBackup == null) File.Delete(todosPath + ".bak"); else File.WriteAllBytes(todosPath + ".bak", oldBackup);
+        }
         Check(!TodoHotKey.Valid(4, 0x41) && !TodoHotKey.Valid(2, 0x7B) && TodoHotKey.Valid(3, 0x4B), "hotkey validation excludes unmodified and reserved F12");
         string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "hotkey.txt");
         byte[] prior = File.Exists(path) ? File.ReadAllBytes(path) : null;
