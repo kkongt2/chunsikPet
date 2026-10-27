@@ -261,7 +261,7 @@ namespace ChunsikDesktop {
             picture.RenderTransformOrigin = new Point(0.5, 1);
             TransformGroup effects = new TransformGroup(); effects.Children.Add(flip); effects.Children.Add(squirm); effects.Children.Add(hop);
             picture.RenderTransform = effects;
-            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); root.Children.Add(taskStars); Content = root;
+            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); Content = root;
             RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
             MouseRightButtonDown += delegate { if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake(); EndReaction(); recentClicks.Clear(); };
             MouseLeftButtonDown += OnDown; MouseMove += OnMove; MouseLeftButtonUp += OnUp;
@@ -549,7 +549,7 @@ namespace ChunsikDesktop {
         void Tick(object sender, EventArgs args) {
             double now = clock.Elapsed.TotalSeconds, dt = Math.Min(0.1, now - lastTime); lastTime = now;
             if (closing || pressed || dragging) return;
-            if (ContextMenu != null && ContextMenu.IsOpen) { if (cueKind != 0) cueStarted = now; return; }
+            if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
             if (falling) { CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
             bool specialNotice = noticeKind == "lunch" || noticeKind == "dinner" || noticeKind == "home" || noticeKind == "water" || noticeKind == "stretch";
@@ -568,6 +568,8 @@ namespace ChunsikDesktop {
                 if (frame != 7) SetFrame(7); return;
             }
             if (TodoService.Current != null && TodoService.Current.IsHoldingFor(this)) { if (frame != 4) SetFrame(4); return; }
+            // Let an explicit mode change finish before the nearby menu cursor triggers evasion.
+            if ((cueKind == 2 || cueKind == 3) && AnimateCue(now)) return;
             if (EvadeInput(now, dt, paused || state == 2)) { wasEvading = true; CancelCue(); return; }
             if (wasEvading) {
                 wasEvading = false;

@@ -157,11 +157,9 @@ namespace ChunsikDesktop {
             FinishComplete(item);
         }
         void FinishComplete(TodoItem item) {
-            PetWindow celebrant = PetWindow.TaskCelebrant(item.NoteLeft, item.NoteTop);
             DateTime? previousDate = item.CompletedAt; item.Done = true; item.CompletedAt = DateTime.Now;
             DateTime? completion = item.CompletedAt;
             if (!Save()) { item.Done = false; item.CompletedAt = previousDate; return; }
-            if (celebrant != null) celebrant.CelebrateTask();
             UndoToast.ShowCompleted(item.Text, delegate {
                 if (!settings.Items.Contains(item) || !item.Done || item.CompletedAt != completion) return;
                 item.Done = false; item.CompletedAt = null;

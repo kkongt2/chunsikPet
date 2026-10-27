@@ -55,11 +55,23 @@ internal static class GhostNoteTests {
             PetCall(fallingPet, "SetRestMode", false);
             PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 1.2);
             Check((int)typeof(PetWindow).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 0, "resume transition finishes in walking state");
-            fallingPet.CelebrateTask(); PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 0.3);
-            TextBlock stars = (TextBlock)typeof(PetWindow).GetField("taskStars", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet);
-            Check(stars.Visibility == Visibility.Visible, "task completion shows star burst and builds clap frames");
-            PetCall(fallingPet, "CancelCue");
-            Check(stars.Visibility == Visibility.Collapsed, "interruption clears celebration overlay");
+            // Exercise the actual quick-menu button and Tick path with the popup open.
+            MenuItem quickHost = (MenuItem)fallingPet.ContextMenu.Items[0];
+            StackPanel quickPanel = (StackPanel)quickHost.Header;
+            System.Windows.Controls.Primitives.UniformGrid quickButtons = (System.Windows.Controls.Primitives.UniformGrid)quickPanel.Children[1];
+            Button restButton = (Button)quickButtons.Children[0];
+            fallingPet.ContextMenu.IsOpen = true;
+            try {
+                restButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                System.Diagnostics.Stopwatch petClock = (System.Diagnostics.Stopwatch)typeof(PetWindow).GetField("clock", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet);
+                PetField(fallingPet, "cueStarted", petClock.Elapsed.TotalSeconds - 0.6);
+                PetCall(fallingPet, "Tick", null, EventArgs.Empty);
+                Check((int)typeof(PetWindow).GetField("frame", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 6, "quick-menu rest animation progresses while menu stays open");
+                restButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                PetField(fallingPet, "cueStarted", petClock.Elapsed.TotalSeconds - 0.5);
+                PetCall(fallingPet, "Tick", null, EventArgs.Empty);
+                Check((int)typeof(PetWindow).GetField("frame", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 7, "quick-menu resume visibly stretches while menu stays open");
+            } finally { fallingPet.ContextMenu.IsOpen = false; PetCall(fallingPet, "CancelCue"); }
         } finally { fallingPet.Close(); }
         // Built-in migration must preserve the user's OFF switch, time and messages.
         ReminderService migrationService = (ReminderService)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(ReminderService));
