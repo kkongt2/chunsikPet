@@ -43,8 +43,11 @@ namespace ChunsikDesktop {
                 if (!(w is PetWindow || w is TodoNote || w is NoticeWindow || w is TimeToolWindow || w is UndoToast)) continue;
                 if (IsSuppressed) { if (!hidden.ContainsKey(w)) hidden[w] = w.Opacity; w.Opacity = 0; w.IsHitTestVisible = false; }
                 else if (hidden.ContainsKey(w)) { w.Opacity = hidden[w]; w.IsHitTestVisible = true; hidden.Remove(w); }
+                PetWindow pet = w as PetWindow; if (pet != null) pet.SetPresentationSuppressed(IsSuppressed);
+                TimeToolWindow tool = w as TimeToolWindow; if (tool != null) tool.SetPresentationSuppressed(IsSuppressed);
             }
             foreach (Window w in new List<Window>(hidden.Keys)) { bool live = false; foreach (Window open in Application.Current.Windows) if (open == w) live = true; if (!live) hidden.Remove(w); }
         }
     }
 }
+

@@ -50,6 +50,21 @@ namespace ChunsikDesktop {
         bool allHidden;
         public bool AllHidden { get { return allHidden; } }
         public bool Stopping { get { return stopping; } }
+        public static List<TodoItem> QueryItems(IEnumerable<TodoItem> items, string search, int filter) {
+            string query = (search ?? "").Trim();
+            IEnumerable<TodoItem> result = items.Where(delegate(TodoItem item) {
+                return (filter != 1 || !item.Done) && (filter != 2 || item.Done) && (query.Length == 0 || (item.Text ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
+            });
+            if (filter == 2) result = result.OrderByDescending(delegate(TodoItem item) { return item.CompletedAt ?? DateTime.MinValue; });
+            return result.ToList();
+        }
+        bool RestoreItem(TodoItem item) {
+            if (!settings.Items.Contains(item) || !item.Done) return false;
+            DateTime? completedAt = item.CompletedAt;
+            item.Done = false; item.CompletedAt = null;
+            if (!Save()) { item.Done = true; item.CompletedAt = completedAt; return false; }
+            if (renderEditor != null) renderEditor(); return true;
+        }
         sealed class Runtime {
             public TodoItem Item;
             public PetWindow Pet;
@@ -162,9 +177,7 @@ namespace ChunsikDesktop {
             if (!Save()) { item.Done = false; item.CompletedAt = previousDate; return; }
             UndoToast.ShowCompleted(item.Text, delegate {
                 if (!settings.Items.Contains(item) || !item.Done || item.CompletedAt != completion) return;
-                item.Done = false; item.CompletedAt = null;
-                if (!Save()) { item.Done = true; item.CompletedAt = completion; }
-                if (renderEditor != null) renderEditor();
+                RestoreItem(item);
             });
             if (renderEditor != null) renderEditor();
         }
@@ -173,7 +186,8 @@ namespace ChunsikDesktop {
             return false;
         }
         void Tick() {
-            if (stopping || allHidden) return;
+            timer.Interval = TimeSpan.FromMilliseconds(allHidden || PresentationPolicy.IsSuppressed ? 1000 : 150);
+            if (stopping || allHidden || PresentationPolicy.IsSuppressed) return;
             Sync();
             List<PetWindow> pets = PetWindow.TodoPets();
             List<Rect> occupied = new List<Rect>();
@@ -234,7 +248,10 @@ namespace ChunsikDesktop {
             StackPanel top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
             top.Children.Add(new TextBlock { Text = "춘식이에게 기억을 맡겨요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue });
             top.Children.Add(new TextBlock { Text = "기억할 일을 적고, 춘식이가 보여줄 방식을 골라주세요. 변경사항은 자동으로 저장돼요.", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 12) });
-            top.Children.Add(Button("포스트잇 전체 숨김 / 보이기 · " + TodoHotKey.Label, ToggleAllVisibility));
+            Button visibility = Button("포스트잇 전체 숨김 / 보이기 · " + TodoHotKey.Label, ToggleAllVisibility); top.Children.Add(visibility);
+            Action hotkeyChanged = delegate { visibility.Content = "포스트잇 전체 숨김 / 보이기 · " + TodoHotKey.Label; };
+            TodoHotKey.Changed += hotkeyChanged;
+            top.Children.Add(TodoHotKey.BuildSettings());
             TextBlock status = new TextBlock { Foreground = Brushes.SlateGray, Margin = new Thickness(0, 10, 0, 0) }; DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
             DockPanel addRow = new DockPanel { Margin = new Thickness(0, 0, 0, 14) }; top.Children.Add(addRow);
             TextBox entry = new TextBox { FontSize = 16, Padding = new Thickness(10), BorderThickness = new Thickness(0), Background = Brushes.Transparent, MaxLength = 160, ToolTip = "예: 기획서 작성 · Enter로 바로 등록" };
@@ -244,6 +261,13 @@ namespace ChunsikDesktop {
             Action changed = delegate { status.Text = "저장 중…"; debounce.Stop(); debounce.Start(); }; debounce.Tick += delegate { persist(); };
             StackPanel list = new StackPanel(); ScrollViewer scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; root.Children.Add(scroll);
             Action render = null;
+            WrapPanel filters = new WrapPanel { Margin = new Thickness(0, 8, 0, 8) }; top.Children.Add(filters);
+            filters.Children.Add(new TextBlock { Text = "메모 검색", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5) });
+            TextBox search = new TextBox { Width = 280, Padding = new Thickness(7), ToolTip = "메모 내용 검색" }; filters.Children.Add(search);
+            ComboBox filter = new ComboBox { Width = 160, Margin = new Thickness(8, 0, 0, 0), ItemsSource = new string[] { "전체", "미완료", "완료 · 최근순" }, SelectedIndex = 0 }; filters.Children.Add(filter);
+            TextBlock resultCount = new TextBlock { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }; filters.Children.Add(resultCount);
+            search.TextChanged += delegate { if (render != null) render(); };
+            filter.SelectionChanged += delegate { if (render != null) render(); };
             Action add = delegate {
                 if (String.IsNullOrWhiteSpace(entry.Text)) { status.Text = "할 일을 먼저 입력해 주세요."; entry.Focus(); return; }
                 if (settings.Items.Count >= 50) { status.Text = "최대 50개까지 저장할 수 있어요. 완료한 항목을 삭제해 주세요."; return; }
@@ -260,10 +284,12 @@ namespace ChunsikDesktop {
                 foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "춘식이 모양", "글자 크기", "불투명도", "색상", "관리" })
                     SettingsCell(header, new TextBlock { Text = label, Foreground = Brushes.SlateGray, FontWeight = FontWeights.SemiBold }, column++);
                 list.Children.Add(header);
-                foreach (TodoItem item in settings.Items) {
+                List<TodoItem> visibleItems = QueryItems(settings.Items, search.Text, filter.SelectedIndex);
+                resultCount.Text = visibleItems.Count + "개 / 전체 " + settings.Items.Count + "개";
+                foreach (TodoItem item in visibleItems) {
                     Grid line = SettingsTableRow(); line.MinHeight = 96;
                     Border card = new Border { Background = item.Done ? BubblePalette.BrushFor("#FFFDF2") : Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(224, 232, 242)), BorderThickness = new Thickness(0, 0, 0, 1), Child = line }; list.Children.Add(card);
-                    Button done = Button(item.Done ? "✓ 완료됨" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else { item.Done = false; item.CompletedAt = null; changed(); render(); } });
+                    Button done = Button(item.Done ? "↶ 복원" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else RestoreItem(item); });
                     done.Padding = new Thickness(5, 7, 5, 7);
                     done.ToolTip = item.Done ? "다시 할 일로 되돌리기" : "완료 처리하기";
                     if (item.Done) { done.Background = BubblePalette.BrushFor("#D5F3DF"); done.Foreground = Brushes.DarkGreen; }
@@ -315,11 +341,11 @@ namespace ChunsikDesktop {
                     opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); }; SettingsCell(line, opacity, 5);
                     SettingsCell(line, BubblePalette.Picker(item.Color, delegate(string color) { item.Color = color; changed(); }, 3), 6);
                 }
-                if (settings.Items.Count == 0) list.Children.Add(new TextBlock { Text = "아직 할 일이 없어요. 위에서 하나 등록해 보세요.", Margin = new Thickness(10, 30, 10, 10), Foreground = Brushes.SlateGray });
+                if (visibleItems.Count == 0) list.Children.Add(new TextBlock { Text = settings.Items.Count == 0 ? "아직 할 일이 없어요. 위에서 하나 등록해 보세요." : "검색·필터 조건에 맞는 메모가 없어요.", Margin = new Thickness(10, 30, 10, 10), Foreground = Brushes.SlateGray });
             };
             renderEditor = render; render();
             win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !persist()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); } };
-            win.Closed += delegate { debounce.Stop(); editor = null; renderEditor = null; saveEditor = null; }; SettingsHub.Attach(win, "포스트잇", persist);
+            win.Closed += delegate { TodoHotKey.Changed -= hotkeyChanged; debounce.Stop(); editor = null; renderEditor = null; saveEditor = null; }; SettingsHub.Attach(win, "포스트잇", persist);
         }
     }
     public sealed class TodoNote : Window {
@@ -691,3 +717,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+

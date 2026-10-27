@@ -99,6 +99,13 @@ namespace ChunsikDesktop {
         bool paused, dragging, closing;
         System.Windows.Point down, origin;
         bool pressed;
+        bool presentationPaused;
+        public void SetPresentationSuppressed(bool suppressed) {
+            if (presentationPaused == suppressed) return;
+            presentationPaused = suppressed;
+            if (suppressed) { clock.Stop(); timer.Stop(); }
+            else { clock.Start(); lastTime = clock.Elapsed.TotalSeconds; if (IsLoaded && !closing) timer.Start(); }
+        }
 
         [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] struct MONITORINFO {
@@ -301,7 +308,7 @@ namespace ChunsikDesktop {
                 paused = saved != null && saved.Paused;
                 placementReady = true;
                 if (paused) { state = 2; SetFrame(6); } else ChooseState();
-                timer.Start();
+                if (!presentationPaused) timer.Start();
             };
             Closed += delegate { closing = true; timer.Stop(); Pets.Remove(this); if (!IsTodoCompanion && Pets.Count == 0) Quit(); };
             timer.Interval = TimeSpan.FromMilliseconds(40); timer.Tick += Tick;
@@ -563,7 +570,7 @@ namespace ChunsikDesktop {
         }
         void Tick(object sender, EventArgs args) {
             double now = clock.Elapsed.TotalSeconds, dt = Math.Min(0.1, now - lastTime); lastTime = now;
-            if (closing || pressed || dragging || movingMonitor) return;
+            if (presentationPaused || closing || pressed || dragging || movingMonitor) return;
             if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
             if (falling) { CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);

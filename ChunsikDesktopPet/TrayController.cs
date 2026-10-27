@@ -101,6 +101,7 @@ namespace ChunsikDesktop {
             menu.Items.Add(Item("프로그램 정보", ShowAbout));
             menu.Items.Add(Item("춘식이 모두 종료", delegate { PetWindow.Quit(); }));
             menu.Opening += delegate {
+                notes.ShortcutKeyDisplayString = TodoHotKey.Label + (todoHotKey != null && todoHotKey.Registered ? "" : " (사용 불가)");
                 notes.Text = TodoService.Current.AllHidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기";
                 quiet.Text = "방해 금지 · " + PresentationPolicy.Status; fullscreen.Checked = PresentationPolicy.FullscreenEnabled;
                 avoid.Checked = PetPreferences.Current.Options.AvoidCursor;
