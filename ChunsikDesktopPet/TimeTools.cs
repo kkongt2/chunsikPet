@@ -175,7 +175,7 @@ namespace ChunsikDesktop {
             return fractions ? result + "." + (value.Milliseconds / 10).ToString("00") : result;
         }
         void UpdateDisplay() {
-            if (start == null) return; // Duration fields fire events during construction.
+            if (start == null || forceClose) return; // Construction or explicit shutdown must not reveal a window.
             TimeSpan shown = elapsed.Elapsed;
             if (countdown) {
                 if (!started) { TimeSpan input; shown = ReadDuration(out input) ? input : TimeSpan.Zero; }
