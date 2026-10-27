@@ -56,6 +56,8 @@ internal static class GhostNoteTests {
             PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 1.2);
             Check((int)typeof(PetWindow).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 0, "resume transition finishes in walking state");
             // Exercise the actual quick-menu button and Tick path with the popup open.
+            fallingPet.ContextMenu = new ContextMenu();
+            PetCall(fallingPet, "AddQuickSettings", fallingPet.ContextMenu);
             MenuItem quickHost = (MenuItem)fallingPet.ContextMenu.Items[0];
             StackPanel quickPanel = (StackPanel)quickHost.Header;
             System.Windows.Controls.Primitives.UniformGrid quickButtons = (System.Windows.Controls.Primitives.UniformGrid)quickPanel.Children[1];
