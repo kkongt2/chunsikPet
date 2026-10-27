@@ -41,6 +41,7 @@
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
     <Compile Include="PetReactions.cs" />
+    <Compile Include="PetManagement.cs" />
     <Compile Include="InputAvoidance.cs" />
     <Compile Include="PreviewUI.cs" />
     <Compile Include="Scheduling.cs" />
@@ -74,3 +75,4 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
+

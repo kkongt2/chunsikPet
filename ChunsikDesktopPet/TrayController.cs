@@ -58,6 +58,8 @@ namespace ChunsikDesktop {
             System.Windows.Forms.ToolStripMenuItem fullscreen = Item("전체 화면에서 자동 숨김", PresentationPolicy.ToggleFullscreen); quiet.DropDownItems.Add(fullscreen);
             menu.Items.Add(quiet);
             menu.Items.Add(Item("설정 열기", delegate { SettingsHub.Open("캐릭터"); }));
+            menu.Items.Add(Item("춘식이 목록 · 모니터 관리", delegate { SettingsHub.Open("캐릭터"); }));
+            menu.Items.Add(Item("마우스가 있는 모니터로 모두 모으기", PetWindow.GatherAtCursor));
             menu.Items.Add(Item("알림 · 메시지 설정", delegate { ReminderService.Current.OpenSettings(); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(null); }));
@@ -167,3 +169,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+

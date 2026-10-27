@@ -10,6 +10,13 @@ using System.Xml.Serialization;
 
 namespace ChunsikDesktop {
     public class PetPlacement {
+        public double Speed { get; set; }
+        public string MonitorDevice { get; set; }
+        public double RelativeX { get; set; }
+        public double RelativeY { get; set; }
+        public PetPlacement() { Speed = 44; }
+        public double RestoredSpeed { get { return Speed == 22 || Speed == 44 || Speed == 80 ? Speed : 44; } }
+        public bool HasRelativePosition { get { return !String.IsNullOrEmpty(MonitorDevice) && RelativeX >= 0 && RelativeX <= 1 && RelativeY >= 0 && RelativeY <= 1; } }
         public bool Paused { get; set; }
         public double Size { get; set; }
         public double CenterX { get; set; }
@@ -100,7 +107,7 @@ namespace ChunsikDesktop {
             bool same = Options.PetCount == positions.Count && Options.Placements != null && Options.Placements.Count == positions.Count;
             if (same) for (int i = 0; i < positions.Count; i++) {
                 PetPlacement a = Options.Placements[i], b = positions[i];
-                if (a == null || a.Size != b.Size || a.Paused != b.Paused || Math.Abs(a.CenterX - b.CenterX) > 0.5 || Math.Abs(a.BottomY - b.BottomY) > 0.5) { same = false; break; }
+                if (a == null || a.Size != b.Size || a.Speed != b.Speed || a.Paused != b.Paused || a.MonitorDevice != b.MonitorDevice || Math.Abs(a.RelativeX - b.RelativeX) > 0.0001 || Math.Abs(a.RelativeY - b.RelativeY) > 0.0001 || Math.Abs(a.CenterX - b.CenterX) > 0.5 || Math.Abs(a.BottomY - b.BottomY) > 0.5) { same = false; break; }
             }
             if (same) return;
             PetOptions value = Options.Copy(); value.PetCount = positions.Count; value.Placements = positions;
@@ -125,6 +132,7 @@ namespace ChunsikDesktop {
             Window win = new Window { Title = "춘식이 설정 — 표시 · 움직임 · 수면", Width = 550, Height = Math.Min(760, SystemParameters.WorkArea.Height - 40), ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen };
             editor = win; win.Closed += delegate { editor = null; };
             StackPanel root = new StackPanel { Margin = new Thickness(22) }; win.Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            root.Children.Add(PetWindow.BuildManagementPanel(win));
             CheckBox enabled = new CheckBox { Content = "키보드·마우스 입력이 없으면 자동으로 잠들기", IsChecked = Options.SleepEnabled, Margin = new Thickness(0, 0, 0, 14) }; root.Children.Add(enabled);
             StackPanel idleRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 20) };
             idleRow.Children.Add(new TextBlock { Text = "입력 없이 ", VerticalAlignment = VerticalAlignment.Center });
@@ -196,3 +204,4 @@ namespace ChunsikDesktop {
         public void Stop() { timer.Stop(); if (editor != null) editor.Close(); }
     }
 }
+

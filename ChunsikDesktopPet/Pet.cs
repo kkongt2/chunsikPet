@@ -53,7 +53,11 @@ namespace ChunsikDesktop {
             if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
         public static void ResizeAll(double value) { foreach (PetWindow pet in Pets) pet.ResizePet(value); }
-        public static void SpeedAll(double value) { foreach (PetWindow pet in Pets) pet.speed = value; }
+        public static void SpeedAll(double value) {
+            if (!ValidSpeed(value)) return;
+            foreach (PetWindow pet in Pets) pet.speed = value;
+            SaveManagement();
+        }
         public static int Count { get { return Pets.Count; } }
         public static void ApplyAppearance() {
             if (PetPreferences.Current == null) return;
@@ -225,13 +229,24 @@ namespace ChunsikDesktop {
         public static List<PetPlacement> CapturePlacements() {
             List<PetPlacement> result = new List<PetPlacement>();
             foreach (PetWindow pet in Pets) {
-                if (!pet.placementReady || pet.closing) return null;
+                if (!pet.placementReady || pet.closing || pet.movingMonitor) return null;
                 Rect bounds = ScreenLayout.BoundsPixels(pet); if (bounds.IsEmpty) return null;
-                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.size, CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom });
+                System.Windows.Forms.Screen screen = pet.CurrentScreen();
+                Rect work = MonitorWork(screen);
+                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.size, Speed = pet.speed,
+                    CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom, MonitorDevice = screen.DeviceName,
+                    RelativeX = PlacementGeometry.Fraction(bounds.Left, work.Left, work.Width - bounds.Width),
+                    RelativeY = PlacementGeometry.Fraction(bounds.Top, work.Top, work.Height - bounds.Height) });
             }
             return result;
         }
         void RestorePlacement(PetPlacement place) {
+            speed = place.RestoredSpeed;
+            if (place.HasRelativePosition) {
+                System.Windows.Forms.Screen target = FindMonitor(place.MonitorDevice) ?? System.Windows.Forms.Screen.PrimaryScreen;
+                PositionOnMonitor(target, place.RelativeX, place.RelativeY, false);
+                return;
+            }
             // Stored positions are physical pixels, so mixed-DPI and negative monitor
             // coordinates do not get interpreted in the primary monitor's scale.
             System.Drawing.Rectangle work = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)place.CenterX, (int)place.BottomY - 1)).WorkingArea;
@@ -261,7 +276,7 @@ namespace ChunsikDesktop {
             picture.RenderTransformOrigin = new Point(0.5, 1);
             TransformGroup effects = new TransformGroup(); effects.Children.Add(flip); effects.Children.Add(squirm); effects.Children.Add(hop);
             picture.RenderTransform = effects;
-            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); Content = root;
+            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); root.Children.Add(managementHighlight); Content = root;
             RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
             MouseRightButtonDown += delegate { if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake(); EndReaction(); recentClicks.Clear(); };
             MouseLeftButtonDown += OnDown; MouseMove += OnMove; MouseLeftButtonUp += OnUp;
@@ -548,7 +563,7 @@ namespace ChunsikDesktop {
         }
         void Tick(object sender, EventArgs args) {
             double now = clock.Elapsed.TotalSeconds, dt = Math.Min(0.1, now - lastTime); lastTime = now;
-            if (closing || pressed || dragging) return;
+            if (closing || pressed || dragging || movingMonitor) return;
             if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
             if (falling) { CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
@@ -742,9 +757,10 @@ namespace ChunsikDesktop {
             sizes.Items.Add(Item("엄청 크게 (270)", delegate { ResizePet(270); }));
             sizes.Items.Add(Item("진격의 춘식이 (500)", delegate { ResizePet(500); })); menu.Items.Add(sizes);
             MenuItem speeds = new MenuItem(); speeds.Header = "걷는 속도";
-            speeds.Items.Add(Item("느리게", delegate { speed = 22; }));
-            speeds.Items.Add(Item("보통", delegate { speed = 44; }));
-            speeds.Items.Add(Item("빠르게", delegate { speed = 80; })); menu.Items.Add(speeds);
+            speeds.Items.Add(Item("느리게", delegate { SetSpeed(22); }));
+            speeds.Items.Add(Item("보통", delegate { SetSpeed(44); }));
+            speeds.Items.Add(Item("빠르게", delegate { SetSpeed(80); })); menu.Items.Add(speeds);
+            AddMonitorMenu(menu);
             menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
             menu.Items.Add(Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }));
             menu.Items.Add(new Separator());
@@ -825,3 +841,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+
