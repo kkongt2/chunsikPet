@@ -11,7 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace ChunsikDesktop {
-    public class PetWindow : Window {
+    public partial class PetWindow : Window {
         static readonly Random Rng = new Random();
         static readonly List<PetWindow> Pets = new List<PetWindow>();
         static BitmapSource[] frames;
@@ -49,7 +49,7 @@ namespace ChunsikDesktop {
             get { if (Pets.Count == 0) return false; foreach (PetWindow pet in Pets) if (!pet.paused) return false; return true; }
         }
         public static void PauseAll(bool value) {
-            foreach (PetWindow pet in Pets) { pet.EndReaction(); pet.paused = value; pet.SetFrame(value ? 6 : pet.frame); }
+            foreach (PetWindow pet in Pets) { pet.SetRestMode(value); }
             if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
         public static void ResizeAll(double value) { foreach (PetWindow pet in Pets) pet.ResizePet(value); }
@@ -202,7 +202,7 @@ namespace ChunsikDesktop {
             sleepingFrame = new CroppedBitmap(bitmap, new Int32Rect(left, top, right-left+1, bottom-top+1)); sleepingFrame.Freeze();
         }
         void ShowSleep(double now) {
-            sleeping = true; timer.Interval = TimeSpan.FromMilliseconds(100); picture.Source = sleepingFrame; flip.ScaleX = 1;
+            CancelCue(); wasEvading = false; sleeping = true; timer.Interval = TimeSpan.FromMilliseconds(100); picture.Source = sleepingFrame; flip.ScaleX = 1;
             double width = Math.Min(Width - 6, size * 1.1);
             picture.Width = width; picture.Height = width * sleepingFrame.PixelHeight / sleepingFrame.PixelWidth;
             flip.ScaleY = 1 + 0.025 * Math.Sin(now * 1.8 + sleepPhase);
@@ -261,7 +261,7 @@ namespace ChunsikDesktop {
             picture.RenderTransformOrigin = new Point(0.5, 1);
             TransformGroup effects = new TransformGroup(); effects.Children.Add(flip); effects.Children.Add(squirm); effects.Children.Add(hop);
             picture.RenderTransform = effects;
-            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); Content = root;
+            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); root.Children.Add(taskStars); Content = root;
             RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
             MouseRightButtonDown += delegate { if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake(); EndReaction(); recentClicks.Clear(); };
             MouseLeftButtonDown += OnDown; MouseMove += OnMove; MouseLeftButtonUp += OnUp;
@@ -417,6 +417,7 @@ namespace ChunsikDesktop {
         Rect WorkArea() { return ScreenLayout.AreaFor(this); }
         public void RecoverDisplay() {
             if (!IsLoaded || closing || pressed || dragging) return;
+            CancelCue(); wasEvading = false;
             falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
             wings.Visibility = Visibility.Collapsed; wingFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
             squirm.Angle = 0; flip.ScaleX = flip.ScaleY = 1;
@@ -547,24 +548,32 @@ namespace ChunsikDesktop {
         }
         void Tick(object sender, EventArgs args) {
             double now = clock.Elapsed.TotalSeconds, dt = Math.Min(0.1, now - lastTime); lastTime = now;
-            if (closing || pressed || dragging || (ContextMenu != null && ContextMenu.IsOpen)) return;
-            if (falling) { AnimateFall(now, dt); return; }
+            if (closing || pressed || dragging) return;
+            if (ContextMenu != null && ContextMenu.IsOpen) { if (cueKind != 0) cueStarted = now; return; }
+            if (falling) { CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
             bool specialNotice = noticeKind == "lunch" || noticeKind == "dinner" || noticeKind == "home" || noticeKind == "water" || noticeKind == "stretch";
-            if (paydayPlaying) { AnimatePayday(now, dt); return; }
+            if (paydayPlaying) { CancelCue(); AnimatePayday(now, dt); return; }
             if (!specialNotice) StopNoticeAnimation();
             if (!specialNotice && PetPreferences.Current != null && PetPreferences.Current.IsIdle) { EndReaction(); recentClicks.Clear(); ShowSleep(now); return; }
             Wake();
             if (reactionKind != 0) {
+                CancelCue();
                 if (now < reactionUntil) { AnimateReaction(now); return; }
                 EndReaction();
             }
-            if (specialNotice) { AnimateNotice(noticeKind, now); return; }
+            if (specialNotice) { CancelCue(); AnimateNotice(noticeKind, now); return; }
             if (ReminderService.Current != null && ReminderService.Current.IsSpeakingFor(this)) {
+                CancelCue();
                 if (frame != 7) SetFrame(7); return;
             }
             if (TodoService.Current != null && TodoService.Current.IsHoldingFor(this)) { if (frame != 4) SetFrame(4); return; }
-            if (EvadeInput(now, dt, paused || state == 2)) return;
+            if (EvadeInput(now, dt, paused || state == 2)) { wasEvading = true; CancelCue(); return; }
+            if (wasEvading) {
+                wasEvading = false;
+                if (cueKind == 0 && now >= nextLookBack && PetPreferences.Current != null && PetPreferences.Current.Options.AvoidCursor) { StartCue(1); nextLookBack = now + 4; }
+            }
+            if (AnimateCue(now)) return;
             if (paused) { if (frame != 6) SetFrame(6); return; }
             Rect area = WorkArea();
             Top = area.Bottom - Height;
@@ -622,7 +631,7 @@ namespace ChunsikDesktop {
         void OnDown(object sender, MouseButtonEventArgs e) {
             if (!picture.IsMouseOver) return;
             if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
-            EndPayday(); StopFall(false); StopNoticeAnimation();
+            CancelCue(); wasEvading = false; EndPayday(); StopFall(false); StopNoticeAnimation();
             pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
             down = PointToScreen(e.GetPosition(this)); origin = ScreenLayout.BoundsPixels(this).TopLeft; CaptureMouse();
             e.Handled = true;
@@ -696,7 +705,7 @@ namespace ChunsikDesktop {
                     System.Windows.Automation.AutomationProperties.SetName(controls[i], names[i] + ": " + states[i].Text + ". " + controls[i].ToolTip);
                 }
             };
-            controls[0].Click += delegate { EndReaction(); paused = !paused; SetFrame(paused ? 6 : frame); if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout(); refresh(); };
+            controls[0].Click += delegate { SetRestMode(!paused); if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout(); refresh(); };
             controls[1].Click += delegate { if (PetPreferences.Current != null) PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); refresh(); };
             controls[2].Click += delegate { if (TodoService.Current != null) TodoService.Current.ToggleAllVisibility(); refresh(); };
             MenuItem host = new MenuItem { Header = panel, StaysOpenOnClick = true, Focusable = false };

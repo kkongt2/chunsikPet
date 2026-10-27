@@ -49,6 +49,17 @@ internal static class GhostNoteTests {
             Check(fallingPet.Left < 420, "next leaf-like leg reverses gradually");
             PetCall(fallingPet, "StopFall", true);
             Check(((Viewbox)typeof(PetWindow).GetField("wings", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet)).Visibility == Visibility.Collapsed, "landing removes wings");
+            PetCall(fallingPet, "SetRestMode", true);
+            PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 0.6);
+            Check((bool)typeof(PetWindow).GetField("paused", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet), "rest transition keeps persistent paused mode");
+            PetCall(fallingPet, "SetRestMode", false);
+            PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 1.2);
+            Check((int)typeof(PetWindow).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 0, "resume transition finishes in walking state");
+            fallingPet.CelebrateTask(); PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 0.3);
+            TextBlock stars = (TextBlock)typeof(PetWindow).GetField("taskStars", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet);
+            Check(stars.Visibility == Visibility.Visible, "task completion shows star burst and builds clap frames");
+            PetCall(fallingPet, "CancelCue");
+            Check(stars.Visibility == Visibility.Collapsed, "interruption clears celebration overlay");
         } finally { fallingPet.Close(); }
         // Built-in migration must preserve the user's OFF switch, time and messages.
         ReminderService migrationService = (ReminderService)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(ReminderService));
