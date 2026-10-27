@@ -75,6 +75,29 @@ internal static class GhostNoteTests {
                 Check((int)typeof(PetWindow).GetField("frame", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 7, "quick-menu resume visibly stretches while menu stays open");
             } finally { fallingPet.ContextMenu.IsOpen = false; PetCall(fallingPet, "CancelCue"); }
         } finally { fallingPet.Close(); }
+        PetWindow grabPet = new PetWindow(true);
+        try {
+            grabPet.Show(); Pump();
+            DispatcherTimer grabTimer = (DispatcherTimer)typeof(PetWindow).GetField("timer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(grabPet);
+            grabTimer.Stop();
+            Image grabPicture = (Image)typeof(PetWindow).GetField("picture", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(grabPet);
+            foreach (bool withWings in new bool[] { false, true }) {
+                foreach (double petSize in new double[] { 80, 270 }) {
+                    PetField(grabPet, "pressed", false); PetField(grabPet, "size", petSize);
+                    PetField(grabPet, "falling", true); PetField(grabPet, "wingFall", withWings);
+                    PetField(grabPet, "fallArea", new Rect(0, 0, 1920, 1080));
+                    PetCall(grabPet, "LayoutPet"); PetCall(grabPet, "SetFrame", 7);
+                    grabPet.Left = 300; grabPet.Top = 100; grabPet.UpdateLayout();
+                    Point fraction = new Point(0.35, 0.4);
+                    Point pointer = grabPicture.PointToScreen(new Point(grabPicture.ActualWidth * fraction.X, grabPicture.ActualHeight * fraction.Y));
+                    PetCall(grabPet, "BeginGrab", pointer, fraction); grabPet.UpdateLayout();
+                    Point held = grabPicture.PointToScreen(new Point(grabPicture.ActualWidth * fraction.X, grabPicture.ActualHeight * fraction.Y));
+                    Check((held - pointer).Length < 2, "grabbing airborne pet preserves clicked body point in screen pixels");
+                    Point dragOrigin = (Point)typeof(PetWindow).GetField("origin", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(grabPet);
+                    Check((dragOrigin - ScreenLayout.BoundsPixels(grabPet).TopLeft).Length < 2, "drag origin uses settled smaller window bounds");
+                }
+            }
+        } finally { grabPet.Close(); }
         // Built-in migration must preserve the user's OFF switch, time and messages.
         ReminderService migrationService = (ReminderService)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(ReminderService));
         MethodInfo ensureBuiltins = typeof(ReminderService).GetMethod("EnsureBuiltins", BindingFlags.Instance | BindingFlags.NonPublic);

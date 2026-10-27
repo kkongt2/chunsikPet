@@ -632,11 +632,26 @@ namespace ChunsikDesktop {
         }
         void OnDown(object sender, MouseButtonEventArgs e) {
             if (!picture.IsMouseOver) return;
-            if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
-            CancelCue(); wasEvading = false; EndPayday(); StopFall(false); StopNoticeAnimation();
-            pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
-            down = PointToScreen(e.GetPosition(this)); origin = ScreenLayout.BoundsPixels(this).TopLeft; CaptureMouse();
+            // Capture the pointer and body anchor before removing wings/parachute:
+            // their larger window can still have an old WPF layout during this event.
+            Point bodyPoint = e.GetPosition(picture);
+            Point fraction = new Point(Clamp(bodyPoint.X / Math.Max(1, picture.ActualWidth), 0, 1), Clamp(bodyPoint.Y / Math.Max(1, picture.ActualHeight), 0, 1));
+            BeginGrab(PointToScreen(e.GetPosition(this)), fraction);
+            CaptureMouse();
             e.Handled = true;
+        }
+        void BeginGrab(Point pointerPixels, Point bodyFraction) {
+            pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
+            if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
+            CancelCue(); wasEvading = false; EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction();
+            // Use the same pose for press and drag so crossing the drag threshold
+            // cannot resize/reposition the body a second time.
+            SetFrame(7); UpdateLayout();
+            Point anchor = picture.PointToScreen(new Point(picture.ActualWidth * bodyFraction.X, picture.ActualHeight * bodyFraction.Y));
+            Rect bounds = ScreenLayout.BoundsPixels(this);
+            if (!bounds.IsEmpty) ScreenLayout.MovePixels(this, bounds.Left + pointerPixels.X - anchor.X, bounds.Top + pointerPixels.Y - anchor.Y);
+            down = pointerPixels;
+            origin = ScreenLayout.BoundsPixels(this).TopLeft;
         }
         void OnMove(object sender, MouseEventArgs e) {
             if (!pressed || e.LeftButton != MouseButtonState.Pressed) return;
@@ -647,9 +662,7 @@ namespace ChunsikDesktop {
             Vector localDelta = src.CompositionTarget.TransformFromDevice.Transform(delta);
             if (!dragging && (Math.Abs(localDelta.X) >= SystemParameters.MinimumHorizontalDragDistance || Math.Abs(localDelta.Y) >= SystemParameters.MinimumVerticalDragDistance)) {
                 dragging = true;
-                EndReaction(); recentClicks.Clear();
-                // Resizing the reaction window must not shift the drag origin.
-                origin = ScreenLayout.BoundsPixels(this).TopLeft;
+                recentClicks.Clear();
             }
             if (dragging) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
         }
