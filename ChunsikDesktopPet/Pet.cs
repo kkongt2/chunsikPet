@@ -660,15 +660,57 @@ namespace ChunsikDesktop {
         MenuItem Item(string label, RoutedEventHandler action) {
             MenuItem item = new MenuItem(); item.Header = label; item.Click += action; return item;
         }
+        void AddQuickSettings(ContextMenu menu) {
+            StackPanel panel = new StackPanel { Margin = new Thickness(8) };
+            panel.Children.Add(new TextBlock { Text = "빠른 설정", FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray, Margin = new Thickness(4, 0, 0, 6) });
+            System.Windows.Controls.Primitives.UniformGrid buttons = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
+            panel.Children.Add(buttons);
+            string[] names = { "걷기 / 쉬기", "입력 피하기", "포스트잇" };
+            Button[] controls = new Button[3]; TextBlock[] states = new TextBlock[3]; TextBlock[] icons = new TextBlock[3];
+            ControlTemplate template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='card' CornerRadius='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' Padding='8'><ContentPresenter HorizontalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='card' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='card' Property='BorderBrush' Value='#0064A8'/><Setter TargetName='card' Property='BorderThickness' Value='2'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='card' Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            for (int i = 0; i < controls.Length; i++) {
+                StackPanel content = new StackPanel();
+                icons[i] = new TextBlock { FontSize = 18, HorizontalAlignment = HorizontalAlignment.Center };
+                states[i] = new TextBlock { FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
+                content.Children.Add(icons[i]);
+                content.Children.Add(new TextBlock { Text = names[i], FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+                content.Children.Add(states[i]);
+                controls[i] = new Button { Content = content, MinWidth = 94, Margin = new Thickness(3), Template = template, Cursor = Cursors.Hand, Foreground = new SolidColorBrush(Color.FromRgb(32, 69, 94)), BorderBrush = Brushes.LightSteelBlue };
+                buttons.Children.Add(controls[i]);
+            }
+            Action refresh = delegate {
+                bool avoid = PetPreferences.Current != null && PetPreferences.Current.Options.AvoidCursor;
+                bool hidden = TodoService.Current != null && TodoService.Current.AllHidden;
+                icons[0].Text = paused ? "Ⅱ" : "▶"; icons[1].Text = "↔"; icons[2].Text = hidden ? "□" : "▣";
+                states[0].Text = paused ? "이 춘식이 · 쉬는 중" : "이 춘식이 · 걷기 모드";
+                states[1].Text = avoid ? "모두 · ON" : "모두 · OFF";
+                states[2].Text = hidden ? "전체 숨김 중" : "전체 숨김 해제";
+                controls[0].ToolTip = paused ? "이 춘식이 다시 걷기" : "이 춘식이 쉬기";
+                controls[1].ToolTip = "모든 춘식이의 마우스 + 키입력 피하기 " + (avoid ? "끄기" : "켜기");
+                controls[2].ToolTip = (hidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기") + " · " + TodoHotKey.Label;
+                controls[1].IsEnabled = PetPreferences.Current != null;
+                controls[2].IsEnabled = TodoService.Current != null;
+                bool[] active = { paused, avoid, hidden };
+                for (int i = 0; i < controls.Length; i++) {
+                    controls[i].Background = new SolidColorBrush(active[i] ? Color.FromRgb(211, 239, 226) : Color.FromRgb(239, 244, 250));
+                    System.Windows.Automation.AutomationProperties.SetName(controls[i], names[i] + ": " + states[i].Text + ". " + controls[i].ToolTip);
+                }
+            };
+            controls[0].Click += delegate { EndReaction(); paused = !paused; SetFrame(paused ? 6 : frame); if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout(); refresh(); };
+            controls[1].Click += delegate { if (PetPreferences.Current != null) PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); refresh(); };
+            controls[2].Click += delegate { if (TodoService.Current != null) TodoService.Current.ToggleAllVisibility(); refresh(); };
+            MenuItem host = new MenuItem { Header = panel, StaysOpenOnClick = true, Focusable = false };
+            host.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='MenuItem'><ContentPresenter ContentSource='Header'/></ControlTemplate>");
+            menu.Items.Add(host); menu.Items.Add(new Separator());
+            menu.Opened += delegate { refresh(); };
+            panel.MouseEnter += delegate { refresh(); };
+            refresh();
+        }
         ContextMenu BuildMenu() {
             ContextMenu menu = new ContextMenu();
+            if (!IsTodoCompanion) AddQuickSettings(menu);
             menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(this); }));
             if (IsTodoCompanion) return menu;
-            MenuItem pause = Item("잠깐 쉬기", delegate(object s, RoutedEventArgs e) {
-                paused = !paused; ((MenuItem)s).Header = paused ? "다시 걷기" : "잠깐 쉬기"; SetFrame(paused ? 6 : frame);
-                if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
-            }); menu.Items.Add(pause);
-            menu.Opened += delegate { pause.Header = paused ? "다시 걷기" : "잠깐 쉬기"; };
             MenuItem sizes = new MenuItem(); sizes.Header = "크기";
             sizes.Items.Add(Item("작게 (50)", delegate { ResizePet(50); }));
             sizes.Items.Add(Item("보통 (80)", delegate { ResizePet(80); }));
