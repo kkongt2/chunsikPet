@@ -9,11 +9,105 @@ internal static class GhostNoteTests {
     static int count;
     static void Check(bool ok, string name) { count++; if (!ok) throw new Exception("FAIL: " + name); }
     static T Field<T>(TodoNote note, string name) { return (T)typeof(TodoNote).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(note); }
+    static void PetField(PetWindow pet, string name, object value) { typeof(PetWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(pet, value); }
+    static void PetCall(PetWindow pet, string name, params object[] args) { typeof(PetWindow).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(pet, args); }
     static void Pump() { Application.Current.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(delegate {})); }
     [STAThread] public static void Main() {
         Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         TodoNote.LoadArt(System.IO.Path.GetFullPath("ChunsikDesktopPet"));
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-sprites.png") });
+        typeof(PetWindow).GetMethod("BuildSeatedScootFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+        double escapeTarget;
+        Rect work = new Rect(0, 0, 1920, 1080);
+        Check(InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(880, 880, 200, 160), out escapeTarget) && escapeTarget == 778, "input avoidance chooses nearest free side");
+        Check(InputAvoidance.TryEscape(new Rect(0, 900, 100, 100), work, new Rect(-50, 880, 200, 160), out escapeTarget) && escapeTarget == 152, "left edge escapes toward available space");
+        Check(InputAvoidance.TryEscape(new Rect(1820, 900, 100, 100), work, new Rect(1800, 880, 200, 160), out escapeTarget) && escapeTarget == 1698, "right edge escapes left without bouncing");
+        Check(!InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(900, 100, 200, 160), out escapeTarget), "input elsewhere vertically does not move pets");
+        Check(!InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, Rect.Empty, out escapeTarget), "unsupported caret leaves mouse behavior unchanged");
+        Check(InputAvoidance.TryEscape(new Rect(-1900, 900, 100, 100), new Rect(-1920, 0, 1920, 1080), new Rect(-1950, 880, 200, 160), out escapeTarget) && escapeTarget == -1748, "negative monitor coordinates supported");
+        Check(InputAvoidance.TryEscape(new Rect(0, 0, 80, 100), new Rect(0, 0, 100, 100), new Rect(-10, 0, 130, 100), out escapeTarget) && escapeTarget == 0, "no room settles at edge instead of oscillating");
+        Check(InputAvoidance.CaretPixels().IsEmpty, "disabled or absent preferences skip caret query");
+        PetWindow fallingPet = new PetWindow(true) { Left = 300, Top = 0 };
+        try {
+            PetField(fallingPet, "falling", true); PetField(fallingPet, "fallArea", new Rect(0, 0, 1920, 1080));
+            PetField(fallingPet, "fallStart", 0.0); PetField(fallingPet, "fallCenter", 355.0); PetField(fallingPet, "landedAt", -1.0);
+            PetCall(fallingPet, "AnimateFall", 1.0, 0.1);
+            double verticalX = fallingPet.Left, previousY = fallingPet.Top;
+            PetCall(fallingPet, "AnimateFall", 1.5, 0.1);
+            Check(fallingPet.Left == verticalX && fallingPet.Top > previousY, "parachute descends on a fixed vertical line");
+            PetField(fallingPet, "wingFall", true); PetField(fallingPet, "wingLegStart", 0.0); PetField(fallingPet, "wingLegDuration", 3.0);
+            PetField(fallingPet, "wingFromX", 300.0); PetField(fallingPet, "wingTargetX", 420.0); PetField(fallingPet, "wingDirection", 1);
+            PetCall(fallingPet, "AnimateFall", 0.75, 0.1); double firstDrift = fallingPet.Left; previousY = fallingPet.Top;
+            PetCall(fallingPet, "AnimateFall", 1.5, 0.1);
+            Check(firstDrift > 300 && fallingPet.Left == 360 && fallingPet.Top > previousY, "wings drift smoothly sideways while descending");
+            PetCall(fallingPet, "AnimateFall", 2.25, 0.1);
+            Check(fallingPet.Left > 360 && fallingPet.Left < 420, "wing direction stays stable within a leg");
+            PetCall(fallingPet, "AnimateFall", 3.0, 0.1);
+            double legDuration = (double)typeof(PetWindow).GetField("wingLegDuration", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet);
+            Check(legDuration >= 2.2 && legDuration < 3.8, "wing turns use a slow randomized interval");
+            PetCall(fallingPet, "AnimateFall", 3.8, 0.1);
+            Check(fallingPet.Left < 420, "next leaf-like leg reverses gradually");
+            PetCall(fallingPet, "StopFall", true);
+            Check(((Viewbox)typeof(PetWindow).GetField("wings", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet)).Visibility == Visibility.Collapsed, "landing removes wings");
+            PetCall(fallingPet, "SetRestMode", true);
+            PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 0.6);
+            Check((bool)typeof(PetWindow).GetField("paused", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet), "rest transition keeps persistent paused mode");
+            PetCall(fallingPet, "SetRestMode", false);
+            PetField(fallingPet, "cueStarted", 0.0); PetCall(fallingPet, "AnimateCue", 1.2);
+            Check((int)typeof(PetWindow).GetField("state", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 0, "resume transition finishes in walking state");
+            // Exercise the actual quick-menu button and Tick path with the popup open.
+            fallingPet.ContextMenu = new ContextMenu();
+            PetCall(fallingPet, "AddQuickSettings", fallingPet.ContextMenu);
+            MenuItem quickHost = (MenuItem)fallingPet.ContextMenu.Items[0];
+            StackPanel quickPanel = (StackPanel)quickHost.Header;
+            System.Windows.Controls.Primitives.UniformGrid quickButtons = (System.Windows.Controls.Primitives.UniformGrid)quickPanel.Children[1];
+            Button restButton = (Button)quickButtons.Children[0];
+            fallingPet.ContextMenu.IsOpen = true;
+            try {
+                restButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                System.Diagnostics.Stopwatch petClock = (System.Diagnostics.Stopwatch)typeof(PetWindow).GetField("clock", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet);
+                PetField(fallingPet, "cueStarted", petClock.Elapsed.TotalSeconds - 0.6);
+                PetCall(fallingPet, "Tick", null, EventArgs.Empty);
+                Check((int)typeof(PetWindow).GetField("frame", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 6, "quick-menu rest animation progresses while menu stays open");
+                restButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                PetField(fallingPet, "cueStarted", petClock.Elapsed.TotalSeconds - 0.5);
+                PetCall(fallingPet, "Tick", null, EventArgs.Empty);
+                Check((int)typeof(PetWindow).GetField("frame", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(fallingPet) == 7, "quick-menu resume visibly stretches while menu stays open");
+            } finally { fallingPet.ContextMenu.IsOpen = false; PetCall(fallingPet, "CancelCue"); }
+        } finally { fallingPet.Close(); }
+        PetWindow grabPet = new PetWindow(true);
+        try {
+            grabPet.Show(); Pump();
+            DispatcherTimer grabTimer = (DispatcherTimer)typeof(PetWindow).GetField("timer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(grabPet);
+            grabTimer.Stop();
+            Image grabPicture = (Image)typeof(PetWindow).GetField("picture", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(grabPet);
+            foreach (bool withWings in new bool[] { false, true }) {
+                foreach (double petSize in new double[] { 80, 270 }) {
+                    PetField(grabPet, "pressed", false); PetField(grabPet, "size", petSize);
+                    PetField(grabPet, "falling", true); PetField(grabPet, "wingFall", withWings);
+                    PetField(grabPet, "fallArea", new Rect(0, 0, 1920, 1080));
+                    PetCall(grabPet, "LayoutPet"); PetCall(grabPet, "SetFrame", 7);
+                    grabPet.Left = 300; grabPet.Top = 100; grabPet.UpdateLayout();
+                    Point fraction = new Point(0.35, 0.4);
+                    Point pointer = grabPicture.PointToScreen(new Point(grabPicture.ActualWidth * fraction.X, grabPicture.ActualHeight * fraction.Y));
+                    PetCall(grabPet, "BeginGrab", pointer, fraction); grabPet.UpdateLayout();
+                    Point held = grabPicture.PointToScreen(new Point(grabPicture.ActualWidth * fraction.X, grabPicture.ActualHeight * fraction.Y));
+                    Check((held - pointer).Length < 2, "grabbing airborne pet preserves clicked body point in screen pixels");
+                    Point dragOrigin = (Point)typeof(PetWindow).GetField("origin", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(grabPet);
+                    Check((dragOrigin - ScreenLayout.BoundsPixels(grabPet).TopLeft).Length < 2, "drag origin uses settled smaller window bounds");
+                }
+            }
+        } finally { grabPet.Close(); }
+        // Built-in migration must preserve the user's OFF switch, time and messages.
+        ReminderService migrationService = (ReminderService)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(ReminderService));
+        MethodInfo ensureBuiltins = typeof(ReminderService).GetMethod("EnsureBuiltins", BindingFlags.Instance | BindingFlags.NonPublic);
+        ReminderSettings migrated = new ReminderSettings();
+        ensureBuiltins.Invoke(migrationService, new object[] { migrated });
+        Reminder dinner = migrated.Items.Find(delegate(Reminder r) { return r.Kind == "dinner"; });
+        Check(dinner != null && dinner.IsBuiltin && dinner.Enabled && dinner.Time == "19:00" && dinner.SelectedDays == 62, "dinner default is enabled at 19:00 on weekdays");
+        dinner.Enabled = false; dinner.Time = "20:30"; dinner.Messages = new List<string> { "custom dinner" };
+        ensureBuiltins.Invoke(migrationService, new object[] { migrated });
+        Check(migrated.Items.FindAll(delegate(Reminder r) { return r.Kind == "dinner"; }).Count == 1 && !dinner.Enabled && dinner.Time == "20:30" && dinner.Messages[0] == "custom dinner", "migration is idempotent and preserves dinner settings");
         bool allowSave = true; int completed = 0, added = 0;
         TodoItem item = new TodoItem { Text = "원본" };
         TodoNote note = new TodoNote(delegate { completed++; }, delegate {}, delegate(double x, double y) {}, delegate { return allowSave; }, delegate { added++; });
@@ -117,6 +211,45 @@ internal static class GhostNoteTests {
         note.Hide(); Pump(); Check(!drag.IsVisible, "strip hides with note");
         note.Show(); Pump(); Check(drag.IsVisible, "strip returns with note");
         note.DisposeNote(); Pump(); Check(!note.IsVisible, "note closes");
+        // Isolated settings avoid touching the user's saved todos during visibility tests.
+        TodoSettings visibilitySettings = new TodoSettings();
+        TodoItem visibleItem = new TodoItem { Text = "visible", HasPosition = true, NoteLeft = 100, NoteTop = 100 };
+        TodoItem minimizedItem = new TodoItem { Text = "minimized", Minimized = true, HasPosition = true, NoteLeft = 450, NoteTop = 100 };
+        visibilitySettings.Items.Add(visibleItem); visibilitySettings.Items.Add(minimizedItem);
+        TodoService service = (TodoService)Activator.CreateInstance(typeof(TodoService), BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { visibilitySettings }, null);
+        MethodInfo tick = typeof(TodoService).GetMethod("Tick", BindingFlags.Instance | BindingFlags.NonPublic);
+        try {
+            tick.Invoke(service, null); Pump();
+            System.Collections.IDictionary runs = (System.Collections.IDictionary)typeof(TodoService).GetField("runtimes", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(service);
+            object firstRun = runs[visibleItem.Id], secondRun = runs[minimizedItem.Id];
+            TodoNote firstNote = (TodoNote)firstRun.GetType().GetField("Note").GetValue(firstRun);
+            TodoNote secondNote = (TodoNote)secondRun.GetType().GetField("Note").GetValue(secondRun);
+            GhostNoteHeader tab = Field<GhostNoteHeader>(secondNote, "restoreTab");
+            Check(firstNote.IsVisible && tab.IsVisible, "both full note and minimized tab initially visible");
+            double left = firstNote.Left, top = firstNote.Top, restoredWidth = firstNote.Width, restoredHeight = firstNote.Height;
+            service.ToggleAllVisibility(); Pump();
+            Check(service.AllHidden && !firstNote.IsVisible && !secondNote.IsVisible && !tab.IsVisible, "global hide includes minimized restore tab");
+            System.Diagnostics.Stopwatch visibilityClock = (System.Diagnostics.Stopwatch)typeof(TodoService).GetField("clock", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(service);
+            Check(!visibilityClock.IsRunning, "scheduled note countdown pauses while hidden");
+            tick.Invoke(service, null); Pump();
+            Check(!firstNote.IsVisible && !tab.IsVisible, "timer cannot reshow hidden notes");
+            TodoItem hiddenNewItem = new TodoItem { Text = "added while hidden" }; visibilitySettings.Items.Add(hiddenNewItem);
+            typeof(TodoService).GetMethod("Sync", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(service, null);
+            object newRun = runs[hiddenNewItem.Id];
+            TodoNote newNote = (TodoNote)newRun.GetType().GetField("Note").GetValue(newRun);
+            tick.Invoke(service, null); Check(!newNote.IsVisible, "new notes stay hidden until explicit restore");
+            service.ToggleAllVisibility(); Pump();
+            Check(!service.AllHidden && firstNote.IsVisible && tab.IsVisible && newNote.IsVisible, "restore shows notes and minimized tab");
+            Check(minimizedItem.Minimized && firstNote.Left == left && firstNote.Top == top && firstNote.Width == restoredWidth && firstNote.Height == restoredHeight, "restore preserves position size and minimized state");
+            Check(visibilityClock.IsRunning, "scheduled note countdown resumes");
+            service.ToggleAllVisibility(); service.ToggleAllVisibility(); Pump();
+            Check(firstNote.IsVisible && tab.IsVisible, "repeated toggles remain reversible");
+        } finally { service.Stop(); }
+        using (TodoHotKey hotKey = new TodoHotKey(delegate {})) {
+            Check(hotKey.Registered, "global hotkey registers on a window independent of notes");
+            using (TodoHotKey duplicate = new TodoHotKey(delegate {})) Check(!duplicate.Registered, "hotkey conflict is reported without throwing");
+        }
+        using (TodoHotKey released = new TodoHotKey(delegate {})) Check(released.Registered, "disposed hotkey can be registered again");
         PetOptions preferences = new PetOptions { PetCount = 2 };
         preferences.Placements.Add(new PetPlacement { Paused = true, Size = 50, CenterX = -400, BottomY = 1080 });
         preferences.Placements.Add(new PetPlacement { Size = 180, CenterX = 1500, BottomY = 900 });

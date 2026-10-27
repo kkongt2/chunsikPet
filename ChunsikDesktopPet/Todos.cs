@@ -47,6 +47,8 @@ namespace ChunsikDesktop {
         Action renderEditor;
         Func<bool> saveEditor;
         bool stopping;
+        bool allHidden;
+        public bool AllHidden { get { return allHidden; } }
         public bool Stopping { get { return stopping; } }
         sealed class Runtime {
             public TodoItem Item;
@@ -57,9 +59,25 @@ namespace ChunsikDesktop {
             public int Minutes, Seconds;
             public double Next, Until;
         }
-        public TodoService() {
-            settings = Load();
+        public TodoService() : this(Load()) { }
+        internal TodoService(TodoSettings initialSettings) {
+            settings = initialSettings;
             timer.Interval = TimeSpan.FromMilliseconds(150); timer.Tick += delegate { Tick(); }; timer.Start();
+        }
+        public void ToggleAllVisibility() {
+            if (stopping) return;
+            if (!allHidden) {
+                // Saving an edit can synchronize the runtime dictionary; enumerate a snapshot.
+                foreach (Runtime run in new List<Runtime>(runtimes.Values))
+                    if (!run.Note.FlushEdit()) return;
+                allHidden = true;
+                clock.Stop(); // Preserve the remaining display/interval time while hidden.
+                foreach (Runtime run in runtimes.Values) run.Note.Hide();
+            } else {
+                allHidden = false;
+                clock.Start();
+                Tick();
+            }
         }
         static TodoSettings Read(string path) {
             using (FileStream stream = File.OpenRead(path)) {
@@ -129,7 +147,7 @@ namespace ChunsikDesktop {
             if (renderEditor != null) renderEditor();
             // Wait for Tick to show and place the blank note before focusing its editor.
             Tick(); Runtime run;
-            if (runtimes.TryGetValue(item.Id, out run)) run.Note.Dispatcher.BeginInvoke(new Action(run.Note.BeginEdit));
+            if (runtimes.TryGetValue(item.Id, out run)) run.Note.Dispatcher.BeginInvoke(new Action(delegate { if (!stopping && !allHidden && run.Note.IsVisible) run.Note.BeginEdit(); }));
         }
         void Complete(TodoItem item) {
             Runtime run;
@@ -155,7 +173,7 @@ namespace ChunsikDesktop {
             return false;
         }
         void Tick() {
-            if (stopping) return;
+            if (stopping || allHidden) return;
             Sync();
             List<PetWindow> pets = PetWindow.TodoPets();
             List<Rect> occupied = new List<Rect>();
@@ -216,6 +234,7 @@ namespace ChunsikDesktop {
             StackPanel top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
             top.Children.Add(new TextBlock { Text = "춘식이에게 기억을 맡겨요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue });
             top.Children.Add(new TextBlock { Text = "기억할 일을 적고, 춘식이가 보여줄 방식을 골라주세요. 변경사항은 자동으로 저장돼요.", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 12) });
+            top.Children.Add(Button("포스트잇 전체 숨김 / 보이기 · " + TodoHotKey.Label, ToggleAllVisibility));
             TextBlock status = new TextBlock { Foreground = Brushes.SlateGray, Margin = new Thickness(0, 10, 0, 0) }; DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
             DockPanel addRow = new DockPanel { Margin = new Thickness(0, 0, 0, 14) }; top.Children.Add(addRow);
             TextBox entry = new TextBox { FontSize = 16, Padding = new Thickness(10), BorderThickness = new Thickness(0), Background = Brushes.Transparent, MaxLength = 160, ToolTip = "예: 기획서 작성 · Enter로 바로 등록" };

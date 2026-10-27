@@ -40,6 +40,8 @@
   <ItemGroup>
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
+    <Compile Include="PetReactions.cs" />
+    <Compile Include="InputAvoidance.cs" />
     <Compile Include="PreviewUI.cs" />
     <Compile Include="Scheduling.cs" />
     <Compile Include="ScreenLayout.cs" />
@@ -54,6 +56,7 @@
     <Compile Include="Reminders.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
+    <Compile Include="TodoHotKey.cs" />
     <Compile Include="GhostNoteHeader.cs" />
     <Compile Include="TodoModels.cs" />
     <Compile Include="TrayController.cs" />

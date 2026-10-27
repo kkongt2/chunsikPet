@@ -204,6 +204,7 @@ namespace ChunsikDesktop {
         ReminderSettings Defaults() {
             ReminderSettings value = new ReminderSettings();
             value.Items.Add(new Reminder { Kind = "lunch", Title = "점심시간", Time = "12:00", Repeat = "평일", Messages = new List<string> { "점심시간이에요!", "맛있게 드세요." } });
+            value.Items.Add(new Reminder { Kind = "dinner", Title = "저녁시간", Time = "19:00", Repeat = "평일", Messages = new List<string> { "저녁시간이에요!", "맛있게 드세요." } });
             value.Items.Add(new Reminder { Kind = "home", Title = "퇴근시간", Time = "18:00", Repeat = "평일", Messages = new List<string> { "퇴근시간이에요!", "오늘도 수고했어요." } });
             value.Items.Add(new Reminder { Kind = "water", Title = "물 마시기", ScheduleType = "interval", IntervalMinutes = 60, Repeat = "평일", Messages = new List<string> { "잠깐 쉬면서 물 한 잔 마셔요!" } });
             value.Items.Add(new Reminder { Kind = "stretch", Title = "스트레칭 하기", ScheduleType = "interval", IntervalMinutes = 60, Repeat = "평일", Messages = new List<string> { "잠깐 쉬어가요! 팔을 쭉 펴고 가볍게 스트레칭해요." } });
@@ -416,7 +417,7 @@ namespace ChunsikDesktop {
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel intro = new StackPanel(); DockPanel.SetDock(intro, Dock.Top); root.Children.Add(intro);
             intro.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent });
-            intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 18) });
+            intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·저녁·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 18) });
             intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 12) });
             TextBlock schedulerClock = new TextBlock { Foreground = Accent, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10), ToolTip = TimeZoneInfo.Local.DisplayName };
             intro.Children.Add(schedulerClock);
