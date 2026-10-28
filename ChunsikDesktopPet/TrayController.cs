@@ -83,7 +83,7 @@ namespace ChunsikDesktop {
             }
             all.DropDownItems.Add(opacity);
             System.Windows.Forms.ToolStripMenuItem avoid = Item("마우스·입력 위치 피하기", delegate { PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); }); all.DropDownItems.Add(avoid);
-            System.Windows.Forms.ToolStripMenuItem add = Item("한 마리 추가", delegate { PetPreferences.Current.ChangeCount(PetWindow.Count + 1); }); all.DropDownItems.Add(add);
+            System.Windows.Forms.ToolStripMenuItem add = Item("한 마리 추가", delegate { PetPreferences.Current.ChangeCount(PetWindow.Count + 1); }); menu.Items.Add(add);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             menu.Items.Add(quiet);
             menu.Items.Add(Item("알림 이력…", ReminderHistory.Open));
