@@ -33,6 +33,16 @@ namespace ChunsikDesktop {
         bool forceClose, pendingReveal, policySuppressed;
         readonly StackPanel presets = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         int lapCount;
+        public static string TimerMenuLabel { get { return countdownWindow == null ? "타이머…" : countdownWindow.MenuLabel(); } }
+        public static string StopwatchMenuLabel { get { return stopwatchWindow == null ? "스톱워치…" : stopwatchWindow.MenuLabel(); } }
+        string MenuLabel() {
+            string name = countdown ? "타이머" : "스톱워치";
+            if (!started) return name + " · 대기 중";
+            TimeSpan remaining = duration - elapsed.Elapsed;
+            if (completed || (countdown && remaining <= TimeSpan.Zero)) return name + " · 완료";
+            if (!elapsed.IsRunning) return name + " · 일시정지";
+            return countdown ? name + " · " + FormatTime(TimeSpan.FromSeconds(Math.Ceiling(remaining.TotalSeconds)), false) + " 남음" : name + " · " + FormatTime(elapsed.Elapsed, false) + " 측정 중";
+        }
         public static void OpenTimer() { Open(true); }
         public static void OpenStopwatch() { Open(false); }
         static void Open(bool countdown) {

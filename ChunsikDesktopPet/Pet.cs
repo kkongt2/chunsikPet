@@ -708,18 +708,18 @@ namespace ChunsikDesktop {
         }
         void AddQuickSettings(ContextMenu menu) {
             StackPanel panel = new StackPanel { Margin = new Thickness(8) };
-            panel.Children.Add(new TextBlock { Text = "빠른 설정", FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray, Margin = new Thickness(4, 0, 0, 6) });
+            TextBlock heading = new TextBlock { Text = "빠른 설정", FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray, Margin = new Thickness(4, 0, 0, 6) }; panel.Children.Add(heading);
             System.Windows.Controls.Primitives.UniformGrid buttons = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
             panel.Children.Add(buttons);
             string[] names = { "걷기 / 쉬기", "입력 피하기", "포스트잇" };
-            Button[] controls = new Button[3]; TextBlock[] states = new TextBlock[3]; TextBlock[] icons = new TextBlock[3];
+            Button[] controls = new Button[3]; TextBlock[] states = new TextBlock[3]; TextBlock[] icons = new TextBlock[3]; TextBlock[] labels = new TextBlock[3];
             ControlTemplate template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='card' CornerRadius='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' Padding='8'><ContentPresenter HorizontalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='card' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='card' Property='BorderBrush' Value='#0064A8'/><Setter TargetName='card' Property='BorderThickness' Value='2'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='card' Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             for (int i = 0; i < controls.Length; i++) {
                 StackPanel content = new StackPanel();
                 icons[i] = new TextBlock { FontSize = 18, HorizontalAlignment = HorizontalAlignment.Center };
                 states[i] = new TextBlock { FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
                 content.Children.Add(icons[i]);
-                content.Children.Add(new TextBlock { Text = names[i], FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+                labels[i] = new TextBlock { Text = names[i], FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center }; content.Children.Add(labels[i]);
                 content.Children.Add(states[i]);
                 controls[i] = new Button { Content = content, MinWidth = 94, Margin = new Thickness(3), Template = template, Cursor = Cursors.Hand, Foreground = new SolidColorBrush(Color.FromRgb(32, 69, 94)), BorderBrush = Brushes.LightSteelBlue };
                 buttons.Children.Add(controls[i]);
@@ -727,19 +727,23 @@ namespace ChunsikDesktop {
             Action refresh = delegate {
                 bool avoid = PetPreferences.Current != null && PetPreferences.Current.Options.AvoidCursor;
                 bool hidden = TodoService.Current != null && TodoService.Current.AllHidden;
-                icons[0].Text = paused ? "Ⅱ" : "▶"; icons[1].Text = "↔"; icons[2].Text = hidden ? "□" : "▣";
+                heading.Text = "춘식이 " + (Pets.IndexOf(this) + 1) + " · " + MonitorLabel(CurrentScreen());
+                labels[0].Text = paused ? "다시 걷기" : "쉬게 하기";
+                labels[1].Text = avoid ? "회피 끄기" : "회피 켜기";
+                labels[2].Text = hidden ? "모두 보이기" : "모두 숨기기";
+                icons[0].Text = paused ? "▶" : "Ⅱ"; icons[1].Text = "↔"; icons[2].Text = hidden ? "□" : "▣";
                 states[0].Text = paused ? "이 춘식이 · 쉬는 중" : "이 춘식이 · 걷기 모드";
-                states[1].Text = avoid ? "모두 · ON" : "모두 · OFF";
-                states[2].Text = hidden ? "전체 숨김 중" : "전체 숨김 해제";
+                states[1].Text = avoid ? "전체 회피 · 켜짐" : "전체 회피 · 꺼짐";
+                states[2].Text = hidden ? "포스트잇 · 숨김 중" : "포스트잇 · 표시 허용";
                 controls[0].ToolTip = paused ? "이 춘식이 다시 걷기" : "이 춘식이 쉬기";
-                controls[1].ToolTip = "모든 춘식이의 마우스 + 키입력 피하기 " + (avoid ? "끄기" : "켜기");
+                controls[1].ToolTip = "모든 춘식이의 마우스·입력 위치 피하기 " + (avoid ? "끄기" : "켜기");
                 controls[2].ToolTip = (hidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기") + " · " + TodoHotKey.Label;
                 controls[1].IsEnabled = PetPreferences.Current != null;
                 controls[2].IsEnabled = TodoService.Current != null;
-                bool[] active = { paused, avoid, hidden };
+                bool[] active = { false, avoid, false };
                 for (int i = 0; i < controls.Length; i++) {
                     controls[i].Background = new SolidColorBrush(active[i] ? Color.FromRgb(211, 239, 226) : Color.FromRgb(239, 244, 250));
-                    System.Windows.Automation.AutomationProperties.SetName(controls[i], names[i] + ": " + states[i].Text + ". " + controls[i].ToolTip);
+                    System.Windows.Automation.AutomationProperties.SetName(controls[i], labels[i].Text + ": " + states[i].Text + ". " + controls[i].ToolTip);
                 }
             };
             controls[0].Click += delegate { SetRestMode(!paused); if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout(); refresh(); };
@@ -754,28 +758,41 @@ namespace ChunsikDesktop {
         }
         ContextMenu BuildMenu() {
             ContextMenu menu = new ContextMenu();
-            if (!IsTodoCompanion) AddQuickSettings(menu);
-            menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(this); }));
-            if (IsTodoCompanion) return menu;
-            MenuItem sizes = new MenuItem(); sizes.Header = "크기";
-            sizes.Items.Add(Item("작게 (50)", delegate { ResizePet(50); }));
-            sizes.Items.Add(Item("보통 (80)", delegate { ResizePet(80); }));
-            sizes.Items.Add(Item("크게 (120)", delegate { ResizePet(120); })); sizes.Items.Add(Item("더 크게 (180)", delegate { ResizePet(180); }));
-            sizes.Items.Add(Item("엄청 크게 (270)", delegate { ResizePet(270); }));
-            sizes.Items.Add(Item("진격의 춘식이 (500)", delegate { ResizePet(500); })); menu.Items.Add(sizes);
-            MenuItem speeds = new MenuItem(); speeds.Header = "걷는 속도";
-            speeds.Items.Add(Item("느리게", delegate { SetSpeed(22); }));
-            speeds.Items.Add(Item("보통", delegate { SetSpeed(44); }));
-            speeds.Items.Add(Item("빠르게", delegate { SetSpeed(80); })); menu.Items.Add(speeds);
+            if (IsTodoCompanion) {
+                menu.Items.Add(Item("포스트잇 관리…", delegate { TodoService.Current.OpenSettings(this); }));
+                return menu;
+            }
+            AddQuickSettings(menu);
+            MenuItem sizes = new MenuItem();
+            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500 }) {
+                double selected = value; MenuItem choice = Item(SizeName(value), delegate { ResizePet(selected); });
+                choice.Tag = value; sizes.Items.Add(choice);
+            }
+            menu.Items.Add(sizes);
+            MenuItem speeds = new MenuItem();
+            foreach (double value in new double[] { 22, 44, 80 }) {
+                double selected = value; MenuItem choice = Item(SpeedName(value), delegate { SetSpeed(selected); });
+                choice.Tag = value; speeds.Items.Add(choice);
+            }
+            menu.Items.Add(speeds);
             AddMonitorMenu(menu);
-            menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
-            menu.Items.Add(Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("알림 설정 (점심·퇴근·사용자 지정)", delegate { ReminderService.Current.OpenSettings(); }));
-            menu.Items.Add(Item("테스트 알림", delegate { ReminderService.Current.Test(); }));
+            MenuItem add = Item("한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }); menu.Items.Add(add);
+            menu.Items.Add(Item("춘식이 관리…", delegate { SettingsHub.Open("캐릭터"); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("이 춘식이 종료", delegate { PetPreferences.Current.ChangeCount(Pets.Count - 1, this); }));
-            menu.Items.Add(Item("모두 종료", delegate { Quit(); }));
+            MenuItem remove = Item("이 춘식이 제거", delegate {
+                if (Pets.Count == 1) {
+                    if (MessageBox.Show("마지막 춘식이예요. 알림·포스트잇·타이머를 포함한 프로그램을 종료할까요?", "프로그램 종료", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes) Quit();
+                } else PetPreferences.Current.ChangeCount(Pets.Count - 1, this);
+            }); menu.Items.Add(remove);
+            menu.Opened += delegate {
+                sizes.Header = "크기 · " + SizeName(size);
+                speeds.Header = "걷는 속도 · " + SpeedName(speed);
+                foreach (MenuItem item in sizes.Items) item.IsChecked = (double)item.Tag == size;
+                foreach (MenuItem item in speeds.Items) item.IsChecked = (double)item.Tag == speed;
+                add.IsEnabled = Pets.Count < 20;
+                remove.Header = Pets.Count == 1 ? "프로그램 종료…" : "이 춘식이 제거";
+            };
             return menu;
         }
         public static List<PetWindow> SpeechPets() {

@@ -281,7 +281,7 @@ namespace ChunsikDesktop {
             render = delegate {
                 list.Children.Clear();
                 Grid header = SettingsTableRow(); int column = 0;
-                foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "춘식이 모양", "글자 크기", "불투명도", "색상", "관리" })
+                foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "춘식이 모양", "글자 크기", "선명도", "색상", "관리" })
                     SettingsCell(header, new TextBlock { Text = label, Foreground = Brushes.SlateGray, FontWeight = FontWeights.SemiBold }, column++);
                 list.Children.Add(header);
                 List<TodoItem> visibleItems = QueryItems(settings.Items, search.Text, filter.SelectedIndex);
@@ -337,7 +337,7 @@ namespace ChunsikDesktop {
                     fontButtons.Children.Add(smaller); fontButtons.Children.Add(larger); font.Children.Add(fontButtons); SettingsCell(line, font, 4);
                     StackPanel opacity = new StackPanel();
                     TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6), Foreground = Brushes.SlateGray }; opacity.Children.Add(opacityText);
-                    Slider opacitySlider = new Slider { Minimum = 10, Maximum = 100, Value = item.NoteOpacity * 100, TickFrequency = 5, IsSnapToTickEnabled = true, ToolTip = "메모 불투명도 10~100%" }; opacity.Children.Add(opacitySlider);
+                    Slider opacitySlider = new Slider { Minimum = 10, Maximum = 100, Value = item.NoteOpacity * 100, TickFrequency = 5, IsSnapToTickEnabled = true, ToolTip = "메모 선명도 10~100%" }; opacity.Children.Add(opacitySlider);
                     opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); }; SettingsCell(line, opacity, 5);
                     SettingsCell(line, BubblePalette.Picker(item.Color, delegate(string color) { item.Color = color; changed(); }, 3), 6);
                 }
@@ -489,8 +489,8 @@ namespace ChunsikDesktop {
             StackPanel fontButtons = new StackPanel { Orientation = Orientation.Horizontal }; footer.Children.Add(fontButtons);
             StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right }; Grid.SetColumn(buttons, 2); footer.Children.Add(buttons);
             StackPanel opacityButtons = new StackPanel { Orientation = Orientation.Horizontal };
-            moreTransparent = NoteButton("◐−", "더 투명하게 · 불투명도 10% 낮추기 (최소 10%)", delegate { ChangeOpacity(-10); });
-            lessTransparent = NoteButton("◐+", "더 선명하게 · 불투명도 10% 높이기 (최대 100%)", delegate { ChangeOpacity(10); });
+            moreTransparent = NoteButton("◐−", "더 투명하게 · 선명도 10% 낮추기 (최소 10%)", delegate { ChangeOpacity(-10); });
+            lessTransparent = NoteButton("◐+", "더 선명하게 · 선명도 10% 높이기 (최대 100%)", delegate { ChangeOpacity(10); });
             moreTransparent.Background = lessTransparent.Background = BubblePalette.BrushFor("#D9EAFE");
             opacityButtons.Children.Add(moreTransparent); opacityButtons.Children.Add(lessTransparent); buttons.Children.Add(opacityButtons);
             smaller = NoteButton("A−", "글자 작게", delegate { ChangeFont(-2); }); fontButtons.Children.Add(smaller);
@@ -517,7 +517,7 @@ namespace ChunsikDesktop {
             ContextMenu menu = new ContextMenu(); MenuItem manage = new MenuItem { Header = "포스트잇 설정" }; manage.Click += delegate { edit(); }; menu.Items.Add(manage); ContextMenu = menu;
             MenuItem finishTask = new MenuItem { Header = "✓ 이 할 일 완료하기" };
             finishTask.Click += delegate { if (EndEdit(true)) complete(); }; menu.Items.Add(finishTask);
-            MenuItem opacityMenu = new MenuItem { Header = "메모 불투명도 (10~100%)" }; menu.Items.Add(opacityMenu);
+            MenuItem opacityMenu = new MenuItem { Header = "메모 선명도 (10~100%)" }; menu.Items.Add(opacityMenu);
             Slider noteOpacity = new Slider { Minimum = 10, Maximum = 100, Width = 160, TickFrequency = 5, IsSnapToTickEnabled = true, Margin = new Thickness(8) };
             MenuItem opacityControl = new MenuItem { Header = noteOpacity, StaysOpenOnClick = true }; opacityMenu.Items.Add(opacityControl);
             bool loadingOpacity = false;
@@ -589,7 +589,7 @@ namespace ChunsikDesktop {
             Update(current); ShowOpacityFeedback();
         }
         void ShowOpacityFeedback() {
-            opacityFeedback.Text = "불투명도 " + Math.Round(current.NoteOpacity * 100) + "%";
+            opacityFeedback.Text = "선명도 " + Math.Round(current.NoteOpacity * 100) + "%";
             opacityFeedback.Visibility = Visibility.Visible; feedbackTimer.Stop(); feedbackTimer.Start();
         }
         void ChangeFont(int delta) {

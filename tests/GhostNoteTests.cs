@@ -19,6 +19,7 @@ internal static class GhostNoteTests {
         typeof(PetWindow).GetMethod("BuildSeatedScootFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
         PetManagementTests.Run();
         ProductivityTests.Run();
+        MenuTests.Run();
         double escapeTarget;
         Rect work = new Rect(0, 0, 1920, 1080);
         Check(InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(880, 880, 200, 160), out escapeTarget) && escapeTarget == 778, "input avoidance chooses nearest free side");

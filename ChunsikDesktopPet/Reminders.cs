@@ -416,6 +416,7 @@ namespace ChunsikDesktop {
             List<Reminder> rows = new List<Reminder>(); foreach (Reminder item in settings.Items) rows.Add(item.Copy());
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel intro = new StackPanel(); DockPanel.SetDock(intro, Dock.Top); root.Children.Add(intro);
+            intro.Children.Add(Pill("테스트 알림", Test));
             intro.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent });
             intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·저녁·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 18) });
             intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 12) });
@@ -758,3 +759,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+

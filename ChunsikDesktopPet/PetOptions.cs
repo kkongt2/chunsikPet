@@ -145,10 +145,10 @@ namespace ChunsikDesktop {
             root.Children.Add(new TextBlock { Text = "다른 프로그램에서 입력해도 깨어나요.\n변경사항은 자동으로 저장·적용되며 다음 실행에도 유지됩니다.\n잠든 중에도 시간 알림 말풍선은 표시됩니다.", Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 16, 0, 16) });
             Border appearanceCard = new Border { Background = new SolidColorBrush(Color.FromRgb(242, 247, 253)), CornerRadius = new CornerRadius(12), Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 16) };
             StackPanel appearance = new StackPanel(); appearanceCard.Child = appearance; root.Children.Add(appearanceCard);
-            TextBlock transparencyLabel = new TextBlock { Text = "돌아다니는 춘식이 투명도: " + Options.TransparencyPercent + "%", FontWeight = FontWeights.SemiBold }; appearance.Children.Add(transparencyLabel);
-            Slider transparency = new Slider { Minimum = 0, Maximum = 90, TickFrequency = 5, IsSnapToTickEnabled = true, Value = Options.TransparencyPercent, Margin = new Thickness(0, 10, 0, 5) }; appearance.Children.Add(transparency);
-            transparency.ValueChanged += delegate { transparencyLabel.Text = "돌아다니는 춘식이 투명도: " + (int)Math.Round(transparency.Value) + "%"; };
-            appearance.Children.Add(new TextBlock { Text = "0%: 선명하게 · 90%: 아주 연하게", Foreground = Brushes.SlateGray, FontSize = 11, Margin = new Thickness(0, 0, 0, 14) });
+            TextBlock transparencyLabel = new TextBlock { Text = "춘식이 선명도: " + (100 - Options.TransparencyPercent) + "%", FontWeight = FontWeights.SemiBold }; appearance.Children.Add(transparencyLabel);
+            Slider transparency = new Slider { Minimum = 10, Maximum = 100, TickFrequency = 5, IsSnapToTickEnabled = true, Value = 100 - Options.TransparencyPercent, Margin = new Thickness(0, 10, 0, 5) }; appearance.Children.Add(transparency);
+            transparency.ValueChanged += delegate { transparencyLabel.Text = "춘식이 선명도: " + (int)Math.Round(transparency.Value) + "%"; };
+            appearance.Children.Add(new TextBlock { Text = "100%: 완전히 선명하게 · 10%: 아주 연하게", Foreground = Brushes.SlateGray, FontSize = 11, Margin = new Thickness(0, 0, 0, 14) });
             System.Windows.Controls.Primitives.ToggleButton avoid = new System.Windows.Controls.Primitives.ToggleButton { Content = "마우스 + 키입력 피하기", IsChecked = Options.AvoidCursor, Padding = new Thickness(12, 8, 12, 8), HorizontalContentAlignment = HorizontalAlignment.Left };
             avoid.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ToggleButton'><Border x:Name='box' CornerRadius='10' Background='#E4EAF1' Padding='{TemplateBinding Padding}'><DockPanel><TextBlock x:Name='state' Text='OFF' FontWeight='Bold' Margin='0,0,12,0'/><ContentPresenter/></DockPanel></Border><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='box' Property='Background' Value='#CDEBDE'/><Setter TargetName='state' Property='Text' Value='ON'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='box' Property='BorderBrush' Value='#0064A8'/><Setter TargetName='box' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             appearance.Children.Add(avoid);
@@ -178,7 +178,7 @@ namespace ChunsikDesktop {
                     saveStatus.Text = "수면 대기 시간을 1~1440분의 정수로 입력해 주세요. 아직 저장되지 않았어요.";
                     saveStatus.Foreground = Brushes.Firebrick; return false;
                 }
-                PetOptions value = new PetOptions { TransparencyPercent = (int)Math.Round(transparency.Value), AvoidCursor = avoid.IsChecked == true, SleepEnabled = enabled.IsChecked == true, IdleMinutes = delay, PetCount = (int)Math.Round(count.Value), PaydayDay = (int)payday.SelectedItem, PaydayEnabled = paydayEnabled.IsChecked == true };
+                PetOptions value = new PetOptions { TransparencyPercent = 100 - (int)Math.Round(transparency.Value), AvoidCursor = avoid.IsChecked == true, SleepEnabled = enabled.IsChecked == true, IdleMinutes = delay, PetCount = (int)Math.Round(count.Value), PaydayDay = (int)payday.SelectedItem, PaydayEnabled = paydayEnabled.IsChecked == true };
                 bool ok = Apply(value);
                 if (ok) dirty = false;
                 saveStatus.Text = ok ? "자동 저장 · 적용 완료" : "저장하지 못했어요. 설정을 다시 변경해 재시도해 주세요.";

@@ -88,9 +88,16 @@ namespace ChunsikDesktop {
             List<PetWindow> pets = new List<PetWindow>(Pets);
             for (int i = 0; i < pets.Count; i++) pets[i].MoveToMonitor(target, (i + 1.0) / (pets.Count + 1));
         }
+        public static string SizeName(double value) {
+            return value == 50 ? "작게" : value == 80 ? "보통" : value == 120 ? "크게" : value == 180 ? "더 크게" : value == 270 ? "엄청 크게" : value == 500 ? "진격의 춘식이" : value.ToString();
+        }
+        public static double? CommonSize { get { if (Pets.Count == 0) return null; double value = Pets[0].size; foreach (PetWindow pet in Pets) if (pet.size != value) return null; return value; } }
+        public static double? CommonSpeed { get { if (Pets.Count == 0) return null; double value = Pets[0].speed; foreach (PetWindow pet in Pets) if (pet.speed != value) return null; return value; } }
+        public static string WalkingSpeedName(double value) { return SpeedName(value); }
+        public static void GatherToMonitor(string device) { Screen screen = FindMonitor(device); if (screen != null) GatherOnMonitor(screen); }
         public static void GatherAtCursor() { GatherOnMonitor(Screen.FromPoint(System.Windows.Forms.Cursor.Position)); }
         void AddMonitorMenu(ContextMenu menu) {
-            MenuItem monitors = new MenuItem { Header = "이 춘식이 모니터 이동" };
+            MenuItem monitors = new MenuItem { Header = "모니터로 이동" };
             menu.Items.Add(monitors);
             menu.Opened += delegate {
                 monitors.Items.Clear();
@@ -100,8 +107,7 @@ namespace ChunsikDesktop {
                     item.IsChecked = CurrentScreen().DeviceName == device; monitors.Items.Add(item);
                 }
             };
-            menu.Items.Add(Item("이 춘식이의 모니터로 모두 모으기", delegate { GatherOnMonitor(CurrentScreen()); }));
-            menu.Items.Add(Item("춘식이 목록 · 모니터 관리", delegate { SettingsHub.Open("캐릭터"); }));
+            menu.Items.Add(Item("이 화면으로 모두 모으기", delegate { GatherOnMonitor(CurrentScreen()); }));
         }
 
         static Button ManagementButton(string label, Action action) {

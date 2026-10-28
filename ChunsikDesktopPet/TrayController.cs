@@ -56,60 +56,70 @@ namespace ChunsikDesktop {
             quiet.DropDownItems.Add(Item("직접 해제할 때까지", delegate { PresentationPolicy.Set(-1); }));
             quiet.DropDownItems.Add(Item("방해 금지 해제", delegate { PresentationPolicy.Set(0); }));
             System.Windows.Forms.ToolStripMenuItem fullscreen = Item("전체 화면에서 자동 숨김", PresentationPolicy.ToggleFullscreen); quiet.DropDownItems.Add(fullscreen);
-            menu.Items.Add(quiet);
-            menu.Items.Add(Item("설정 열기", delegate { SettingsHub.Open("캐릭터"); }));
-            menu.Items.Add(Item("춘식이 목록 · 모니터 관리", delegate { SettingsHub.Open("캐릭터"); }));
-            menu.Items.Add(Item("마우스가 있는 모니터로 모두 모으기", PetWindow.GatherAtCursor));
-            menu.Items.Add(Item("알림 · 메시지 설정", delegate { ReminderService.Current.OpenSettings(); }));
+            System.Windows.Forms.ToolStripMenuItem timerItem = Item("타이머", TimeToolWindow.OpenTimer);
+            System.Windows.Forms.ToolStripMenuItem stopwatchItem = Item("스톱워치", TimeToolWindow.OpenStopwatch);
+            menu.Items.Add(timerItem); menu.Items.Add(stopwatchItem);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(null); }));
-            System.Windows.Forms.ToolStripMenuItem notes = Item("포스트잇 전체 숨기기", delegate { TodoService.Current.ToggleAllVisibility(); });
-            notes.ShortcutKeyDisplayString = TodoHotKey.Label;
+            System.Windows.Forms.ToolStripMenuItem notes = Item("포스트잇 모두 숨기기", delegate { TodoService.Current.ToggleAllVisibility(); });
             menu.Items.Add(notes);
-            menu.Items.Add(Item("타이머 · 전담 춘식이", TimeToolWindow.OpenTimer));
-            menu.Items.Add(Item("스톱워치 · 전담 춘식이", TimeToolWindow.OpenStopwatch));
+            menu.Items.Add(Item("포스트잇 관리…", delegate { TodoService.Current.OpenSettings(null); }));
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            System.Windows.Forms.ToolStripMenuItem sizes = new System.Windows.Forms.ToolStripMenuItem("크기 (모두)");
-            sizes.DropDownItems.Add(Item("작게 (50)", delegate { PetWindow.ResizeAll(50); }));
-            sizes.DropDownItems.Add(Item("보통 (80)", delegate { PetWindow.ResizeAll(80); }));
-            sizes.DropDownItems.Add(Item("크게 (120)", delegate { PetWindow.ResizeAll(120); }));
-            sizes.DropDownItems.Add(Item("더 크게 (180)", delegate { PetWindow.ResizeAll(180); }));
-            sizes.DropDownItems.Add(Item("엄청 크게 (270)", delegate { PetWindow.ResizeAll(270); }));
-            sizes.DropDownItems.Add(Item("진격의 춘식이 (500)", delegate { PetWindow.ResizeAll(500); }));
-            menu.Items.Add(sizes);
-            System.Windows.Forms.ToolStripMenuItem speeds = new System.Windows.Forms.ToolStripMenuItem("걷는 속도 (모두)");
-            speeds.DropDownItems.Add(Item("느리게", delegate { PetWindow.SpeedAll(22); }));
-            speeds.DropDownItems.Add(Item("보통", delegate { PetWindow.SpeedAll(44); }));
-            speeds.DropDownItems.Add(Item("빠르게", delegate { PetWindow.SpeedAll(80); }));
-            menu.Items.Add(speeds);
-            System.Windows.Forms.ToolStripMenuItem transparency = new System.Windows.Forms.ToolStripMenuItem("투명도 (돌아다니는 춘식이)");
-            foreach (int amount in new int[] { 0, 25, 50, 75, 90 }) {
-                int percent = amount;
-                transparency.DropDownItems.Add(Item(percent == 0 ? "0% · 선명하게" : percent + "%", delegate { PetPreferences.Current.SetTransparency(percent); }));
+            System.Windows.Forms.ToolStripMenuItem gather = new System.Windows.Forms.ToolStripMenuItem("모두 모으기"); menu.Items.Add(gather);
+            System.Windows.Forms.ToolStripMenuItem pause = Item("모두 쉬게 하기", delegate { PetWindow.PauseAll(!PetWindow.AllPaused); }); menu.Items.Add(pause);
+            System.Windows.Forms.ToolStripMenuItem all = new System.Windows.Forms.ToolStripMenuItem("모든 춘식이 설정"); menu.Items.Add(all);
+            System.Windows.Forms.ToolStripMenuItem sizes = new System.Windows.Forms.ToolStripMenuItem("크기");
+            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500 }) {
+                double selected = value; System.Windows.Forms.ToolStripMenuItem choice = Item(PetWindow.SizeName(value), delegate { PetWindow.ResizeAll(selected); }); choice.Tag = value; sizes.DropDownItems.Add(choice);
             }
-            menu.Items.Add(transparency);
-            System.Windows.Forms.ToolStripMenuItem avoid = Item("마우스 + 키입력 피하기", delegate { PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); }); menu.Items.Add(avoid);
-            System.Windows.Forms.ToolStripMenuItem pause = Item("모두 잠깐 쉬기", delegate { PetWindow.PauseAll(!PetWindow.AllPaused); });
-            menu.Items.Add(pause);
-            System.Windows.Forms.ToolStripMenuItem add = Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(PetWindow.Count + 1); });
-            menu.Items.Add(add);
-            menu.Items.Add(Item("알림 이력 · 놓친 알림", ReminderHistory.Open));
-            menu.Items.Add(Item("테스트 알림", delegate { ReminderService.Current.Test(); }));
+            all.DropDownItems.Add(sizes);
+            System.Windows.Forms.ToolStripMenuItem speeds = new System.Windows.Forms.ToolStripMenuItem("걷는 속도");
+            foreach (double value in new double[] { 22, 44, 80 }) {
+                double selected = value; System.Windows.Forms.ToolStripMenuItem choice = Item(PetWindow.WalkingSpeedName(value), delegate { PetWindow.SpeedAll(selected); }); choice.Tag = value; speeds.DropDownItems.Add(choice);
+            }
+            all.DropDownItems.Add(speeds);
+            System.Windows.Forms.ToolStripMenuItem opacity = new System.Windows.Forms.ToolStripMenuItem("선명도");
+            foreach (int value in new int[] { 100, 75, 50, 25, 10 }) {
+                int selected = value; System.Windows.Forms.ToolStripMenuItem choice = Item(value + "%", delegate { PetPreferences.Current.SetTransparency(100 - selected); }); choice.Tag = value; opacity.DropDownItems.Add(choice);
+            }
+            all.DropDownItems.Add(opacity);
+            System.Windows.Forms.ToolStripMenuItem avoid = Item("마우스·입력 위치 피하기", delegate { PetPreferences.Current.SetCursorAvoidance(!PetPreferences.Current.Options.AvoidCursor); }); all.DropDownItems.Add(avoid);
+            System.Windows.Forms.ToolStripMenuItem add = Item("한 마리 추가", delegate { PetPreferences.Current.ChangeCount(PetWindow.Count + 1); }); all.DropDownItems.Add(add);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            menu.Items.Add(Item("설정 백업 내보내기", SettingsBackup.Export));
-            menu.Items.Add(Item("설정 백업 복원", SettingsBackup.Import));
-            menu.Items.Add(Item("프로그램 정보", ShowAbout));
-            menu.Items.Add(Item("춘식이 모두 종료", delegate { PetWindow.Quit(); }));
-            menu.Opening += delegate {
+            menu.Items.Add(quiet);
+            menu.Items.Add(Item("알림 이력…", ReminderHistory.Open));
+            menu.Items.Add(Item("설정…", delegate { SettingsHub.Open("캐릭터"); }));
+            menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            menu.Items.Add(Item("프로그램 종료", PetWindow.Quit));
+            Action refreshMenu = delegate {
+                timerItem.Text = TimeToolWindow.TimerMenuLabel;
+                stopwatchItem.Text = TimeToolWindow.StopwatchMenuLabel;
                 notes.ShortcutKeyDisplayString = TodoHotKey.Label + (todoHotKey != null && todoHotKey.Registered ? "" : " (사용 불가)");
-                notes.Text = TodoService.Current.AllHidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기";
+                notes.Text = TodoService.Current.AllHidden ? "포스트잇 모두 보이기" : "포스트잇 모두 숨기기";
                 quiet.Text = "방해 금지 · " + PresentationPolicy.Status; fullscreen.Checked = PresentationPolicy.FullscreenEnabled;
                 avoid.Checked = PetPreferences.Current.Options.AvoidCursor;
-                avoid.Text = "마우스 + 키입력 피하기 · " + (avoid.Checked ? "ON" : "OFF");
-                foreach (System.Windows.Forms.ToolStripMenuItem choice in transparency.DropDownItems) choice.Checked = choice.Text.StartsWith(PetPreferences.Current.Options.TransparencyPercent + "%", StringComparison.Ordinal);
-                pause.Text = PetWindow.AllPaused ? "모두 다시 걷기" : "모두 잠깐 쉬기";
+                double? size = PetWindow.CommonSize, speed = PetWindow.CommonSpeed;
+                sizes.Text = "크기 · " + (size.HasValue ? PetWindow.SizeName(size.Value) : "각각 다름");
+                speeds.Text = "걷는 속도 · " + (speed.HasValue ? PetWindow.WalkingSpeedName(speed.Value) : "각각 다름");
+                foreach (System.Windows.Forms.ToolStripMenuItem item in sizes.DropDownItems) item.Checked = size.HasValue && (double)item.Tag == size.Value;
+                foreach (System.Windows.Forms.ToolStripMenuItem item in speeds.DropDownItems) item.Checked = speed.HasValue && (double)item.Tag == speed.Value;
+                int clarity = 100 - PetPreferences.Current.Options.TransparencyPercent;
+                opacity.Text = "선명도 · " + clarity + "%";
+                foreach (System.Windows.Forms.ToolStripMenuItem item in opacity.DropDownItems) item.Checked = (int)item.Tag == clarity;
+                pause.Text = PetWindow.AllPaused ? "모두 다시 걷기" : "모두 쉬게 하기";
                 add.Enabled = PetWindow.Count < 20;
             };
+            menu.Opening += delegate { refreshMenu(); };
+            all.DropDownOpening += delegate { refreshMenu(); };
+            gather.DropDownOpening += delegate {
+                while (gather.DropDownItems.Count > 0) { System.Windows.Forms.ToolStripItem item = gather.DropDownItems[0]; gather.DropDownItems.RemoveAt(0); item.Dispose(); }
+                foreach (System.Windows.Forms.Screen screen in System.Windows.Forms.Screen.AllScreens) {
+                    string device = screen.DeviceName;
+                    gather.DropDownItems.Add(Item(device.Replace(@"\\.\DISPLAY", "모니터 ") + (screen.Primary ? " (주 화면)" : ""), delegate { PetWindow.GatherToMonitor(device); }));
+                }
+            };
+            System.Windows.Forms.Timer menuRefresh = new System.Windows.Forms.Timer { Interval = 1000 };
+            menuRefresh.Tick += delegate { timerItem.Text = TimeToolWindow.TimerMenuLabel; stopwatchItem.Text = TimeToolWindow.StopwatchMenuLabel; };
+            menu.Opened += delegate { menuRefresh.Start(); }; menu.Closed += delegate { menuRefresh.Stop(); }; menu.Disposed += delegate { menuRefresh.Dispose(); };
             tray = new System.Windows.Forms.NotifyIcon { Icon = icon, Text = "춘식이 · 우클릭으로 설정", ContextMenuStrip = menu, Visible = true };
             tray.MouseDoubleClick += delegate(object sender, System.Windows.Forms.MouseEventArgs e) {
                 if (e.Button == System.Windows.Forms.MouseButtons.Left) Dispatch(delegate { PetPreferences.Current.OpenSettings(); });
