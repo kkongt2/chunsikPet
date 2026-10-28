@@ -97,11 +97,11 @@
     </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="TabItem">
-    <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="#66758A"/><Setter Property="Padding" Value="14,9"/>
+    <Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{StaticResource ControlInk}"/><Setter Property="Padding" Value="14,9"/>
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
-      <Border x:Name="tab" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="8" BorderBrush="Transparent" BorderThickness="1"><ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/></Border>
+      <Border x:Name="tab" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="8" BorderBrush="Transparent" BorderThickness="1"><ContentPresenter x:Name="header" ContentSource="Header" RecognizesAccessKey="True" TextElement.Foreground="#66758A"/></Border>
       <ControlTemplate.Triggers>
-        <Trigger Property="IsSelected" Value="True"><Setter TargetName="tab" Property="Background" Value="#E2EBFC"/><Setter Property="Foreground" Value="#264FA8"/></Trigger>
+        <Trigger Property="IsSelected" Value="True"><Setter TargetName="tab" Property="Background" Value="#E2EBFC"/><Setter TargetName="header" Property="TextElement.Foreground" Value="#264FA8"/></Trigger>
         <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="tab" Property="BorderBrush" Value="{StaticResource ControlAccent}"/></Trigger>
         <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger>
       </ControlTemplate.Triggers>
