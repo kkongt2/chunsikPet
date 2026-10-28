@@ -17,8 +17,8 @@ namespace ChunsikDesktop {
         static IntPtr requestWindow, resultWindow;
         static double resultAt, nextRequest;
         static Rect result = Rect.Empty;
-        static string status = "UIA 대기";
-        public static string Status { get { lock (gate) return status; } }
+        static string status = "UIA 대기", lastResult = "조회 전";
+        public static string Status { get { lock (gate) return status + " · 최근 결과: " + lastResult; } }
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
         [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out NativeRect rect);
@@ -57,7 +57,7 @@ namespace ChunsikDesktop {
                     if (token == generation && active) {
                         bool timely = now - began <= 0.75;
                         result = timely ? found : Rect.Empty; resultAt = now; resultWindow = window;
-                        status = timely ? source : "UIA 응답 지연";
+                        status = timely ? source : "UIA 응답 지연"; lastResult = status;
                         nextRequest = now + (result.IsEmpty ? 1.0 : 0.25);
                     }
                     busy = false;

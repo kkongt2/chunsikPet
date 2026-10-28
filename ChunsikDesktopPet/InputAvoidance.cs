@@ -31,7 +31,7 @@ namespace ChunsikDesktop {
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool LogicalToPhysicalPointForPerMonitorDPI(IntPtr window, ref POINT point);
 
-        public static void Clear() { caret = Rect.Empty; nextSample = 0; sampledWindow = IntPtr.Zero; AutomationCaret.Clear(); DetectionStatus = "비활성"; }
+        public static void Clear() { caret = Rect.Empty; nextSample = 0; sampledWindow = IntPtr.Zero; AutomationCaret.Clear(); }
         public static Rect CaretPixels() {
             PetPreferences prefs = PetPreferences.Current;
             if (prefs == null || !prefs.Options.AvoidCursor || PresentationPolicy.IsSuppressed || prefs.InputIdleSeconds > 3) {

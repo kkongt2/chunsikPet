@@ -50,7 +50,7 @@ namespace ChunsikDesktop {
             report.AppendLine("CLR: " + Environment.Version + " · Process: " + (Environment.Is64BitProcess ? "64-bit" : "32-bit"));
             report.AppendLine("방해 금지: " + PresentationPolicy.Status + " · 춘식이 수: " + PetWindow.Count);
             report.AppendLine("포스트잇 단축키: " + TodoHotKey.Label + " · " + (TodoHotKey.Current != null && TodoHotKey.Current.Registered ? "등록됨" : "등록 안 됨"));
-            report.AppendLine("입력 위치 감지: " + InputAvoidance.DetectionStatus);
+            report.AppendLine("최근 입력 위치 감지: " + (InputAvoidance.DetectionStatus ?? "조회 전"));
             report.AppendLine("모니터 (물리 픽셀 좌표):");
             try {
                 foreach (System.Windows.Forms.Screen screen in System.Windows.Forms.Screen.AllScreens) {
