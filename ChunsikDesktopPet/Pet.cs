@@ -480,7 +480,7 @@ namespace ChunsikDesktop {
                 pressed = dragging = false; ReleaseMouseCapture();
                 CancelCue(); EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction(); Wake();
             }
-            giant = value == GiantSize; giantReactionUntil = 0;
+            giant = value == GiantSize;
             giantBadge.Visibility = giant ? Visibility.Visible : Visibility.Collapsed;
             if (!giant) size = value;
             LayoutPet(); SetFrame(giant ? 4 : frame);
@@ -521,7 +521,7 @@ namespace ChunsikDesktop {
         }
         static double Clamp(double n, double lo, double hi) { return Math.Max(lo, Math.Min(Math.Max(lo, hi), n)); }
         void SetFrame(int index) {
-            if (giant) { ShowGiantFrame(); return; }
+            if (giant) { ShowGiantFrame(index); return; }
             scooting = false; frame = index;
             picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
             if (paused && index == 6 && pausedSeatedFrame != null) picture.Source = pausedSeatedFrame;
@@ -539,7 +539,7 @@ namespace ChunsikDesktop {
             foreach (PetWindow pet in Pets) pet.BeginPayday();
         }
         void BeginPayday() {
-            if (giant) { ReactGiant(); return; }
+            if (giant) return;
             // Dragging and parachuting remain under the user's control.
             if (pressed || dragging || falling) return;
             EndReaction(); StopNoticeAnimation(); Wake();
@@ -667,7 +667,6 @@ namespace ChunsikDesktop {
         }
         void OnDown(object sender, MouseButtonEventArgs e) {
             if (!picture.IsMouseOver) return;
-            if (giant) { ReactGiant(); e.Handled = true; return; }
             // Capture the pointer and body anchor before removing wings/parachute:
             // their larger window can still have an old WPF layout during this event.
             Point bodyPoint = e.GetPosition(picture);
@@ -677,13 +676,13 @@ namespace ChunsikDesktop {
             e.Handled = true;
         }
         void BeginGrab(Point pointerPixels, Point bodyFraction) {
-            if (giant) { ReactGiant(); return; }
             pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
             if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
             CancelCue(); wasEvading = false; EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction();
             // Use the same pose for press and drag so crossing the drag threshold
             // cannot resize/reposition the body a second time.
             SetFrame(7); UpdateLayout();
+            if (giant) { down = pointerPixels; return; }
             Point anchor = picture.PointToScreen(new Point(picture.ActualWidth * bodyFraction.X, picture.ActualHeight * bodyFraction.Y));
             Rect bounds = ScreenLayout.BoundsPixels(this);
             if (!bounds.IsEmpty) ScreenLayout.MovePixels(this, bounds.Left + pointerPixels.X - anchor.X, bounds.Top + pointerPixels.Y - anchor.Y);
@@ -691,7 +690,7 @@ namespace ChunsikDesktop {
             origin = ScreenLayout.BoundsPixels(this).TopLeft;
         }
         void OnMove(object sender, MouseEventArgs e) {
-            if (giant || !pressed || e.LeftButton != MouseButtonState.Pressed) return;
+            if (!pressed || e.LeftButton != MouseButtonState.Pressed) return;
             Point at = PointToScreen(e.GetPosition(this));
             PresentationSource src = PresentationSource.FromVisual(this);
             if (src == null || src.CompositionTarget == null) return;
@@ -701,10 +700,10 @@ namespace ChunsikDesktop {
                 dragging = true;
                 recentClicks.Clear();
             }
-            if (dragging) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
+            if (dragging && !giant) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
         }
         void OnUp(object sender, MouseButtonEventArgs e) {
-            if (giant || !pressed) return;
+            if (!pressed) return;
             bool click = !dragging && clock.Elapsed.TotalSeconds - pressedAt <= 0.7;
             FinishDrag();
             if (click && !falling) StartTickle(); else recentClicks.Clear();

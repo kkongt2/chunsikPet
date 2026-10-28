@@ -6,7 +6,6 @@ namespace ChunsikDesktop {
     public partial class PetWindow {
         public const double GiantSize = -1;
         bool giant;
-        double giantReactionUntil;
         double SelectedSize { get { return giant ? GiantSize : size; } }
         readonly TextBlock giantBadge = new TextBlock {
             Text = "초대형 · 고정", FontSize = 17, FontWeight = FontWeights.Bold,
@@ -25,23 +24,25 @@ namespace ChunsikDesktop {
             giantBadge.Visibility = Visibility.Visible;
             ShowGiantFrame();
         }
-        void ShowGiantFrame() {
-            frame = 4; picture.Source = frames[4];
-            double scale = Math.Min(Math.Max(1, Height - 36) / frames[4].PixelHeight, Math.Max(1, Width - 12) / frames[4].PixelWidth);
-            picture.Width = frames[4].PixelWidth * scale; picture.Height = frames[4].PixelHeight * scale;
+        void ShowGiantFrame(int index = 4) {
+            frame = index;
+            picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
+            // Leave room for the shared tickle rotation and hopping inside the fixed window.
+            double room = reactionKind == 0 ? 1 : 0.75;
+            double scale = room * Math.Min(Math.Max(1, Height - 36) / maxH, Math.Max(1, Width - 12) / maxW);
+            if (reactionKind == 0)
+                scale = Math.Min(Math.Max(1, Height - 36) / frames[index].PixelHeight, Math.Max(1, Width - 12) / frames[index].PixelWidth);
+            picture.Width = frames[index].PixelWidth * scale; picture.Height = frames[index].PixelHeight * scale;
+            reactionMark.Margin = new Thickness(0, 0, 0, Math.Max(0, Height - 70));
             flip.ScaleX = flip.ScaleY = 1; squirm.Angle = 0; hop.X = hop.Y = 0;
         }
-        void ReactGiant() {
-            if (!giant) return;
-            giantReactionUntil = clock.Elapsed.TotalSeconds + 1.6;
-            giantBadge.Text = "여기 있을게.";
-        }
         void TickGiant(double now) {
+            if (ContextMenu != null && ContextMenu.IsOpen) return;
+            if (reactionKind != 0) {
+                if (now < reactionUntil) { AnimateReaction(now); return; }
+                EndReaction();
+            }
             ShowGiantFrame();
-            if (now < giantReactionUntil) {
-                double pulse = Math.Sin((giantReactionUntil - now) * Math.PI * 4);
-                flip.ScaleX = flip.ScaleY = 1 - 0.012 * Math.Abs(pulse);
-            } else giantBadge.Text = "초대형 · 고정";
         }
     }
 }
