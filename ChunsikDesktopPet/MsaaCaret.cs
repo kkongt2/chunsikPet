@@ -40,7 +40,7 @@ namespace ChunsikDesktop {
             accessible.accLocation(out x, out y, out width, out height, ChildSelf);
             if (width < 0 || height <= 0 || width > 64) return Rect.Empty;
             // accLocation is already in screen pixels; applying ClientToScreen/DPI scaling again is wrong.
-            return AutomationCaret.Accept(new Rect(x, y, width, height), owner, false);
+            return AccessibilityCaret.Accept(new Rect(x, y, width, height), owner);
         }
         internal static Rect Read(IntPtr foreground, out string source) {
             source = "MSAA 커서 없음";

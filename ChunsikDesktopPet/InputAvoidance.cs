@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 
 namespace ChunsikDesktop {
-    // Geometry only: no keyboard hooks or text contents. Win32 first, bounded asynchronous MSAA/UIA fallback.
+    // Geometry only: no keyboard hooks or text contents. Win32 first, bounded asynchronous MSAA fallback.
     // All pets share a 4 Hz sample; Accessibility providers never run on the animation/UI thread.
     public static class InputAvoidance {
         static readonly Stopwatch clock = Stopwatch.StartNew();
@@ -31,7 +31,7 @@ namespace ChunsikDesktop {
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool LogicalToPhysicalPointForPerMonitorDPI(IntPtr window, ref POINT point);
 
-        public static void Clear() { caret = Rect.Empty; nextSample = 0; sampledWindow = IntPtr.Zero; AutomationCaret.Clear(); }
+        public static void Clear() { caret = Rect.Empty; nextSample = 0; sampledWindow = IntPtr.Zero; AccessibilityCaret.Clear(); }
         public static Rect CaretPixels() {
             PetPreferences prefs = PetPreferences.Current;
             if (prefs == null || !prefs.Options.AvoidCursor || PresentationPolicy.IsSuppressed || prefs.InputIdleSeconds > 3) {
@@ -39,7 +39,7 @@ namespace ChunsikDesktop {
             }
             double now = clock.Elapsed.TotalSeconds;
             IntPtr active = GetForegroundWindow();
-            if (active != sampledWindow) { caret = Rect.Empty; nextSample = 0; AutomationCaret.Clear(); sampledWindow = active; }
+            if (active != sampledWindow) { caret = Rect.Empty; nextSample = 0; AccessibilityCaret.Clear(); sampledWindow = active; }
             if (now < nextSample) return caret;
             nextSample = now + 0.25; caret = Rect.Empty;
             IntPtr foreground = GetForegroundWindow();
@@ -48,9 +48,9 @@ namespace ChunsikDesktop {
             uint thread = GetWindowThreadProcessId(foreground, out process);
             if (thread == 0 || process == ownProcess) return caret;
             caret = NativeCaret(foreground, thread);
-            if (!caret.IsEmpty) { AutomationCaret.Clear(); DetectionStatus = "Win32"; return caret; }
-            caret = AutomationCaret.Sample(foreground);
-            DetectionStatus = AutomationCaret.Status;
+            if (!caret.IsEmpty) { AccessibilityCaret.Clear(); DetectionStatus = "Win32"; return caret; }
+            caret = AccessibilityCaret.Sample(foreground);
+            DetectionStatus = AccessibilityCaret.Status;
             return caret;
         }
         static Rect NativeCaret(IntPtr foreground, uint thread) {
