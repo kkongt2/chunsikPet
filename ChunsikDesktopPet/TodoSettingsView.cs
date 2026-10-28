@@ -128,11 +128,11 @@ namespace ChunsikDesktop {
                         StackPanel intervalRow = new StackPanel { Orientation = Orientation.Horizontal };
                         NumberField interval = new NumberField(item.EveryMinutes, 1440, "알림 간격 분"); intervalRow.Children.Add(interval);
                         intervalRow.Children.Add(new TextBlock { Text = "분마다", Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Center }); display.Children.Add(intervalRow);
-                        interval.Changed += delegate { item.EveryMinutes = interval.Value; changed(); };
+                        interval.Changed += delegate { item.EveryMinutes = interval.Value; caption.Text = item.EveryMinutes + "분마다 · " + item.DisplaySeconds + "초 표시  ·  " + (item.Peek ? "빼꼼" : "전신"); changed(); };
                         StackPanel durationRow = new StackPanel { Orientation = Orientation.Horizontal };
                         NumberField seconds = new NumberField(item.DisplaySeconds, 3600, "표시 시간 초"); durationRow.Children.Add(seconds);
                         durationRow.Children.Add(new TextBlock { Text = "초 표시", Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Center }); display.Children.Add(durationRow);
-                        seconds.Changed += delegate { item.DisplaySeconds = seconds.Value; changed(); };
+                        seconds.Changed += delegate { item.DisplaySeconds = seconds.Value; caption.Text = item.EveryMinutes + "분마다 · " + item.DisplaySeconds + "초 표시  ·  " + (item.Peek ? "빼꼼" : "전신"); changed(); };
                     }
                     details.Children.Add(SettingsTheme.Field("표시 방식", display));
                     StackPanel placement = new StackPanel();
