@@ -15,6 +15,8 @@ internal static class GhostNoteTests {
     [STAThread] public static void Main() {
         Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         TodoNote.LoadArt(System.IO.Path.GetFullPath("ChunsikDesktopPet"));
+        typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-tickle.png") });
+        typeof(PetWindow).GetField("reactionFrames", BindingFlags.Static | BindingFlags.NonPublic).SetValue(null, typeof(PetWindow).GetField("frames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-sprites.png") });
         typeof(PetWindow).GetMethod("BuildSeatedScootFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
         PetManagementTests.Run();
