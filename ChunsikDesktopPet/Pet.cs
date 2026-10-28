@@ -177,16 +177,17 @@ namespace ChunsikDesktop {
         static ImageSource WithRestHeadband(ImageSource sprite, double width, double height) {
             DrawingGroup drawing = new DrawingGroup();
             using (DrawingContext dc = drawing.Open()) {
-                dc.DrawImage(sprite, new Rect(0, 0, width, height));
                 dc.PushTransform(new ScaleTransform(width, height));
                 Pen edge = new Pen(new SolidColorBrush(Color.FromRgb(133, 125, 110)), 0.007);
                 edge.LineJoin = PenLineJoin.Round;
-                // Two short cloth tails and a knot at the right temple.
+                // Tie behind the head: draw both tails first so the sprite covers their roots.
                 dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.26 Q 0.94,0.28 0.985,0.37 L 0.94,0.36 0.92,0.40 Q 0.90,0.33 0.85,0.30 Z"));
-                dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.27 Q 0.92,0.34 0.90,0.44 L 0.87,0.41 0.84,0.43 Q 0.87,0.35 0.83,0.29 Z"));
-                // Curved white cloth sits above the eyes, leaving ears and face visible.
+                dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.27 Q 0.97,0.34 0.965,0.47 L 0.935,0.44 0.90,0.46 Q 0.92,0.35 0.83,0.29 Z"));
+                dc.Pop();
+                dc.DrawImage(sprite, new Rect(0, 0, width, height));
+                dc.PushTransform(new ScaleTransform(width, height));
+                // Only the forehead strip is in front; no visible round temple knot.
                 dc.DrawGeometry(Brushes.White, edge, Geometry.Parse("M 0.14,0.21 Q 0.50,0.26 0.86,0.21 L 0.91,0.31 Q 0.50,0.36 0.09,0.31 Z"));
-                dc.DrawEllipse(Brushes.White, edge, new Point(0.88, 0.28), 0.028, 0.035);
                 dc.Pop();
             }
             drawing.Freeze(); DrawingImage result = new DrawingImage(drawing); result.Freeze(); return result;
