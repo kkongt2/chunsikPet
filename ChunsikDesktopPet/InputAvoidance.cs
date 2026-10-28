@@ -4,8 +4,8 @@ using System.Runtime.InteropServices;
 using System.Windows;
 
 namespace ChunsikDesktop {
-    // Geometry only: no keyboard hooks or text contents. Win32 first, bounded asynchronous UIA fallback.
-    // All pets share a 4 Hz sample; UIA providers never run on the animation/UI thread.
+    // Geometry only: no keyboard hooks or text contents. Win32 first, bounded asynchronous MSAA/UIA fallback.
+    // All pets share a 4 Hz sample; Accessibility providers never run on the animation/UI thread.
     public static class InputAvoidance {
         static readonly Stopwatch clock = Stopwatch.StartNew();
         static readonly uint ownProcess = (uint)Process.GetCurrentProcess().Id;

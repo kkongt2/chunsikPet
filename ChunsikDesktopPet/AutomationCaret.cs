@@ -17,7 +17,7 @@ namespace ChunsikDesktop {
         static IntPtr requestWindow, resultWindow;
         static double resultAt, nextRequest;
         static Rect result = Rect.Empty;
-        static string status = "UIA 대기", lastResult = "조회 전";
+        static string status = "접근성 감지 대기", lastResult = "조회 전";
         public static string Status { get { lock (gate) return status + " · 최근 결과: " + lastResult; } }
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flags);
@@ -34,10 +34,10 @@ namespace ChunsikDesktop {
                 if (!busy && now >= nextRequest) {
                     busy = true; requestWindow = window; requestGeneration = generation;
                     if (!started) {
-                        Thread worker = new Thread(Work) { IsBackground = true, Name = "Chunsik UIA caret" };
+                        Thread worker = new Thread(Work) { IsBackground = true, Name = "Chunsik accessibility caret" };
                         worker.SetApartmentState(ApartmentState.MTA); worker.Start(); started = true;
                     }
-                    status = "UIA 조회 중"; wake.Set();
+                    status = "MSAA/UIA 조회 중"; wake.Set();
                 }
                 return current;
             }
@@ -49,15 +49,21 @@ namespace ChunsikDesktop {
                 lock (gate) { window = requestWindow; token = requestGeneration; }
                 double began = clock.Elapsed.TotalSeconds;
                 Rect found = Rect.Empty; string source = "UIA 위치 없음";
-                try { found = Read(window, out source); }
-                catch (Exception error) { source = "UIA 사용 불가: " + error.GetType().Name; }
+                try { found = MsaaCaret.Read(window, out source); }
+                catch (Exception error) { source = "MSAA 사용 불가: " + error.GetType().Name; }
+                if (found.IsEmpty && GetForegroundWindow() == window) {
+                    string msaaStatus = source;
+                    try { found = Read(window, out source); }
+                    catch (Exception error) { source = "UIA 사용 불가: " + error.GetType().Name; }
+                    source = msaaStatus + " → " + source;
+                }
                 double now = clock.Elapsed.TotalSeconds;
                 bool active = GetForegroundWindow() == window;
                 lock (gate) {
                     if (token == generation && active) {
                         bool timely = now - began <= 0.75;
                         result = timely ? found : Rect.Empty; resultAt = now; resultWindow = window;
-                        status = timely ? source : "UIA 응답 지연"; lastResult = status;
+                        status = timely ? source : "MSAA/UIA 응답 지연"; lastResult = status;
                         nextRequest = now + (result.IsEmpty ? 1.0 : 0.25);
                     }
                     busy = false;
