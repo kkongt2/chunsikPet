@@ -25,8 +25,10 @@ namespace ChunsikDesktop {
         static void Ensure() {
             if (window != null) return;
             building = true;
-            window = new Window { Title = "춘식이 설정", Width = 1320, Height = 800, MinWidth = 800, MinHeight = 480, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = Brushes.WhiteSmoke };
-            tabs = new TabControl { Margin = new Thickness(12) }; window.Content = tabs;
+            window = new Window { Title = "춘식이 설정", Width = 1120, Height = 800, MinWidth = 800, MinHeight = 480, WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = SettingsTheme.Canvas };
+            tabs = new TabControl { Margin = new Thickness(12), TabStripPlacement = Dock.Left, Background = SettingsTheme.Canvas, BorderThickness = new Thickness(0) };
+            tabs.ItemContainerStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='TabItem'><Setter Property='Width' Value='148'/><Setter Property='Margin' Value='0,0,10,6'/><Setter Property='FontSize' Value='14'/><Setter Property='Foreground' Value='#66758A'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='TabItem'><Border x:Name='nav' Background='{TemplateBinding Background}' CornerRadius='8' Padding='16,13'><ContentPresenter ContentSource='Header' HorizontalAlignment='Left'/></Border><ControlTemplate.Triggers><Trigger Property='IsSelected' Value='True'><Setter Property='Foreground' Value='#264FA8'/><Setter Property='FontWeight' Value='SemiBold'/><Setter TargetName='nav' Property='Background' Value='#E6EDFC'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='nav' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='nav' Property='BorderBrush' Value='#3568D4'/><Setter TargetName='nav' Property='BorderThickness' Value='1'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>");
+            window.Content = tabs;
             foreach (string name in new string[] { "캐릭터", "알림", "포스트잇", "타이머·스톱워치", "프로그램" }) {
                 TabItem tab = new TabItem { Header = name, Padding = new Thickness(18, 10, 18, 10) }; sections[name] = tab; tabs.Items.Add(tab);
                 string captured = name; Button load = new Button { Content = name + " 설정 열기", Padding = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }; load.Click += delegate { Open(captured); }; tab.Content = load;
@@ -45,10 +47,11 @@ namespace ChunsikDesktop {
         }
         public static void Attach(Window form, string name, Func<bool> flush) {
             Ensure(); TabItem tab = sections[name]; object content = form.Content; form.Content = null;
-            FrameworkElement element = content as FrameworkElement; if (element != null && (name == "알림" || name == "포스트잇")) element.MinWidth = 1240;
-            tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
+            FrameworkElement element = content as FrameworkElement; if (element != null && name == "알림") element.MinWidth = 1240;
+            tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = name == "포스트잇" ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
             form.Closed += delegate { forms.Remove(form); if (tab.Tag == form) { tab.Tag = null; Button reopen = new Button { Content = name + " 설정 다시 열기", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(20) }; reopen.Click += delegate { Open(name); }; tab.Content = reopen; } };
             tabs.SelectedItem = tab; window.Activate();
         }
     }
 }
+

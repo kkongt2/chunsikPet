@@ -62,6 +62,8 @@
     <Compile Include="Reminders.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
+    <Compile Include="TodoSettingsView.cs" />
+    <Compile Include="SettingsTheme.cs" />
     <Compile Include="TodoHotKey.cs" />
     <Compile Include="GhostNoteHeader.cs" />
     <Compile Include="TodoModels.cs" />

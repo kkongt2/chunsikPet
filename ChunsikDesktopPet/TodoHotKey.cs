@@ -74,7 +74,7 @@ namespace ChunsikDesktop {
             }
             row.Children.Add(keys);
             TextBlock status = new TextBlock { Text = "현재: " + Label + (Current != null && Current.Registered ? " · 사용 가능" : " · 등록되지 않음"), Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap };
-            Button apply = new Button { Content = "충돌 확인 · 적용", Padding = new Thickness(10, 5, 10, 5), Margin = new Thickness(6) };
+            Button apply = SettingsTheme.Button("적용", delegate {}); apply.Margin = new Thickness(6);
             apply.Click += delegate {
                 string message = "단축키 서비스가 아직 준비되지 않았어요.";
                 uint value = (ctrl.IsChecked == true ? 2U : 0) | (alt.IsChecked == true ? 1U : 0) | (shift.IsChecked == true ? 4U : 0);

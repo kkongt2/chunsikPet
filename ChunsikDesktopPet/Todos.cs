@@ -17,6 +17,7 @@ namespace ChunsikDesktop {
             foreach (string color in Colors) if (color == value) return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
             return new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors[0]));
         }
+        static readonly ControlTemplate SwatchTemplate = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='swatch' CornerRadius='11' Background='{TemplateBinding Background}' BorderBrush='#A8B3C2' BorderThickness='1'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='swatch' Property='BorderBrush' Value='#3568D4'/><Setter TargetName='swatch' Property='BorderThickness' Value='2'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
         public static FrameworkElement Picker(string selected, Action<string> change, int columns) {
             System.Windows.Controls.Primitives.UniformGrid grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = columns, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
             Action paint = null;
@@ -25,14 +26,14 @@ namespace ChunsikDesktop {
                 for (int i = 0; i < Colors.Length; i++) {
                     string color = Colors[i];
                     Button button = new Button { Width = 22, Height = 22, Margin = new Thickness(2), Content = (selected ?? Colors[0]) == color ? "✓" : "", FontSize = 12, Foreground = Brushes.DarkSlateGray, Background = BrushFor(color), ToolTip = Names[i], Cursor = System.Windows.Input.Cursors.Hand };
-                    button.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border CornerRadius='7' Background='{TemplateBinding Background}' BorderBrush='#8292A3' BorderThickness='1'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border></ControlTemplate>");
+                    button.Template = SwatchTemplate;
                     System.Windows.Automation.AutomationProperties.SetName(button, Names[i] + " 말풍선 색상");
                     button.Click += delegate { selected = color; paint(); change(color); }; grid.Children.Add(button);
                 }
             }; paint(); return grid;
         }
     }
-    public sealed class TodoService {
+    public sealed partial class TodoService {
         public static TodoService Current;
         static readonly string FilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "todos.xml");
         static readonly XmlSerializer Serializer = new XmlSerializer(typeof(TodoSettings));
@@ -212,140 +213,6 @@ namespace ChunsikDesktop {
             if (saveEditor != null) saveEditor();
             foreach (Runtime run in runtimes.Values) DisposeRuntime(run); runtimes.Clear();
             if (editor != null) editor.Close();
-        }
-        static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(0, 100, 168));
-        static readonly ControlTemplate SoftButton = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='b' CornerRadius='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='b' Property='Opacity' Value='0.75'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#0064A8'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
-        static Button Button(string text, Action action) {
-            Button b = new Button { Content = text, Padding = new Thickness(12, 7, 12, 7), Margin = new Thickness(3), Background = BubblePalette.BrushFor("#D9EAFE"), BorderBrush = new SolidColorBrush(Color.FromRgb(210, 225, 241)), Foreground = Accent, Template = SoftButton, Cursor = System.Windows.Input.Cursors.Hand }; b.Click += delegate { action(); }; return b;
-        }
-        static Grid SettingsTableRow() {
-            Grid row = new Grid();
-            foreach (double width in new double[] { 100, -1, 190, 160, 110, 160, 96, 110 })
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = width < 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(width), MinWidth = width < 0 ? 180 : 0 });
-            return row;
-        }
-        static void SettingsCell(Grid row, UIElement child, int column) {
-            Border cell = new Border { Child = child, Padding = new Thickness(6, 8, 6, 8), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(cell, column); row.Children.Add(cell);
-        }
-        static readonly Style SettingSegmentStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='FontSize' Value='11'/><Setter Property='Padding' Value='4,7'/><Setter Property='Margin' Value='1'/><Setter Property='Background' Value='Transparent'/><Setter Property='Foreground' Value='#52637A'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border x:Name='box' Background='{TemplateBinding Background}' BorderBrush='Transparent' BorderThickness='1' CornerRadius='7' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='box' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='box' Property='BorderBrush' Value='#EAAE38'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/><Setter Property='FontWeight' Value='SemiBold'/></Trigger></Style.Triggers></Style>");
-        static Border SettingChoice(string[] labels, int selected, Action<int> change) {
-            string group = Guid.NewGuid().ToString("N");
-            System.Windows.Controls.Primitives.UniformGrid segments = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Min(2, Math.Max(1, labels.Length)) };
-            for (int i = 0; i < labels.Length; i++) {
-                int index = i;
-                RadioButton segment = new RadioButton { Content = labels[i], ToolTip = labels[i], GroupName = group, IsChecked = i == selected, Style = SettingSegmentStyle };
-                System.Windows.Automation.AutomationProperties.SetName(segment, labels[i]);
-                segment.Checked += delegate { change(index); }; segments.Children.Add(segment);
-            }
-            return new Border { Background = new SolidColorBrush(Color.FromRgb(237, 242, 248)), CornerRadius = new CornerRadius(9), Padding = new Thickness(2), Margin = new Thickness(0, 3, 0, 3), Child = segments };
-        }
-        public void OpenSettings(PetWindow preferred) {
-            preferredPet = preferred;
-            if (editor != null) { SettingsHub.Open("포스트잇"); return; }
-            Window win = new Window { Title = "춘식이 포스트잇 · 할 일", Width = 1280, Height = 740, MinWidth = 1240, MinHeight = 480, UseLayoutRounding = true, Background = new SolidColorBrush(Color.FromRgb(247, 249, 252)), WindowStartupLocation = WindowStartupLocation.CenterScreen }; editor = win;
-            DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
-            StackPanel top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
-            top.Children.Add(new TextBlock { Text = "춘식이에게 기억을 맡겨요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue });
-            top.Children.Add(new TextBlock { Text = "기억할 일을 적고, 춘식이가 보여줄 방식을 골라주세요. 변경사항은 자동으로 저장돼요.", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 12) });
-            Button visibility = Button("포스트잇 전체 숨김 / 보이기 · " + TodoHotKey.Label, ToggleAllVisibility); top.Children.Add(visibility);
-            Action hotkeyChanged = delegate { visibility.Content = "포스트잇 전체 숨김 / 보이기 · " + TodoHotKey.Label; };
-            TodoHotKey.Changed += hotkeyChanged;
-            top.Children.Add(TodoHotKey.BuildSettings());
-            TextBlock status = new TextBlock { Foreground = Brushes.SlateGray, Margin = new Thickness(0, 10, 0, 0) }; DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
-            DockPanel addRow = new DockPanel { Margin = new Thickness(0, 0, 0, 14) }; top.Children.Add(addRow);
-            TextBox entry = new TextBox { FontSize = 16, Padding = new Thickness(10), BorderThickness = new Thickness(0), Background = Brushes.Transparent, MaxLength = 160, ToolTip = "예: 기획서 작성 · Enter로 바로 등록" };
-            DispatcherTimer debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            Func<bool> persist = delegate { debounce.Stop(); bool ok = Save(); status.Text = ok ? "저장됨 · 프로그램을 다시 열어도 할 일이 남아요" : "간격을 1~1440분, 표시 시간을 1~3600초로 지정해 주세요. 저장되지 않았어요."; status.Foreground = ok ? Brushes.SlateGray : Brushes.Firebrick; return ok; };
-            saveEditor = persist;
-            Action changed = delegate { status.Text = "저장 중…"; debounce.Stop(); debounce.Start(); }; debounce.Tick += delegate { persist(); };
-            StackPanel list = new StackPanel(); ScrollViewer scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; root.Children.Add(scroll);
-            Action render = null;
-            WrapPanel filters = new WrapPanel { Margin = new Thickness(0, 8, 0, 8) }; top.Children.Add(filters);
-            filters.Children.Add(new TextBlock { Text = "메모 검색", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5) });
-            TextBox search = new TextBox { Width = 280, Padding = new Thickness(7), ToolTip = "메모 내용 검색" }; filters.Children.Add(search);
-            ComboBox filter = new ComboBox { Width = 160, Margin = new Thickness(8, 0, 0, 0), ItemsSource = new string[] { "전체", "미완료", "완료 · 최근순" }, SelectedIndex = 0 }; filters.Children.Add(filter);
-            TextBlock resultCount = new TextBlock { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }; filters.Children.Add(resultCount);
-            search.TextChanged += delegate { if (render != null) render(); };
-            filter.SelectionChanged += delegate { if (render != null) render(); };
-            Action add = delegate {
-                if (String.IsNullOrWhiteSpace(entry.Text)) { status.Text = "할 일을 먼저 입력해 주세요."; entry.Focus(); return; }
-                if (settings.Items.Count >= 50) { status.Text = "최대 50개까지 저장할 수 있어요. 완료한 항목을 삭제해 주세요."; return; }
-                List<PetWindow> pets = PetWindow.TodoPets(); int index = preferredPet == null ? 0 : Math.Max(0, pets.IndexOf(preferredPet));
-                TodoItem item = new TodoItem { Text = entry.Text.Trim(), PetIndex = index, Dedicated = preferredPet != null && preferredPet.IsTodoCompanion };
-                settings.Items.Add(item); if (!persist()) { settings.Items.Remove(item); return; } entry.Clear(); render(); scroll.ScrollToBottom();
-            };
-            Button addButton = Button("＋ 할 일 등록", add); DockPanel.SetDock(addButton, Dock.Right); addRow.Children.Add(addButton); addRow.Children.Add(new Border { Background = Brushes.White, BorderBrush = Brushes.LightSteelBlue, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Margin = new Thickness(0, 3, 7, 3), Child = entry });
-            top.Children.Add(Button("＋ 빈 포스트잇", delegate { AddBlank(new TodoItem()); }));
-            entry.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) { if (e.Key == System.Windows.Input.Key.Enter) { add(); e.Handled = true; } };
-            render = delegate {
-                list.Children.Clear();
-                Grid header = SettingsTableRow(); int column = 0;
-                foreach (string label in new string[] { "상태", "메모", "표시 방식 · 시간", "춘식이 모양", "글자 크기", "선명도", "색상", "관리" })
-                    SettingsCell(header, new TextBlock { Text = label, Foreground = Brushes.SlateGray, FontWeight = FontWeights.SemiBold }, column++);
-                list.Children.Add(header);
-                List<TodoItem> visibleItems = QueryItems(settings.Items, search.Text, filter.SelectedIndex);
-                resultCount.Text = visibleItems.Count + "개 / 전체 " + settings.Items.Count + "개";
-                foreach (TodoItem item in visibleItems) {
-                    Grid line = SettingsTableRow(); line.MinHeight = 96;
-                    Border card = new Border { Background = item.Done ? BubblePalette.BrushFor("#FFFDF2") : Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(224, 232, 242)), BorderThickness = new Thickness(0, 0, 0, 1), Child = line }; list.Children.Add(card);
-                    Button done = Button(item.Done ? "↶ 복원" : "○ 진행 중", delegate { if (!item.Done) Complete(item); else RestoreItem(item); });
-                    done.Padding = new Thickness(5, 7, 5, 7);
-                    done.ToolTip = item.Done ? "다시 할 일로 되돌리기" : "완료 처리하기";
-                    if (item.Done) { done.Background = BubblePalette.BrushFor("#D5F3DF"); done.Foreground = Brushes.DarkGreen; }
-                    SettingsCell(line, done, 0);
-                    StackPanel textArea = new StackPanel();
-                    TextBox title = new TextBox { Text = item.Text, FontSize = 14, Padding = new Thickness(6), MaxLength = 160, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 52, MaxHeight = 110, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, BorderBrush = Brushes.LightSteelBlue, Foreground = item.Done ? Brushes.Gray : Brushes.DarkSlateGray, ToolTip = "메모 내용 · 변경사항 자동 저장" };
-                    title.TextChanged += delegate { item.Text = title.Text; changed(); }; textArea.Children.Add(title);
-                    if (item.Done) textArea.Children.Add(new TextBlock { Text = item.CompletedAt.HasValue ? "완료 · " + item.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm") : "완료 · 날짜 기록 없음", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
-                    SettingsCell(line, textArea, 1);
-                    StackPanel management = new StackPanel();
-                    if (!item.Done) management.Children.Add(Button("미리보기", delegate { PreviewUI.Todo(win, item); }));
-                    Button delete = Button("삭제", delegate { int i = settings.Items.IndexOf(item); settings.Items.Remove(item); if (!persist()) settings.Items.Insert(i, item); render(); });
-                    delete.Background = Brushes.White; delete.Foreground = Brushes.SlateGray; management.Children.Add(delete); SettingsCell(line, management, 7);
-                    if (item.Done) continue;
-                    StackPanel display = new StackPanel();
-                    display.Children.Add(SettingChoice(new string[] { "항상 표시", "가끔 알림" }, item.Always ? 0 : 1, delegate(int value) { item.Always = value == 0; changed(); render(); }));
-                    if (!item.Always) {
-                        StackPanel intervalRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
-                        NumberField interval = new NumberField(item.EveryMinutes, 1440, "리마인드 간격 분"); intervalRow.Children.Add(interval);
-                        intervalRow.Children.Add(new TextBlock { Text = "분마다", Foreground = Brushes.SlateGray, Margin = new Thickness(5), VerticalAlignment = VerticalAlignment.Center }); display.Children.Add(intervalRow);
-                        interval.Changed += delegate { item.EveryMinutes = interval.Value; changed(); };
-                        StackPanel duration = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
-                        NumberField seconds = new NumberField(item.DisplaySeconds, 3600, "포스트잇 표시 시간 초"); duration.Children.Add(seconds);
-                        duration.Children.Add(new TextBlock { Text = "초 표시", Foreground = Brushes.SlateGray, Margin = new Thickness(5), VerticalAlignment = VerticalAlignment.Center }); display.Children.Add(duration);
-                        seconds.ToolTip = "1~3600초 · 표시 시간이 알림 간격보다 길면 숨긴 후 1초 뒤 다시 표시해요.";
-                        seconds.Changed += delegate { item.DisplaySeconds = seconds.Value; changed(); };
-                    }
-                    SettingsCell(line, display, 2);
-                    StackPanel placement = new StackPanel();
-                    Border shape = SettingChoice(new string[] { "빼꼼", "전신" }, item.Peek ? 0 : 1, delegate(int value) { item.Peek = value == 0; changed(); render(); }); shape.ToolTip = "춘식이 모양"; placement.Children.Add(shape);
-                    if (item.Standalone) placement.Children.Add(Button("위치 초기화", delegate { item.HasPosition = false; Runtime run; if (runtimes.TryGetValue(item.Id, out run)) run.Note.ResetPosition(); changed(); }));
-                    else {
-                        placement.Children.Add(SettingChoice(new string[] { "기존", "새 전담" }, item.Dedicated ? 1 : 0, delegate(int value) { item.Dedicated = value == 1; changed(); render(); }));
-                        if (!item.Dedicated) {
-                            List<string> petNames = new List<string>(); for (int i = 0; i < Math.Max(1, PetWindow.Count); i++) petNames.Add("춘식이 " + (i + 1));
-                            placement.Children.Add(SettingChoice(petNames.ToArray(), Math.Max(0, Math.Min(petNames.Count - 1, item.PetIndex)), delegate(int value) { item.PetIndex = value; changed(); }));
-                        }
-                    }
-                    SettingsCell(line, placement, 3);
-                    StackPanel font = new StackPanel();
-                    TextBlock fontValue = new TextBlock { Text = item.FontSize.ToString(), HorizontalAlignment = HorizontalAlignment.Center, Foreground = Brushes.SlateGray }; font.Children.Add(fontValue);
-                    StackPanel fontButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-                    Button smaller = Button("A−", delegate { item.FontSize = Math.Max(10, item.FontSize - 2); fontValue.Text = item.FontSize.ToString(); changed(); }); smaller.Padding = new Thickness(7);
-                    Button larger = Button("A+", delegate { item.FontSize = Math.Min(64, item.FontSize + 2); fontValue.Text = item.FontSize.ToString(); changed(); }); larger.Padding = new Thickness(7);
-                    fontButtons.Children.Add(smaller); fontButtons.Children.Add(larger); font.Children.Add(fontButtons); SettingsCell(line, font, 4);
-                    StackPanel opacity = new StackPanel();
-                    TextBlock opacityText = new TextBlock { Text = Math.Round(item.NoteOpacity * 100) + "%", HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6), Foreground = Brushes.SlateGray }; opacity.Children.Add(opacityText);
-                    Slider opacitySlider = new Slider { Minimum = 10, Maximum = 100, Value = item.NoteOpacity * 100, TickFrequency = 5, IsSnapToTickEnabled = true, ToolTip = "메모 선명도 10~100%" }; opacity.Children.Add(opacitySlider);
-                    opacitySlider.ValueChanged += delegate { item.NoteOpacity = opacitySlider.Value / 100; opacityText.Text = Math.Round(opacitySlider.Value) + "%"; changed(); }; SettingsCell(line, opacity, 5);
-                    SettingsCell(line, BubblePalette.Picker(item.Color, delegate(string color) { item.Color = color; changed(); }, 3), 6);
-                }
-                if (visibleItems.Count == 0) list.Children.Add(new TextBlock { Text = settings.Items.Count == 0 ? "아직 할 일이 없어요. 위에서 하나 등록해 보세요." : "검색·필터 조건에 맞는 메모가 없어요.", Margin = new Thickness(10, 30, 10, 10), Foreground = Brushes.SlateGray });
-            };
-            renderEditor = render; render();
-            win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !persist()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); } };
-            win.Closed += delegate { TodoHotKey.Changed -= hotkeyChanged; debounce.Stop(); editor = null; renderEditor = null; saveEditor = null; }; SettingsHub.Attach(win, "포스트잇", persist);
         }
     }
     public sealed class TodoNote : Window {

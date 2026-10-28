@@ -39,3 +39,7 @@ jobs:
           name: ChunsikPet-Windows-x64
           path: ChunsikDesktopPet/bin/x64/Release/ChunsikPet.exe
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Postit-settings-preview
+          path: tests/bin/postit-settings.png
