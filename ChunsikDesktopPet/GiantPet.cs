@@ -34,7 +34,7 @@ namespace ChunsikDesktop {
         void ReactGiant() {
             if (!giant) return;
             giantReactionUntil = clock.Elapsed.TotalSeconds + 1.6;
-            giantBadge.Text = "♥ 든든하게 지켜줄게!";
+            giantBadge.Text = "여기 있을게.";
         }
         void TickGiant(double now) {
             ShowGiantFrame();

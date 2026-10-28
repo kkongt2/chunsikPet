@@ -29,7 +29,7 @@ internal static class GiantPetTests {
             Call(pet, "Tick", null, EventArgs.Empty);
             Check(!(bool)Field(pet, "pressed") && !(bool)Field(pet, "dragging") && !(bool)Field(pet, "falling"), "cannot grab or fly");
             Check(new Point(pet.Left, pet.Top) == before, "reaction does not move pet");
-            Check(((TextBlock)Field(pet, "giantBadge")).Text.Contains("든든"), "unique reaction appears");
+            Check(((TextBlock)Field(pet, "giantBadge")).Text.Contains("여기 있을게."), "unique reaction appears");
             List<PetPlacement> saved = PetWindow.CapturePlacements();
             Check(saved.Count == 1 && saved[0].Giant && saved[0].IsValid(), "saved giant placement remains valid");
             XmlSerializer serializer = new XmlSerializer(typeof(PetPlacement));
