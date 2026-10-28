@@ -459,7 +459,7 @@ namespace ChunsikDesktop {
                     updated.Items.Add(copy);
                 }
                 EnsureBuiltins(updated);
-                try { Write(updated); } catch (Exception ex) { status.Text = "저장 실패: " + ex.Message; status.Foreground = Brushes.Firebrick; return false; }
+                try { Write(updated); } catch (Exception ex) { Diagnostics.Record("알림 설정 저장", ex); status.Text = "저장 실패: " + ex.Message; status.Foreground = Brushes.Firebrick; return false; }
                 foreach (Reminder next in updated.Items) foreach (Reminder prior in settings.Items)
                     if (next.Id == prior.Id && !ReminderRules.SameSchedule(prior, next)) dateSeen.RemoveWhere(delegate(string key) { return key.StartsWith(next.Id + ":", StringComparison.Ordinal); });
                 ResetIntervals(updated, settings, DateTime.Now);

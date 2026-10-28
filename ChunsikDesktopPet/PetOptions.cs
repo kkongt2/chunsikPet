@@ -97,6 +97,7 @@ namespace ChunsikDesktop {
                     else File.Move(temp, PathName);
                 } finally { if (File.Exists(temp)) File.Delete(temp); }
             } catch (Exception ex) {
+                Diagnostics.Record("캐릭터 설정 저장", ex);
                 if (notify) MessageBox.Show("설정을 저장하지 못했어요.\n" + ex.Message, "춘식이 설정"); return false;
             }
             return true;

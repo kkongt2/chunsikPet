@@ -54,6 +54,7 @@
     <Compile Include="ReminderHistory.cs" />
     <Compile Include="PetOptions.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Diagnostics.cs" />
     <Compile Include="Reminders.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
@@ -74,5 +75,6 @@
     <EmbeddedResource Include="holidays-2025-2040.csv"><LogicalName>Assets.holidays-2025-2040.csv</LogicalName></EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="Version.targets" />
 </Project>
 

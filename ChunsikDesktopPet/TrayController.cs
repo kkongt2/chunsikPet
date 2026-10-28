@@ -157,7 +157,7 @@ namespace ChunsikDesktop {
                 Margin = new Thickness(0, 20, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
             });
             card.Children.Add(new System.Windows.Controls.TextBlock {
-                Text = "v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3), FontSize = 16, FontWeight = FontWeights.SemiBold,
+                Text = "v" + Diagnostics.Version, FontSize = 16, FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 6, 0, 0), HorizontalAlignment = HorizontalAlignment.Center
             });
             content.Children.Add(new System.Windows.Controls.Border {
@@ -170,6 +170,7 @@ namespace ChunsikDesktop {
             close.Click += delegate { SettingsHub.Close(); }; content.Children.Add(close);
             System.Windows.Controls.Button export = new System.Windows.Controls.Button { Content = "설정 백업 내보내기", Padding = new Thickness(12), Margin = new Thickness(0, 4, 0, 4) }; export.Click += delegate { SettingsBackup.Export(); }; content.Children.Add(export);
             System.Windows.Controls.Button import = new System.Windows.Controls.Button { Content = "설정 복원", Padding = new Thickness(12) }; import.Click += delegate { SettingsBackup.Import(); }; content.Children.Add(import);
+            System.Windows.Controls.Button diagnostics = new System.Windows.Controls.Button { Content = "오류 진단 정보 보기 · 복사", Padding = new Thickness(12), Margin = new Thickness(0, 8, 0, 0) }; diagnostics.Click += delegate { Diagnostics.Open(); }; content.Children.Add(diagnostics);
             SettingsHub.Attach(win, "프로그램", null);
         }
         public void Dispose() {

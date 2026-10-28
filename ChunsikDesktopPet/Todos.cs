@@ -130,7 +130,7 @@ namespace ChunsikDesktop {
                 using (FileStream stream = File.Create(temp)) Serializer.Serialize(stream, settings);
                 if (File.Exists(FilePath)) File.Replace(temp, FilePath, FilePath + ".bak", true); else File.Move(temp, FilePath);
                 if (!stopping) Sync(); return true;
-            } catch (Exception e) { MessageBox.Show("할 일 저장에 실패했어요. " + e.Message, "춘식이 할 일"); return false; }
+            } catch (Exception e) { Diagnostics.Record("포스트잇 저장", e); MessageBox.Show("할 일 저장에 실패했어요. " + e.Message, "춘식이 할 일"); return false; }
         }
         void DisposeRuntime(Runtime run) { run.Note.DisposeNote(); if (run.Owned != null) run.Owned.Close(); }
         void Sync() {

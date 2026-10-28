@@ -7,12 +7,11 @@ using System.Windows;
 [assembly: AssemblyDescription("Desktop companion, reminders and sticky notes")]
 [assembly: AssemblyCompany("kkongt2.kang")]
 [assembly: AssemblyProduct("Chunsik Desktop Pet")]
-[assembly: AssemblyVersion("1.53.0.0")]
-[assembly: AssemblyFileVersion("1.53.0.0")]
 namespace ChunsikDesktop {
     internal static class Program {
         [STAThread]
         private static void Main() {
+            Diagnostics.Install();
             try {
                 string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "assets-v32");
                 Directory.CreateDirectory(folder);
@@ -35,7 +34,7 @@ namespace ChunsikDesktop {
                 }
                 PetWindow.Run(folder);
             } catch (Exception error) {
-                MessageBox.Show("춘식이를 시작하지 못했어요.\n\n" + error.ToString(), "춘식이 실행 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                Diagnostics.ShowError("춘식이 시작·실행 오류", error);
             }
         }
     }

@@ -23,7 +23,7 @@ namespace ChunsikDesktop {
             if (dialog.ShowDialog() != true) return;
             try { SettingsBundle bundle = new SettingsBundle { Format = 1, Version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(), Reminders = ReminderService.Current.Snapshot(), Todos = TodoService.Current.Snapshot(), Pets = PetPreferences.Current.Options, Fullscreen = PresentationPolicy.FullscreenEnabled };
                 File.WriteAllBytes(dialog.FileName, Bytes(bundle)); MessageBox.Show("알림·할 일·캐릭터 설정을 백업했어요.");
-            } catch (Exception e) { MessageBox.Show("백업 실패: " + e.Message); }
+            } catch (Exception e) { Diagnostics.Record("설정 백업", e); MessageBox.Show("백업 실패: " + e.Message); }
         }
         static void Validate(SettingsBundle b) {
             if (b == null || b.Format != 1 || b.Reminders == null || b.Todos == null || b.Pets == null || !PetPreferences.Valid(b.Pets)) throw new InvalidDataException("지원하지 않거나 잘못된 백업입니다.");
@@ -55,7 +55,8 @@ namespace ChunsikDesktop {
                 try { foreach (string name in files.Keys) { string target = Path.Combine(folder, name); File.WriteAllBytes(target + ".restore", files[name]); if (File.Exists(target)) File.Replace(target + ".restore", target, target + ".bak"); else File.Move(target + ".restore", target); } }
                 catch { foreach (string name in originals.Keys) { string target = Path.Combine(folder, name); if (originals[name] == null) File.Delete(target); else File.WriteAllBytes(target, originals[name]); } throw; }
                 MessageBox.Show("설정을 복원했어요. EXE를 다시 실행해 주세요.\n이전 설정은 " + backup + "에 보관했어요."); PetWindow.Quit();
-            } catch (Exception e) { MessageBox.Show("복원 실패: " + e.Message); }
+            } catch (Exception e) { Diagnostics.Record("설정 복원", e); MessageBox.Show("복원 실패: " + e.Message); }
         }
     }
 }
+

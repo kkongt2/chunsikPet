@@ -1,0 +1,26 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="GenerateVersionInfo" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\..\VERSION')" Text="VERSION file is required." />
+    <PropertyGroup>
+      <PetVersion>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\..\VERSION').Trim())</PetVersion>
+      <ValidPetVersion>$([System.Text.RegularExpressions.Regex]::IsMatch('$(PetVersion)', '^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$'))</ValidPetVersion>
+    </PropertyGroup>
+    <Error Condition="'$(ValidPetVersion)' != 'True'" Text="VERSION must be major.minor.patch with numeric components (0..65534)." />
+    <PropertyGroup>
+      <VersionMajor>$([System.Version]::Parse('$(PetVersion)').Major)</VersionMajor>
+      <VersionMinor>$([System.Version]::Parse('$(PetVersion)').Minor)</VersionMinor>
+      <VersionPatch>$([System.Version]::Parse('$(PetVersion)').Build)</VersionPatch>
+    </PropertyGroup>
+    <Error Condition="$(VersionMajor) &gt; 65534 Or $(VersionMinor) &gt; 65534 Or $(VersionPatch) &gt; 65534" Text="VERSION components must be 0..65534." />
+    <ItemGroup>
+      <PetVersionAttribute Include="System.Reflection.AssemblyVersionAttribute"><_Parameter1>$(PetVersion).0</_Parameter1></PetVersionAttribute>
+      <PetVersionAttribute Include="System.Reflection.AssemblyFileVersionAttribute"><_Parameter1>$(PetVersion).0</_Parameter1></PetVersionAttribute>
+      <PetVersionAttribute Include="System.Reflection.AssemblyInformationalVersionAttribute"><_Parameter1>$(PetVersion)</_Parameter1></PetVersionAttribute>
+    </ItemGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <WriteCodeFragment Language="C#" AssemblyAttributes="@(PetVersionAttribute)" OutputFile="$(IntermediateOutputPath)Version.g.cs">
+      <Output TaskParameter="OutputFile" ItemName="Compile" />
+      <Output TaskParameter="OutputFile" ItemName="FileWrites" />
+    </WriteCodeFragment>
+  </Target>
+</Project>
