@@ -34,6 +34,7 @@
     </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="CheckBox">
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="Foreground" Value="{StaticResource ControlInk}"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#B8C5D6"/>
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
       <Grid Background="Transparent"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -158,18 +159,27 @@
       <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="grip" Property="Background" Value="#8EA4C3"/></Trigger><Trigger Property="IsDragging" Value="True"><Setter TargetName="grip" Property="Background" Value="#6688BA"/></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
   </Style>
+  <Style x:Key="ScrollArrow" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False"/><Setter Property="Foreground" Value="#7F94B0"/><Setter Property="FontSize" Value="9"/>
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton"><Border x:Name="arrow" Background="Transparent" CornerRadius="3"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="arrow" Property="Background" Value="#E2EBFC"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
   <Style TargetType="ScrollBar">
     <Setter Property="Width" Value="12"/><Setter Property="Background" Value="#F5F7FA"/>
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
-      <Grid Background="{TemplateBinding Background}">
+      <DockPanel Background="{TemplateBinding Background}">
+        <RepeatButton x:Name="lineStart" DockPanel.Dock="Top" Height="12" Content="⌃" Style="{StaticResource ScrollArrow}" Command="{x:Static ScrollBar.LineUpCommand}" CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
+        <RepeatButton x:Name="lineEnd" DockPanel.Dock="Bottom" Height="12" Content="⌄" Style="{StaticResource ScrollArrow}" Command="{x:Static ScrollBar.LineDownCommand}" CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/>
         <Track x:Name="PART_Track" Orientation="{TemplateBinding Orientation}" IsDirectionReversed="True" ViewportSize="{TemplateBinding ViewportSize}">
           <Track.DecreaseRepeatButton><RepeatButton x:Name="decrease" Style="{StaticResource TrackButton}" Command="{x:Static ScrollBar.PageUpCommand}" CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/></Track.DecreaseRepeatButton>
           <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}"/></Track.Thumb>
           <Track.IncreaseRepeatButton><RepeatButton x:Name="increase" Style="{StaticResource TrackButton}" Command="{x:Static ScrollBar.PageDownCommand}" CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"/></Track.IncreaseRepeatButton>
         </Track>
-      </Grid>
+      </DockPanel>
       <ControlTemplate.Triggers>
-        <Trigger Property="Orientation" Value="Horizontal"><Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/><Setter TargetName="decrease" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}"/><Setter TargetName="increase" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}"/></Trigger>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter TargetName="lineStart" Property="DockPanel.Dock" Value="Left"/><Setter TargetName="lineStart" Property="Height" Value="Auto"/><Setter TargetName="lineStart" Property="Width" Value="12"/><Setter TargetName="lineStart" Property="Content" Value="‹"/><Setter TargetName="lineStart" Property="Command" Value="{x:Static ScrollBar.LineLeftCommand}"/>
+          <Setter TargetName="lineEnd" Property="DockPanel.Dock" Value="Right"/><Setter TargetName="lineEnd" Property="Height" Value="Auto"/><Setter TargetName="lineEnd" Property="Width" Value="12"/><Setter TargetName="lineEnd" Property="Content" Value="›"/><Setter TargetName="lineEnd" Property="Command" Value="{x:Static ScrollBar.LineRightCommand}"/>
+          <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/><Setter TargetName="decrease" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}"/><Setter TargetName="increase" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}"/></Trigger>
         <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.35"/></Trigger>
       </ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>

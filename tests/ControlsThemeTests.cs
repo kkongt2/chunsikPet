@@ -67,7 +67,7 @@ internal static class ControlsThemeTests {
             foreach (ScrollBar bar in All<ScrollBar>(scroll)) {
                 Check(bar.Style != null && bar.Template.FindName("PART_Track", bar) is Track, "scrollbar template/track");
             }
-            scroll.ScrollToTop(); scroll.ScrollToLeft(); Pump(); win.UpdateLayout();
+            scroll.ScrollToTop(); scroll.ScrollToLeftEnd(); Pump(); win.UpdateLayout();
             RenderTargetBitmap bitmap = new RenderTargetBitmap((int)win.ActualWidth, (int)win.ActualHeight, 96,96,PixelFormats.Pbgra32); bitmap.Render(win);
             PngBitmapEncoder encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using (MemoryStream bytes = new MemoryStream()) { encoder.Save(bytes); File.WriteAllBytes("tests/bin/controls-theme.png", bytes.ToArray()); Console.WriteLine("CONTROLS_PREVIEW_BASE64=" + Convert.ToBase64String(bytes.ToArray())); }
