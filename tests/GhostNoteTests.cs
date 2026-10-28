@@ -14,6 +14,7 @@ internal static class GhostNoteTests {
     static void Pump() { Application.Current.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(delegate {})); }
     [STAThread] public static void Main() {
         Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        typeof(TodoService).Assembly.GetType("ChunsikDesktop.SettingsTheme").GetMethod("Install").Invoke(null, new object[] { app });
         TodoNote.LoadArt(System.IO.Path.GetFullPath("ChunsikDesktopPet"));
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-tickle.png") });
         typeof(PetWindow).GetField("reactionFrames", BindingFlags.Static | BindingFlags.NonPublic).SetValue(null, typeof(PetWindow).GetField("frames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
@@ -27,6 +28,7 @@ internal static class GhostNoteTests {
         MenuTests.Run();
         DiagnosticsTests.Run();
         PostitEditorTests.Run();
+        ControlsThemeTests.Run();
         double escapeTarget;
         Rect work = new Rect(0, 0, 1920, 1080);
         Check(InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(880, 880, 200, 160), out escapeTarget) && escapeTarget == 778, "input avoidance chooses nearest free side");

@@ -78,6 +78,7 @@
     <EmbeddedResource Include="chunsik-stretch.png"><LogicalName>Assets.chunsik-stretch.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-tickle.png"><LogicalName>Assets.chunsik-tickle.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-water.png"><LogicalName>Assets.chunsik-water.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="ControlsTheme.xaml"><LogicalName>Theme.Controls.xaml</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="holidays-2025-2040.csv"><LogicalName>Assets.holidays-2025-2040.csv</LogicalName></EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

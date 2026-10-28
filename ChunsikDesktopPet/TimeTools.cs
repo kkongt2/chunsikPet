@@ -58,7 +58,8 @@ namespace ChunsikDesktop {
         }
         static Button ActionButton(string text) {
             Button button = new Button { Content = text, Margin = new Thickness(3), Padding = new Thickness(12, 7, 12, 7), Cursor = Cursors.Hand, Foreground = Brushes.DarkSlateBlue };
-            button.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='b' CornerRadius='12' Background='#EAF3FF' BorderBrush='#C9DBF1' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='b' Property='Background' Value='#D7E9FF'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#0064A8'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            button.Template = SettingsTheme.SharedButtonTemplate;
+            button.Background = BubblePalette.BrushFor("#D9EAFE"); button.BorderBrush = SettingsTheme.Line;
             return button;
         }
         TimeToolWindow(bool isCountdown) {

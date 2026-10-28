@@ -880,7 +880,7 @@ namespace ChunsikDesktop {
             BuildSeatedScootFrames();
             LoadSleepingFrame(Path.Combine(folder, "chunsik-sleep.png"));
             TodoNote.LoadArt(folder);
-            Application app = new Application(); Diagnostics.Attach(app); app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Application app = new Application(); SettingsTheme.Install(app); Diagnostics.Attach(app); app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             PetPreferences.Current = new PetPreferences();
             ReminderService.Current = new ReminderService();
             TodoService.Current = new TodoService();

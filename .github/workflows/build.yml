@@ -43,3 +43,7 @@ jobs:
         with:
           name: Postit-settings-preview
           path: tests/bin/postit-settings.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shared-controls-preview
+          path: tests/bin/controls-theme.png
