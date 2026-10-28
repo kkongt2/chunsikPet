@@ -29,6 +29,8 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
@@ -44,6 +46,7 @@
     <Compile Include="PetReactions.cs" />
     <Compile Include="PetManagement.cs" />
     <Compile Include="InputAvoidance.cs" />
+    <Compile Include="AutomationCaret.cs" />
     <Compile Include="PreviewUI.cs" />
     <Compile Include="Scheduling.cs" />
     <Compile Include="ScreenLayout.cs" />

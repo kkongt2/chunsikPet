@@ -4,13 +4,15 @@ using System.Runtime.InteropServices;
 using System.Windows;
 
 namespace ChunsikDesktop {
-    // Geometry only: no keyboard hooks, key states, text, accessibility tree or event history.
-    // All pets share a lazy 4 Hz sample on the UI thread; no extra timer/thread is created.
+    // Geometry only: no keyboard hooks or text contents. Win32 first, bounded asynchronous UIA fallback.
+    // All pets share a 4 Hz sample; UIA providers never run on the animation/UI thread.
     public static class InputAvoidance {
         static readonly Stopwatch clock = Stopwatch.StartNew();
         static readonly uint ownProcess = (uint)Process.GetCurrentProcess().Id;
         static double nextSample;
         static Rect caret = Rect.Empty;
+        static IntPtr sampledWindow;
+        public static string DetectionStatus { get; private set; }
         [StructLayout(LayoutKind.Sequential)] struct POINT { public int X, Y; }
         [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] struct GUITHREADINFO {
@@ -29,13 +31,15 @@ namespace ChunsikDesktop {
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool LogicalToPhysicalPointForPerMonitorDPI(IntPtr window, ref POINT point);
 
-        public static void Clear() { caret = Rect.Empty; nextSample = 0; }
+        public static void Clear() { caret = Rect.Empty; nextSample = 0; sampledWindow = IntPtr.Zero; AutomationCaret.Clear(); DetectionStatus = "비활성"; }
         public static Rect CaretPixels() {
             PetPreferences prefs = PetPreferences.Current;
             if (prefs == null || !prefs.Options.AvoidCursor || PresentationPolicy.IsSuppressed || prefs.InputIdleSeconds > 3) {
                 Clear(); return Rect.Empty;
             }
             double now = clock.Elapsed.TotalSeconds;
+            IntPtr active = GetForegroundWindow();
+            if (active != sampledWindow) { caret = Rect.Empty; nextSample = 0; AutomationCaret.Clear(); sampledWindow = active; }
             if (now < nextSample) return caret;
             nextSample = now + 0.25; caret = Rect.Empty;
             IntPtr foreground = GetForegroundWindow();
@@ -43,9 +47,16 @@ namespace ChunsikDesktop {
             uint process;
             uint thread = GetWindowThreadProcessId(foreground, out process);
             if (thread == 0 || process == ownProcess) return caret;
+            caret = NativeCaret(foreground, thread);
+            if (!caret.IsEmpty) { AutomationCaret.Clear(); DetectionStatus = "Win32"; return caret; }
+            caret = AutomationCaret.Sample(foreground);
+            DetectionStatus = AutomationCaret.Status;
+            return caret;
+        }
+        static Rect NativeCaret(IntPtr foreground, uint thread) {
             GUITHREADINFO info = new GUITHREADINFO { Size = (uint)Marshal.SizeOf(typeof(GUITHREADINFO)) };
-            if (!GetGUIThreadInfo(thread, ref info) || info.Caret == IntPtr.Zero || info.Focus == IntPtr.Zero || (info.Flags & 0x1E) != 0) return caret;
-            if (info.Bounds.Bottom <= info.Bounds.Top || info.Bounds.Right < info.Bounds.Left) return caret;
+            if (!GetGUIThreadInfo(thread, ref info) || info.Caret == IntPtr.Zero || info.Focus == IntPtr.Zero || (info.Flags & 0x1E) != 0) return Rect.Empty;
+            if (info.Bounds.Bottom <= info.Bounds.Top || info.Bounds.Right < info.Bounds.Left) return Rect.Empty;
             POINT first = new POINT { X = info.Bounds.Left, Y = info.Bounds.Top };
             POINT last = new POINT { X = info.Bounds.Right, Y = info.Bounds.Bottom };
             // rcCaret is expressed in the owner window's logical coordinates.
@@ -54,13 +65,12 @@ namespace ChunsikDesktop {
             try {
                 previous = SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(info.Caret));
                 if (previous == IntPtr.Zero || !ClientToScreen(info.Caret, ref first) || !ClientToScreen(info.Caret, ref last) ||
-                    !LogicalToPhysicalPointForPerMonitorDPI(info.Caret, ref first) || !LogicalToPhysicalPointForPerMonitorDPI(info.Caret, ref last)) return caret;
-            } catch (EntryPointNotFoundException) { return caret; }
+                    !LogicalToPhysicalPointForPerMonitorDPI(info.Caret, ref first) || !LogicalToPhysicalPointForPerMonitorDPI(info.Caret, ref last)) return Rect.Empty;
+            } catch (EntryPointNotFoundException) { return Rect.Empty; }
             finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
             // Discard stale focus/closed-window data; blink phase is deliberately ignored.
-            if (GetForegroundWindow() != foreground || last.Y <= first.Y || last.X < first.X) return caret;
-            caret = new Rect(first.X, first.Y, Math.Max(1, last.X - first.X), last.Y - first.Y);
-            return caret;
+            if (GetForegroundWindow() != foreground || last.Y <= first.Y || last.X < first.X) return Rect.Empty;
+            return new Rect(first.X, first.Y, Math.Max(1, last.X - first.X), last.Y - first.Y);
         }
 
         // Return a reachable horizontal position outside the protected input area.
@@ -83,3 +93,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+
