@@ -10,6 +10,7 @@ using System.Xml.Serialization;
 
 namespace ChunsikDesktop {
     public class PetPlacement {
+        public bool Giant { get; set; }
         public double Speed { get; set; }
         public string MonitorDevice { get; set; }
         public double RelativeX { get; set; }
@@ -108,7 +109,7 @@ namespace ChunsikDesktop {
             bool same = Options.PetCount == positions.Count && Options.Placements != null && Options.Placements.Count == positions.Count;
             if (same) for (int i = 0; i < positions.Count; i++) {
                 PetPlacement a = Options.Placements[i], b = positions[i];
-                if (a == null || a.Size != b.Size || a.Speed != b.Speed || a.Paused != b.Paused || a.MonitorDevice != b.MonitorDevice || Math.Abs(a.RelativeX - b.RelativeX) > 0.0001 || Math.Abs(a.RelativeY - b.RelativeY) > 0.0001 || Math.Abs(a.CenterX - b.CenterX) > 0.5 || Math.Abs(a.BottomY - b.BottomY) > 0.5) { same = false; break; }
+                if (a == null || a.Size != b.Size || a.Giant != b.Giant || a.Speed != b.Speed || a.Paused != b.Paused || a.MonitorDevice != b.MonitorDevice || Math.Abs(a.RelativeX - b.RelativeX) > 0.0001 || Math.Abs(a.RelativeY - b.RelativeY) > 0.0001 || Math.Abs(a.CenterX - b.CenterX) > 0.5 || Math.Abs(a.BottomY - b.BottomY) > 0.5) { same = false; break; }
             }
             if (same) return;
             PetOptions value = Options.Copy(); value.PetCount = positions.Count; value.Placements = positions;

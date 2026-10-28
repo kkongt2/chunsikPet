@@ -240,7 +240,7 @@ namespace ChunsikDesktop {
                 Rect bounds = ScreenLayout.BoundsPixels(pet); if (bounds.IsEmpty) return null;
                 System.Windows.Forms.Screen screen = pet.CurrentScreen();
                 Rect work = MonitorWork(screen);
-                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.size, Speed = pet.speed,
+                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.giant ? 500 : pet.size, Giant = pet.giant, Speed = pet.speed,
                     CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom, MonitorDevice = screen.DeviceName,
                     RelativeX = PlacementGeometry.Fraction(bounds.Left, work.Left, work.Width - bounds.Width),
                     RelativeY = PlacementGeometry.Fraction(bounds.Top, work.Top, work.Height - bounds.Height) });
@@ -283,7 +283,7 @@ namespace ChunsikDesktop {
             picture.RenderTransformOrigin = new Point(0.5, 1);
             TransformGroup effects = new TransformGroup(); effects.Children.Add(flip); effects.Children.Add(squirm); effects.Children.Add(hop);
             picture.RenderTransform = effects;
-            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); root.Children.Add(managementHighlight); Content = root;
+            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); root.Children.Add(managementHighlight); root.Children.Add(giantBadge); Content = root;
             RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
             MouseRightButtonDown += delegate { if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake(); EndReaction(); recentClicks.Clear(); };
             MouseLeftButtonDown += OnDown; MouseMove += OnMove; MouseLeftButtonUp += OnUp;
@@ -300,7 +300,7 @@ namespace ChunsikDesktop {
                     int index = Pets.IndexOf(this);
                     if (positions != null && index >= 0 && index < positions.Count && positions[index] != null && positions[index].IsValid()) saved = positions[index];
                 }
-                ResizePet(saved == null ? 80 : saved.Size);
+                ResizePet(saved == null ? 80 : saved.Giant ? GiantSize : saved.Size);
                 if (!IsTodoCompanion && PetPreferences.Current != null) PresentationPolicy.SetOpacity(this, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
                 Rect area = WorkArea(); Left = area.Left + Rng.NextDouble() * Math.Max(0, area.Width - Width);
                 Top = area.Bottom - Height;
@@ -357,6 +357,7 @@ namespace ChunsikDesktop {
             wings.Child = pair; wings.RenderTransformOrigin = new Point(0.5, 0.72); wings.RenderTransform = wingScale;
         }
         void StartFall() {
+            if (giant) return;
             double feet = Top + Height, center = Left + Width / 2;
             Wake(); EndReaction(); StopNoticeAnimation();
             falling = true; fallArea = WorkArea(); fallStart = clock.Elapsed.TotalSeconds; landedAt = -1;
@@ -447,6 +448,7 @@ namespace ChunsikDesktop {
         }
 
         void LayoutPet() {
+            if (giant) { FitGiant(); return; }
             double center = IsLoaded && !Double.IsNaN(Left) ? Left + Width / 2 : SystemParameters.WorkArea.Left + Width / 2;
             Width = Math.Ceiling(size * maxW / maxH + 12 + (reactionKind == 0 ? 0 : size * 0.45));
             Height = size + 6 + (reactionKind == 0 ? 0 : size * 0.22 + 18);
@@ -473,7 +475,15 @@ namespace ChunsikDesktop {
         }
         void ResizePet(double value) {
             double feet = Top + Height;
-            size = value; LayoutPet(); SetFrame(frame);
+            if (value != GiantSize && (value < 50 || value > 500)) return;
+            if (giant || value == GiantSize) {
+                pressed = dragging = false; ReleaseMouseCapture();
+                CancelCue(); EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction(); Wake();
+            }
+            giant = value == GiantSize; giantReactionUntil = 0;
+            giantBadge.Visibility = giant ? Visibility.Visible : Visibility.Collapsed;
+            if (!giant) size = value;
+            LayoutPet(); SetFrame(giant ? 4 : frame);
             if (falling) { Top = Math.Min(feet, fallArea.Bottom) - Height; fallCenter = Left + Width / 2; }
             if (placementReady && !IsTodoCompanion && PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
@@ -511,6 +521,7 @@ namespace ChunsikDesktop {
         }
         static double Clamp(double n, double lo, double hi) { return Math.Max(lo, Math.Min(Math.Max(lo, hi), n)); }
         void SetFrame(int index) {
+            if (giant) { ShowGiantFrame(); return; }
             scooting = false; frame = index;
             picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
             if (paused && index == 6 && pausedSeatedFrame != null) picture.Source = pausedSeatedFrame;
@@ -528,6 +539,7 @@ namespace ChunsikDesktop {
             foreach (PetWindow pet in Pets) pet.BeginPayday();
         }
         void BeginPayday() {
+            if (giant) { ReactGiant(); return; }
             // Dragging and parachuting remain under the user's control.
             if (pressed || dragging || falling) return;
             EndReaction(); StopNoticeAnimation(); Wake();
@@ -571,6 +583,7 @@ namespace ChunsikDesktop {
         void Tick(object sender, EventArgs args) {
             double now = clock.Elapsed.TotalSeconds, dt = Math.Min(0.1, now - lastTime); lastTime = now;
             if (presentationPaused || closing || pressed || dragging || movingMonitor) return;
+            if (giant) { TickGiant(now); return; }
             if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
             if (falling) { CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
@@ -654,6 +667,7 @@ namespace ChunsikDesktop {
         }
         void OnDown(object sender, MouseButtonEventArgs e) {
             if (!picture.IsMouseOver) return;
+            if (giant) { ReactGiant(); e.Handled = true; return; }
             // Capture the pointer and body anchor before removing wings/parachute:
             // their larger window can still have an old WPF layout during this event.
             Point bodyPoint = e.GetPosition(picture);
@@ -663,6 +677,7 @@ namespace ChunsikDesktop {
             e.Handled = true;
         }
         void BeginGrab(Point pointerPixels, Point bodyFraction) {
+            if (giant) { ReactGiant(); return; }
             pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
             if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
             CancelCue(); wasEvading = false; EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction();
@@ -676,7 +691,7 @@ namespace ChunsikDesktop {
             origin = ScreenLayout.BoundsPixels(this).TopLeft;
         }
         void OnMove(object sender, MouseEventArgs e) {
-            if (!pressed || e.LeftButton != MouseButtonState.Pressed) return;
+            if (giant || !pressed || e.LeftButton != MouseButtonState.Pressed) return;
             Point at = PointToScreen(e.GetPosition(this));
             PresentationSource src = PresentationSource.FromVisual(this);
             if (src == null || src.CompositionTarget == null) return;
@@ -689,7 +704,7 @@ namespace ChunsikDesktop {
             if (dragging) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
         }
         void OnUp(object sender, MouseButtonEventArgs e) {
-            if (!pressed) return;
+            if (giant || !pressed) return;
             bool click = !dragging && clock.Elapsed.TotalSeconds - pressedAt <= 0.7;
             FinishDrag();
             if (click && !falling) StartTickle(); else recentClicks.Clear();
@@ -738,6 +753,8 @@ namespace ChunsikDesktop {
                 controls[0].ToolTip = paused ? "이 춘식이 다시 걷기" : "이 춘식이 쉬기";
                 controls[1].ToolTip = "모든 춘식이의 마우스·입력 위치 피하기 " + (avoid ? "끄기" : "켜기");
                 controls[2].ToolTip = (hidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기") + " · " + TodoHotKey.Label;
+                if (giant) { labels[0].Text = "초대형 고정"; states[0].Text = "이 춘식이 · 이동 안 함"; }
+                controls[0].IsEnabled = !giant;
                 controls[1].IsEnabled = PetPreferences.Current != null;
                 controls[2].IsEnabled = TodoService.Current != null;
                 bool[] active = { false, avoid, false };
@@ -763,8 +780,9 @@ namespace ChunsikDesktop {
                 return menu;
             }
             AddQuickSettings(menu);
+            MenuItem shrink = Item("보통 크기로 돌아가기", delegate { ResizePet(80); }); menu.Items.Add(shrink);
             MenuItem sizes = new MenuItem();
-            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500 }) {
+            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500, GiantSize }) {
                 double selected = value; MenuItem choice = Item(SizeName(value), delegate { ResizePet(selected); });
                 choice.Tag = value; sizes.Items.Add(choice);
             }
@@ -786,9 +804,11 @@ namespace ChunsikDesktop {
                 } else PetPreferences.Current.ChangeCount(Pets.Count - 1, this);
             }); menu.Items.Add(remove);
             menu.Opened += delegate {
-                sizes.Header = "크기 · " + SizeName(size);
+                shrink.Visibility = giant ? Visibility.Visible : Visibility.Collapsed;
+                speeds.IsEnabled = !giant;
+                sizes.Header = "크기 · " + SizeName(SelectedSize);
                 speeds.Header = "걷는 속도 · " + SpeedName(speed);
-                foreach (MenuItem item in sizes.Items) item.IsChecked = (double)item.Tag == size;
+                foreach (MenuItem item in sizes.Items) item.IsChecked = (double)item.Tag == SelectedSize;
                 foreach (MenuItem item in speeds.Items) item.IsChecked = (double)item.Tag == speed;
                 add.IsEnabled = Pets.Count < 20;
                 remove.Header = Pets.Count == 1 ? "프로그램 종료…" : "이 춘식이 제거";

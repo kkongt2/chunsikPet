@@ -68,7 +68,7 @@ namespace ChunsikDesktop {
             System.Windows.Forms.ToolStripMenuItem pause = Item("모두 쉬게 하기", delegate { PetWindow.PauseAll(!PetWindow.AllPaused); }); menu.Items.Add(pause);
             System.Windows.Forms.ToolStripMenuItem all = new System.Windows.Forms.ToolStripMenuItem("모든 춘식이 설정"); menu.Items.Add(all);
             System.Windows.Forms.ToolStripMenuItem sizes = new System.Windows.Forms.ToolStripMenuItem("크기");
-            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500 }) {
+            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500, PetWindow.GiantSize }) {
                 double selected = value; System.Windows.Forms.ToolStripMenuItem choice = Item(PetWindow.SizeName(value), delegate { PetWindow.ResizeAll(selected); }); choice.Tag = value; sizes.DropDownItems.Add(choice);
             }
             all.DropDownItems.Add(sizes);

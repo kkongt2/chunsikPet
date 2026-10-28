@@ -59,6 +59,7 @@ namespace ChunsikDesktop {
             Action settle = delegate {
                 if (closing || generation != monitorMoveGeneration) return;
                 Screen currentTarget = FindMonitor(device) ?? Screen.PrimaryScreen;
+                if (giant) FitGiant();
                 UpdateLayout();
                 Rect bounds = ScreenLayout.BoundsPixels(this);
                 if (!bounds.IsEmpty) {
@@ -89,9 +90,9 @@ namespace ChunsikDesktop {
             for (int i = 0; i < pets.Count; i++) pets[i].MoveToMonitor(target, (i + 1.0) / (pets.Count + 1));
         }
         public static string SizeName(double value) {
-            return value == 50 ? "작게" : value == 80 ? "보통" : value == 120 ? "크게" : value == 180 ? "더 크게" : value == 270 ? "엄청 크게" : value == 500 ? "진격의 춘식이" : value.ToString();
+            return value == GiantSize ? "초대형 춘식이 (화면 가득)" : value == 50 ? "작게" : value == 80 ? "보통" : value == 120 ? "크게" : value == 180 ? "더 크게" : value == 270 ? "엄청 크게" : value == 500 ? "진격의 춘식이" : value.ToString();
         }
-        public static double? CommonSize { get { if (Pets.Count == 0) return null; double value = Pets[0].size; foreach (PetWindow pet in Pets) if (pet.size != value) return null; return value; } }
+        public static double? CommonSize { get { if (Pets.Count == 0) return null; double value = Pets[0].SelectedSize; foreach (PetWindow pet in Pets) if (pet.SelectedSize != value) return null; return value; } }
         public static double? CommonSpeed { get { if (Pets.Count == 0) return null; double value = Pets[0].speed; foreach (PetWindow pet in Pets) if (pet.speed != value) return null; return value; } }
         public static string WalkingSpeedName(double value) { return SpeedName(value); }
         public static void GatherToMonitor(string device) { Screen screen = FindMonitor(device); if (screen != null) GatherOnMonitor(screen); }
@@ -156,9 +157,10 @@ namespace ChunsikDesktop {
                     }
                     for (int i = 0; i < Pets.Count; i++) {
                         PetWindow pet = Pets[i];
-                        ((ListBoxItem)list.Items[i]).Content = "춘식이 " + (i + 1) + "  ·  " + MonitorLabel(pet.CurrentScreen()) + "  ·  크기 " + pet.size + "  ·  " + (pet.paused ? "쉬기" : "걷기") + "  ·  속도 " + SpeedName(pet.speed);
+                        ((ListBoxItem)list.Items[i]).Content = "춘식이 " + (i + 1) + "  ·  " + MonitorLabel(pet.CurrentScreen()) + "  ·  크기 " + SizeName(pet.SelectedSize) + "  ·  " + (pet.giant ? "초대형 고정" : pet.paused ? "쉬기" : "걷기") + "  ·  속도 " + SpeedName(pet.speed);
                     }
                     actions.IsEnabled = selected() != null;
+                    for (int a = 1; a < actions.Children.Count; a++) ((Button)actions.Children[a]).IsEnabled = selected() != null && !selected().giant;
                     List<string> screenKeys = new List<string>();
                     foreach (Screen screen in Screen.AllScreens) screenKeys.Add(screen.DeviceName + "|" + MonitorLabel(screen));
                     string signature = String.Join(";", screenKeys.ToArray());

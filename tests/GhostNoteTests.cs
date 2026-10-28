@@ -18,6 +18,7 @@ internal static class GhostNoteTests {
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-sprites.png") });
         typeof(PetWindow).GetMethod("BuildSeatedScootFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
         PetManagementTests.Run();
+        GiantPetTests.Run();
         ProductivityTests.Run();
         MenuTests.Run();
         DiagnosticsTests.Run();

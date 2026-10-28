@@ -40,6 +40,7 @@
   <ItemGroup>
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
+    <Compile Include="GiantPet.cs" />
     <Compile Include="PetReactions.cs" />
     <Compile Include="PetManagement.cs" />
     <Compile Include="InputAvoidance.cs" />
