@@ -291,6 +291,8 @@ internal static class GhostNoteTests {
         artType.GetMethod("SetPose", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(celebration, new object[] { 0.48 });
         toast.UpdateLayout();
         FrameworkElement art = (FrameworkElement)celebration;
+        System.Windows.Media.Imaging.BitmapSource original = (System.Windows.Media.Imaging.BitmapSource)artType.GetField("artwork", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        Check(original.PixelWidth == 1536 && original.PixelHeight == 1059 && original.IsFrozen, "original full-resolution image is embedded and cached without cropping");
         Check(!art.IsHitTestVisible && art.ActualHeight > 0 && art.TranslatePoint(new Point(0, art.ActualHeight), toast).Y < undoAt.Y, "celebration stays above actions without intercepting input");
         System.Windows.Media.Imaging.RenderTargetBitmap preview = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(toast.ActualWidth), (int)Math.Ceiling(toast.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
         preview.Render(toast);
