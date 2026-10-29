@@ -47,3 +47,7 @@ jobs:
         with:
           name: Shared-controls-preview
           path: tests/bin/controls-theme.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Completion-celebration-preview
+          path: tests/bin/completion-celebration.png

@@ -53,6 +53,7 @@
     <Compile Include="NoticePlacement.cs" />
     <Compile Include="SettingsHub.cs" />
     <Compile Include="UndoToast.cs" />
+    <Compile Include="CompletionCelebration.cs" />
     <Compile Include="SettingsBackup.cs" />
     <Compile Include="PresentationPolicy.cs" />
     <Compile Include="ReminderHistory.cs" />

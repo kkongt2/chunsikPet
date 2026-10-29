@@ -286,8 +286,29 @@ internal static class GhostNoteTests {
         Button undoButton = (Button)typeof(UndoToast).GetField("undoButton", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(toast);
         Point undoAt = undoButton.TranslatePoint(new Point(), toast);
         Check(toast.SizeToContent == SizeToContent.Height && undoButton.ActualHeight >= 38 && undoAt.Y + undoButton.ActualHeight <= toast.ActualHeight - 10, "undo action is fully visible in content-sized toast");
+        object celebration = typeof(UndoToast).GetField("celebration", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(toast);
+        Type artType = celebration.GetType();
+        artType.GetMethod("SetPose", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(celebration, new object[] { 0.48 });
+        FrameworkElement art = (FrameworkElement)celebration;
+        Check(!art.IsHitTestVisible && art.ActualHeight > 0 && art.TranslatePoint(new Point(0, art.ActualHeight), toast).Y < undoAt.Y, "celebration stays above actions without intercepting input");
+        System.Windows.Media.Imaging.RenderTargetBitmap preview = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(toast.ActualWidth), (int)Math.Ceiling(toast.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        preview.Render(toast);
+        System.Windows.Media.Imaging.PngBitmapEncoder encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(preview));
+        using (System.IO.MemoryStream stream = new System.IO.MemoryStream()) {
+            encoder.Save(stream); System.IO.File.WriteAllBytes("tests/bin/completion-celebration.png", stream.ToArray());
+            Console.WriteLine("CELEBRATION_PREVIEW_BASE64=" + Convert.ToBase64String(stream.ToArray()));
+        }
         undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
         Check(undoCount == 1 && !toast.IsVisible, "undo action fires once and dismisses toast");
+        DispatcherTimer artTimer = (DispatcherTimer)artType.GetField("timer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(celebration);
+        Check(!artTimer.IsEnabled, "undo stops celebration timer");
+        UndoToast.ShowCompleted("연속 완료 1", delegate {}); Pump();
+        UndoToast previousToast = (UndoToast)typeof(UndoToast).GetField("current", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        object previousArt = typeof(UndoToast).GetField("celebration", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(previousToast);
+        UndoToast.ShowCompleted("연속 완료 2", delegate {}); Pump();
+        Check(!previousToast.IsVisible && !((DispatcherTimer)artType.GetField("timer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(previousArt)).IsEnabled, "replacement closes old toast and stops animation");
+        ((UndoToast)typeof(UndoToast).GetField("current", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null)).Close();
         Console.WriteLine("PASS: " + count + " normal mode assertions"); app.Shutdown();
     }
 }

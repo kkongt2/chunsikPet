@@ -9,6 +9,7 @@ namespace ChunsikDesktop {
     public sealed class UndoToast : Window {
         static UndoToast current;
         readonly Button undoButton = new Button();
+        readonly CompletionCelebration celebration = new CompletionCelebration();
         public static void ShowCompleted(string text, Action undo) {
             if (current != null) current.Close();
             UndoToast win = new UndoToast {
@@ -29,6 +30,7 @@ namespace ChunsikDesktop {
             close.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Background='{TemplateBinding Background}' CornerRadius='13'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border></ControlTemplate>");
             close.Click += delegate { win.Close(); }; DockPanel.SetDock(close, Dock.Right); heading.Children.Add(close);
             heading.Children.Add(new TextBlock { Text = "✓  할 일을 완료했어요", FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(42, 113, 84)), VerticalAlignment = VerticalAlignment.Center });
+            panel.Children.Add(win.celebration);
             panel.Children.Add(new TextBlock { Text = String.IsNullOrWhiteSpace(text) ? "빈 메모" : text.Replace('\r', ' ').Replace('\n', ' '), ToolTip = text, FontSize = 13, Foreground = Brushes.DarkSlateGray, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 7, 0, 14) });
             Grid actions = new Grid(); actions.ColumnDefinitions.Add(new ColumnDefinition()); actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); panel.Children.Add(actions);
             TextBlock remaining = new TextBlock { Text = "12초 안에 되돌릴 수 있어요", FontSize = 11, Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) }; actions.Children.Add(remaining);
@@ -55,8 +57,9 @@ namespace ChunsikDesktop {
                 win.Top = Math.Max(area.Top, area.Bottom - win.ActualHeight - 12);
                 win.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
             };
-            win.Closed += delegate { timer.Stop(); elapsed.Stop(); if (current == win) current = null; };
+            win.Closed += delegate { win.celebration.Stop(); timer.Stop(); elapsed.Stop(); if (current == win) current = null; };
             win.Show(); timer.Start();
         }
     }
 }
+
