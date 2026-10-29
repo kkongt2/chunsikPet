@@ -412,10 +412,10 @@ namespace ChunsikDesktop {
             List<Reminder> rows = new List<Reminder>(); foreach (Reminder item in settings.Items) rows.Add(item.Copy());
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel intro = new StackPanel(); DockPanel.SetDock(intro, Dock.Top); root.Children.Add(intro);
-            intro.Children.Add(Pill("테스트 알림", Test));
-            intro.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent });
-            intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·저녁·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 10) });
-            intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) });
+            DockPanel heading = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
+            Button test = Pill("테스트 알림", Test); DockPanel.SetDock(test, Dock.Right); heading.Children.Add(test);
+            heading.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent }); intro.Children.Add(heading);
+            intro.Children.Add(new TextBlock { Text = "알림을 선택해 편집하세요. 변경사항은 자동 저장됩니다.", Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10), ToolTip = "기본 알림은 스위치로 켜고 끌 수 있어요. 간격 알림은 실행·간격 변경 후부터 계산하며 선택한 요일에만 울려요." });
             TextBlock schedulerClock = new TextBlock { Foreground = Accent, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10), ToolTip = TimeZoneInfo.Local.DisplayName };
             intro.Children.Add(schedulerClock);
             TextBlock status = new TextBlock { Text = "모든 변경사항 저장됨", Foreground = Accent, Margin = new Thickness(0, 12, 0, 0) };
@@ -473,6 +473,7 @@ namespace ChunsikDesktop {
             root.Children.Add(workspace);
             DockPanel navigation = new DockPanel { Margin = new Thickness(0, 0, 12, 0) };
             ListBox reminderList = new ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            reminderList.ItemContainerStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ListBoxItem'><Setter Property='Foreground' Value='#52637A'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ListBoxItem'><Border x:Name='card' CornerRadius='8' Background='Transparent' BorderBrush='Transparent' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property='IsSelected' Value='True'><Setter TargetName='card' Property='Background' Value='#E6EDFC'/><Setter Property='Foreground' Value='#264FA8'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='card' Property='BorderBrush' Value='#A9C4EB'/></Trigger><Trigger Property='IsKeyboardFocusWithin' Value='True'><Setter TargetName='card' Property='BorderBrush' Value='#3568D4'/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>");
             ScrollViewer.SetHorizontalScrollBarVisibility(reminderList, ScrollBarVisibility.Disabled);
             System.Windows.Automation.AutomationProperties.SetName(reminderList, "알림 목록");
             StackPanel table = new StackPanel();
@@ -487,6 +488,7 @@ namespace ChunsikDesktop {
                 workspace.RowDefinitions[1].Height = narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
                 Grid.SetColumn(detailCard, narrow ? 0 : 1); Grid.SetRow(detailCard, narrow ? 1 : 0);
                 navigation.Margin = narrow ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 12, 0);
+                reminderList.Dispatcher.BeginInvoke(new Action(delegate { if (reminderList.SelectedItem != null) reminderList.ScrollIntoView(reminderList.SelectedItem); }), DispatcherPriority.Loaded);
             };
             workspace.SizeChanged += delegate { adapt(); };
             Reminder selected = rows.Count == 0 ? null : rows[0];
