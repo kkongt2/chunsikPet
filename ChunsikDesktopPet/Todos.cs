@@ -61,6 +61,7 @@ namespace ChunsikDesktop {
         }
         bool RestoreItem(TodoItem item) {
             if (!settings.Items.Contains(item) || !item.Done) return false;
+            if (!settings.HasRoom(false)) { MessageBox.Show("진행 중 메모는 최대 50개예요. 메모를 완료하거나 삭제한 뒤 복원해 주세요."); return false; }
             DateTime? completedAt = item.CompletedAt;
             item.Done = false; item.CompletedAt = null;
             if (!Save()) { item.Done = true; item.CompletedAt = completedAt; return false; }
@@ -124,6 +125,8 @@ namespace ChunsikDesktop {
             }
         }
         bool Save() {
+            if (SettingsBackup.Restoring) return true;
+            if (!settings.ValidCounts()) return false;
             foreach (TodoItem item in settings.Items) if (item.Text == null || item.Text.Length > 160 || !TodoItem.ValidAppearance(item) || item.EveryMinutes < 1 || item.EveryMinutes > 1440 || item.DisplaySeconds < 1 || item.DisplaySeconds > 3600) return false;
             try {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
@@ -154,7 +157,7 @@ namespace ChunsikDesktop {
             foreach (string id in new List<string>(runtimes.Keys)) if (!keep.Contains(id)) { DisposeRuntime(runtimes[id]); runtimes.Remove(id); }
         }
         void AddBlank(TodoItem near) {
-            if (settings.Items.Count >= 50) { MessageBox.Show("포스트잇은 최대 50개까지 저장할 수 있어요."); return; }
+            if (!settings.HasRoom(false)) { MessageBox.Show("진행 중 포스트잇은 최대 50개까지 저장할 수 있어요. 완료 보관함은 별도예요."); return; }
             TodoItem item = new TodoItem { Color = near.Color, FontSize = near.FontSize, NoteOpacity = near.NoteOpacity, NoteWidth = near.NoteWidth, NoteHeight = near.NoteHeight };
             Runtime source;
             if (runtimes.TryGetValue(near.Id, out source)) { item.HasPosition = true; item.NoteLeft = source.Note.Left + 32; item.NoteTop = source.Note.Top + 32; }
@@ -166,6 +169,8 @@ namespace ChunsikDesktop {
             if (runtimes.TryGetValue(item.Id, out run)) run.Note.Dispatcher.BeginInvoke(new Action(delegate { if (!stopping && !allHidden && run.Note.IsVisible) run.Note.BeginEdit(); }));
         }
         void Complete(TodoItem item) {
+            if (item.Done) return;
+            if (!settings.HasRoom(true)) { MessageBox.Show("완료 보관함이 1,000개로 가득 찼어요. 포스트잇 설정에서 완료 항목을 정리해 주세요."); return; }
             Runtime run;
             if (runtimes.TryGetValue(item.Id, out run) && run.Note.IsVisible) {
                 run.Note.AnimateComplete(delegate { FinishComplete(item); }); return;
@@ -173,6 +178,8 @@ namespace ChunsikDesktop {
             FinishComplete(item);
         }
         void FinishComplete(TodoItem item) {
+            if (item.Done) return;
+            if (!settings.HasRoom(true)) { MessageBox.Show("완료 보관함이 가득 찼어요. 기록은 삭제되지 않았습니다."); Sync(); return; }
             DateTime? previousDate = item.CompletedAt; item.Done = true; item.CompletedAt = DateTime.Now;
             DateTime? completion = item.CompletedAt;
             if (!Save()) { item.Done = false; item.CompletedAt = previousDate; return; }

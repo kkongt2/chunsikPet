@@ -31,7 +31,11 @@ namespace ChunsikDesktop {
         }
     }
     public class TodoSettings {
+        public const int ActiveLimit = 50, ArchiveLimit = 1000;
         public List<TodoItem> Items { get; set; }
+        public int CountItems(bool done) { return Items.FindAll(delegate(TodoItem item) { return item != null && item.Done == done; }).Count; }
+        public bool HasRoom(bool done) { return CountItems(done) < (done ? ArchiveLimit : ActiveLimit); }
+        public bool ValidCounts() { return Items != null && CountItems(false) <= ActiveLimit && CountItems(true) <= ArchiveLimit; }
         public TodoSettings() { Items = new List<TodoItem>(); }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -272,6 +272,7 @@ namespace ChunsikDesktop {
             }
         }
         void Write(ReminderSettings value) {
+            if (SettingsBackup.Restoring) return;
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath));
             string temp = SettingsPath + ".tmp";
             try {
@@ -403,29 +404,23 @@ namespace ChunsikDesktop {
             button.Click += delegate { action(); }; return button;
         }
         static readonly Style SegmentStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='Padding' Value='8,7'/><Setter Property='FontSize' Value='11'/><Setter Property='Foreground' Value='#546578'/><Setter Property='Background' Value='Transparent'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border CornerRadius='9' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center'/></Border></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter Property='Opacity' Value='0.7'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.6'/></Trigger></Style.Triggers></Style>");
-        static Grid TableRow() {
-            Grid grid = new Grid();
-            foreach (double width in new double[] { 64, -1, 238, 212, 86, 98, 145 })
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width < 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(width) });
-            return grid;
-        }
         static void Cell(Grid grid, UIElement child, int column) { Grid.SetColumn(child, column); grid.Children.Add(child); }
         public void OpenSettings() {
             if (editor != null) { SettingsHub.Open("알림"); return; }
-            Window win = new Window { Title = "춘식이 알림 설정", Width = 1280, Height = 670, MinWidth = 1240, MinHeight = 540, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            Window win = new Window { Title = "춘식이 알림 설정", Width = 1000, Height = 740, MinWidth = 620, MinHeight = 480, Background = new SolidColorBrush(Color.FromRgb(246, 249, 253)), WindowStartupLocation = WindowStartupLocation.CenterScreen };
             editor = win;
             List<Reminder> rows = new List<Reminder>(); foreach (Reminder item in settings.Items) rows.Add(item.Copy());
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel intro = new StackPanel(); DockPanel.SetDock(intro, Dock.Top); root.Children.Add(intro);
             intro.Children.Add(Pill("테스트 알림", Test));
             intro.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent });
-            intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·저녁·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 18) });
-            intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 12) });
+            intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·저녁·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 10) });
+            intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) });
             TextBlock schedulerClock = new TextBlock { Foreground = Accent, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10), ToolTip = TimeZoneInfo.Local.DisplayName };
             intro.Children.Add(schedulerClock);
             TextBlock status = new TextBlock { Text = "모든 변경사항 저장됨", Foreground = Accent, Margin = new Thickness(0, 12, 0, 0) };
             StackPanel options = new StackPanel { Margin = new Thickness(0, 14, 0, 0) }; DockPanel.SetDock(options, Dock.Bottom); root.Children.Add(options);
-            WrapPanel timing = new WrapPanel(); options.Children.Add(timing);
+            WrapPanel timing = new WrapPanel(); options.Children.Add(new Expander { Header = "공통 표시 옵션 · 소리 / 문구 전환 / 다시 알림", Content = timing });
             CheckBox sound = new CheckBox { Content = "알림 소리", IsChecked = settings.Sound, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 20, 0) }; timing.Children.Add(sound);
             timing.Children.Add(new TextBlock { Text = "문구 전환  ", VerticalAlignment = VerticalAlignment.Center });
             NumberField seconds = new NumberField(settings.MessageSeconds, 60, "문구 전환 초");
@@ -470,30 +465,76 @@ namespace ChunsikDesktop {
             debounce.Tick += delegate { save(); };
             sound.Checked += delegate { changed(); }; sound.Unchecked += delegate { changed(); };
             seconds.Changed += changed; snooze.Changed += changed;
+            Grid workspace = new Grid();
+            workspace.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
+            workspace.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            workspace.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            workspace.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.Children.Add(workspace);
+            DockPanel navigation = new DockPanel { Margin = new Thickness(0, 0, 12, 0) };
+            ListBox reminderList = new ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            ScrollViewer.SetHorizontalScrollBarVisibility(reminderList, ScrollBarVisibility.Disabled);
+            System.Windows.Automation.AutomationProperties.SetName(reminderList, "알림 목록");
             StackPanel table = new StackPanel();
-            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = table };
-            root.Children.Add(new Border { CornerRadius = new CornerRadius(14), Background = Brushes.White, BorderBrush = Line, BorderThickness = new Thickness(1), Padding = new Thickness(10), Child = scroll });
+            ScrollViewer scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = table };
+            Border detailCard = new Border { CornerRadius = new CornerRadius(14), Background = Brushes.White, BorderBrush = Line, BorderThickness = new Thickness(1), Padding = new Thickness(14), Child = scroll };
+            workspace.Children.Add(navigation); workspace.Children.Add(detailCard); Grid.SetColumn(detailCard, 1);
+            Action adapt = delegate {
+                bool narrow = workspace.ActualWidth < 720;
+                workspace.ColumnDefinitions[0].Width = narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(220);
+                workspace.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+                workspace.RowDefinitions[0].Height = narrow ? new GridLength(160) : new GridLength(1, GridUnitType.Star);
+                workspace.RowDefinitions[1].Height = narrow ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+                Grid.SetColumn(detailCard, narrow ? 0 : 1); Grid.SetRow(detailCard, narrow ? 1 : 0);
+                navigation.Margin = narrow ? new Thickness(0, 0, 0, 10) : new Thickness(0, 0, 12, 0);
+            };
+            workspace.SizeChanged += delegate { adapt(); };
+            Reminder selected = rows.Count == 0 ? null : rows[0];
+            bool rebuilding = false;
             Action render = null;
+            Button add = Pill("＋ 알림 추가", delegate { selected = new Reminder(); rows.Add(selected); render(); changed(); });
+            DockPanel.SetDock(add, Dock.Top); navigation.Children.Add(add); navigation.Children.Add(reminderList);
+            reminderList.SelectionChanged += delegate {
+                if (rebuilding || reminderList.SelectedItem == null) return;
+                selected = (Reminder)((ListBoxItem)reminderList.SelectedItem).Tag; render();
+            };
             render = delegate {
-                table.Children.Clear(); countdowns.Clear();
-                DockPanel toolbar = new DockPanel { Margin = new Thickness(4, 0, 4, 8) };
-                Button add = Pill("＋ 알림 추가", delegate { rows.Add(new Reminder()); render(); changed(); scroll.ScrollToBottom(); });
-                DockPanel.SetDock(add, Dock.Right); toolbar.Children.Add(add);
-                toolbar.Children.Add(new TextBlock { Text = "알림 목록 · " + rows.Count, FontSize = 16, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Foreground = Accent }); table.Children.Add(toolbar);
-                Grid header = TableRow(); int col = 0;
-                foreach (string name in new string[] { "사용", "알림 이름", "알림 종류 · 시간", "요일 / 특정 날짜", "색상", "메시지 편집", "관리" }) Cell(header, new TextBlock { Text = name, Foreground = Brushes.SlateGray, Margin = new Thickness(5, 8, 0, 8) }, col++);
-                table.Children.Add(header);
-                foreach (Reminder row in rows) {
-                    Grid line = TableRow(); line.MinHeight = 58;
-                    Border card = new Border { Background = new SolidColorBrush(Color.FromRgb(250, 252, 255)), BorderBrush = Line, BorderThickness = new Thickness(0, 0, 0, 1), Child = line }; table.Children.Add(card);
+                rebuilding = true;
+                table.Children.Clear(); countdowns.Clear(); reminderList.Items.Clear();
+                if (!rows.Contains(selected)) selected = rows.Count == 0 ? null : rows[0];
+                foreach (Reminder item in rows) {
+                    ListBoxItem entry = new ListBoxItem { Tag = item, Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 5),
+                        Content = new TextBlock { Text = (item.Enabled ? "● " : "○ ") + item.Title, TextWrapping = TextWrapping.Wrap } };
+                    reminderList.Items.Add(entry); if (item == selected) reminderList.SelectedItem = entry;
+                }
+                rebuilding = false;
+                if (selected == null) { table.Children.Add(new TextBlock { Text = "알림을 추가해 주세요." }); return; }
+                foreach (Reminder row in new[] { selected }) {
+                    StackPanel basic = new StackPanel(); table.Children.Add(basic);
+                    StackPanel advanced = new StackPanel();
+                    Expander more = new Expander { Header = "추가 옵션 · 활동 시간 / 색상 / 메시지", Content = advanced, Margin = new Thickness(0, 12, 0, 8) };
+                    table.Children.Add(more);
+                    string[] fieldLabels = { "알림 사용", "알림 이름 · 다음 예정", "알림 종류 · 시간", "요일 / 특정 날짜", "말풍선 색상", "알림 메시지", "미리보기 · 관리" };
+                    Action<UIElement, int> detail = delegate(UIElement child, int index) {
+                        StackPanel group = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+                        group.Children.Add(new TextBlock { Text = fieldLabels[index], Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 5) });
+                        group.Children.Add(child);
+                        if (index == 4 || index == 5) advanced.Children.Add(group);
+                        else if (index == 6) table.Children.Add(group);
+                        else basic.Children.Add(group);
+                    };
+                    Action refreshLabel = delegate {
+                        foreach (ListBoxItem entry in reminderList.Items) if (entry.Tag == row)
+                            ((TextBlock)entry.Content).Text = (row.Enabled ? "● " : "○ ") + row.Title;
+                    };
                     System.Windows.Controls.Primitives.ToggleButton toggle = new System.Windows.Controls.Primitives.ToggleButton { Width = 44, Height = 24, IsChecked = row.Enabled, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(5), ToolTip = "알림 켜기/끄기" };
                     toggle.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ToggleButton'><Border x:Name='track' Background='#CCD5DF' CornerRadius='12'><Ellipse x:Name='thumb' Width='18' Height='18' Fill='White' HorizontalAlignment='Left' Margin='3'/></Border><ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='track' Property='Background' Value='#0064A8'/><Setter TargetName='thumb' Property='HorizontalAlignment' Value='Right'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='track' Property='BorderBrush' Value='#F6B73C'/><Setter TargetName='track' Property='BorderThickness' Value='2'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
                     System.Windows.Automation.AutomationProperties.SetName(toggle, row.Title + " 알림 사용");
-                    toggle.Checked += delegate { row.Enabled = true; changed(); }; toggle.Unchecked += delegate { row.Enabled = false; changed(); }; Cell(line, toggle, 0);
+                    toggle.Checked += delegate { row.Enabled = true; refreshLabel(); changed(); }; toggle.Unchecked += delegate { row.Enabled = false; refreshLabel(); changed(); }; detail(toggle, 0);
                     StackPanel titleArea = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 4, 10, 4) };
                     if (row.IsBuiltin) titleArea.Children.Add(new TextBlock { Text = "기본 알림", FontSize = 10, Foreground = Accent });
                     TextBox title = new TextBox { Text = row.Title, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(2, 4, 2, 4), FontSize = 14 };
-                    title.TextChanged += delegate { row.Title = title.Text; changed(); }; titleArea.Children.Add(title); Cell(line, titleArea, 1);
+                    title.TextChanged += delegate { row.Title = title.Text; refreshLabel(); changed(); }; titleArea.Children.Add(title); detail(titleArea, 1);
                     TextBlock countdown = new TextBlock { FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Accent, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 4, 0, 4) };
                     titleArea.Children.Add(countdown); countdowns[row.Id] = countdown;
                     StackPanel schedule = new StackPanel();
@@ -522,8 +563,8 @@ namespace ChunsikDesktop {
                         schedule.Children.Add(specify);
                     }
                     schedule.Children.Add(clock);
-                    if (row.IsInterval) schedule.Children.Add(Pill(row.ActivityEnabled ? "활동 " + row.ActiveFrom + "~" + row.ActiveUntil : "활동 시간 · 자리 비움", delegate { EditActivity(win, row, changed); }));
-                    Cell(line, new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 246, 253)), Padding = new Thickness(5), Margin = new Thickness(0, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center, Child = schedule }, 2);
+                    if (row.IsInterval) advanced.Children.Add(Pill(row.ActivityEnabled ? "활동 " + row.ActiveFrom + "~" + row.ActiveUntil : "활동 시간 · 자리 비움", delegate { EditActivity(win, row, changed); }));
+                    detail(new Border { CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromRgb(237, 246, 253)), Padding = new Thickness(5), Margin = new Thickness(0, 8, 10, 8), VerticalAlignment = VerticalAlignment.Center, Child = schedule }, 2);
                     if (row.IsDate) {
                         StackPanel dateArea = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8) };
                         DateTime date; DatePicker picker = new DatePicker { SelectedDateFormat = DatePickerFormat.Short, ToolTip = "필수: 알림 날짜를 선택하세요", Language = System.Windows.Markup.XmlLanguage.GetLanguage("ko-KR") };
@@ -531,19 +572,20 @@ namespace ChunsikDesktop {
                         picker.SelectedDateChanged += delegate { row.Date = picker.SelectedDate.HasValue ? picker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""; changed(); };
                         picker.DateValidationError += delegate(object sender, DatePickerDateValidationErrorEventArgs e) { e.ThrowException = false; picker.SelectedDate = null; row.Date = ""; changed(); };
                         dateArea.Children.Add(picker);
-                        dateArea.Children.Add(new TextBlock { Text = "날짜 필수 · 반복 없음\n시간 미지정: 당일 실행 시 알림", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 7, 0, 0) }); Cell(line, dateArea, 3);
+                        dateArea.Children.Add(new TextBlock { Text = "날짜 필수 · 반복 없음\n시간 미지정: 당일 실행 시 알림", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 7, 0, 0) }); detail(dateArea, 3);
                     } else {
                         WeekdayPicker days = new WeekdayPicker { DataContext = row };
                         days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.CheckedEvent, new RoutedEventHandler(delegate { changed(); }));
-                        days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent, new RoutedEventHandler(delegate { changed(); })); Cell(line, days, 3);
+                        days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent, new RoutedEventHandler(delegate { changed(); })); detail(days, 3);
                     }
-                    Cell(line, BubblePalette.Picker(row.BubbleColor, delegate(string color) { row.BubbleColor = color; changed(); }, 3), 4);
-                    Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; Cell(line, edit, 5);
+                    detail(BubblePalette.Picker(row.BubbleColor, delegate(string color) { row.BubbleColor = color; changed(); }, 3), 4);
+                    Button edit = Pill("메시지 편집", delegate { if (save()) EditMessages(win, row, save); else MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "입력 확인"); }); edit.VerticalAlignment = VerticalAlignment.Center; detail(edit, 5);
                     StackPanel actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                     actions.Children.Add(Pill("▶ 보기", delegate { PreviewUI.Reminder(win, row, delegate { return seconds.Value; }); }));
                     Button remove = Pill(row.IsBuiltin ? "기본" : "삭제", delegate { if (row.IsBuiltin) return; rows.Remove(row); render(); changed(); });
-                    remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); Cell(line, actions, 6);
+                    remove.IsEnabled = !row.IsBuiltin; remove.ToolTip = row.IsBuiltin ? "기본 알림은 삭제할 수 없어요" : "이 알림 삭제"; actions.Children.Add(remove); detail(actions, 6);
                 }
+                refreshCountdowns();
             };
             render(); refreshCountdowns(); countdownTimer.Tick += delegate { refreshCountdowns(); }; countdownTimer.Start();
             win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !save()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "저장 확인"); } };
