@@ -15,6 +15,21 @@ internal static class GhostNoteTests {
     [STAThread] public static void Main() {
         Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         typeof(TodoService).Assembly.GetType("ChunsikDesktop.SettingsTheme").GetMethod("Install").Invoke(null, new object[] { app });
+        // Run the actual entry-point extraction path, not just UI constructors.
+        string assetFolder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Chunsik-startup-" + Guid.NewGuid().ToString("N"));
+        try {
+            Type program = typeof(UndoToast).Assembly.GetType("ChunsikDesktop.Program");
+            MethodInfo extract = program.GetMethod("ExtractAssets", BindingFlags.Static | BindingFlags.NonPublic);
+            extract.Invoke(null, new object[] { assetFolder });
+            string jpg = System.IO.Path.Combine(assetFolder, "chunsik-completion.jpg");
+            byte[] original = System.IO.File.ReadAllBytes(jpg);
+            Check(original.Length > 0, "real startup accepts and extracts embedded JPEG");
+            extract.Invoke(null, new object[] { assetFolder });
+            Check(Convert.ToBase64String(System.IO.File.ReadAllBytes(jpg)) == Convert.ToBase64String(original), "existing startup assets remain intact");
+            System.IO.File.WriteAllText(jpg, "corrupt cache");
+            extract.Invoke(null, new object[] { assetFolder });
+            Check(Convert.ToBase64String(System.IO.File.ReadAllBytes(jpg)) == Convert.ToBase64String(original), "startup repairs stale or corrupt cached artwork");
+        } finally { if (System.IO.Directory.Exists(assetFolder)) System.IO.Directory.Delete(assetFolder, true); }
         TodoNote.LoadArt(System.IO.Path.GetFullPath("ChunsikDesktopPet"));
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-tickle.png") });
         typeof(PetWindow).GetField("reactionFrames", BindingFlags.Static | BindingFlags.NonPublic).SetValue(null, typeof(PetWindow).GetField("frames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
