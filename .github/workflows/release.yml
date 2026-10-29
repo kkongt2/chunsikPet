@@ -66,10 +66,6 @@ jobs:
             }
             const { assertTagTarget } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-tag.cjs`);
             await assertTagTarget(github, context.repo, tag, sha);
-            const source = fs.readFileSync('ChunsikDesktopPet/Program.cs', 'utf8');
-            for (const attribute of ['AssemblyVersion', 'AssemblyFileVersion']) {
-              if (!source.includes(`${attribute}("${version}.0")`)) throw new Error(`${attribute} does not match VERSION`);
-            }
             core.setOutput('publish', 'true');
             await core.summary.addHeading('Release planned').addList(changed).write();
 
@@ -86,6 +82,9 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
       - name: Build Release x64
         run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
+      - name: Verify generated versions and incremental rebuild
+        shell: pwsh
+        run: ./tests/version-build.ps1
       - name: Build scheduling tests
         run: msbuild tests/ScheduleTests.csproj /t:Rebuild /m
       - name: Run scheduling tests
@@ -147,3 +146,4 @@ jobs:
               ...context.repo, release_id: release.id, draft: false, make_latest: 'true'
             });
             await core.summary.addHeading(`Published ${tag}`).addLink('Download EXE / Release', published.html_url).write();
+

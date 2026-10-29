@@ -398,7 +398,8 @@ namespace ChunsikDesktop {
         static readonly Brush Line = new SolidColorBrush(Color.FromRgb(222, 231, 240));
         static Button Pill(string text, Action action) {
             Button button = new Button { Content = text, Padding = new Thickness(10, 5, 10, 5), Margin = new Thickness(3), Foreground = Accent, Cursor = System.Windows.Input.Cursors.Hand };
-            button.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='box' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' CornerRadius='10' Background='#EDF6FD' BorderBrush='#CCE0F0' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='box' Property='Background' Value='#D9ECFA'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='box' Property='BorderBrush' Value='#0064A8'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            button.Template = SettingsTheme.SharedButtonTemplate;
+            button.Background = BubblePalette.BrushFor("#D9EAFE"); button.BorderBrush = SettingsTheme.Line;
             button.Click += delegate { action(); }; return button;
         }
         static readonly Style SegmentStyle = (Style)System.Windows.Markup.XamlReader.Parse(@"<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='RadioButton'><Setter Property='Padding' Value='8,7'/><Setter Property='FontSize' Value='11'/><Setter Property='Foreground' Value='#546578'/><Setter Property='Background' Value='Transparent'/><Setter Property='Cursor' Value='Hand'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='RadioButton'><Border CornerRadius='9' Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center'/></Border></ControlTemplate></Setter.Value></Setter><Style.Triggers><Trigger Property='IsChecked' Value='True'><Setter Property='Background' Value='#0064A8'/><Setter Property='Foreground' Value='White'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter Property='Opacity' Value='0.7'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.6'/></Trigger></Style.Triggers></Style>");
@@ -416,6 +417,7 @@ namespace ChunsikDesktop {
             List<Reminder> rows = new List<Reminder>(); foreach (Reminder item in settings.Items) rows.Add(item.Copy());
             DockPanel root = new DockPanel { Margin = new Thickness(22) }; win.Content = root;
             StackPanel intro = new StackPanel(); DockPanel.SetDock(intro, Dock.Top); root.Children.Add(intro);
+            intro.Children.Add(Pill("테스트 알림", Test));
             intro.Children.Add(new TextBlock { Text = "춘식이가 알려드려요", FontSize = 24, FontWeight = FontWeights.Bold, Foreground = Accent });
             intro.Children.Add(new TextBlock { Text = "요일·시간·메시지를 바꾸면 자동 저장돼요. 점심·저녁·퇴근·물 마시기·스트레칭 기본 알림은 스위치로 켜고 끌 수 있어요.", Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 18) });
             intro.Children.Add(new TextBlock { Text = "간격 알림은 실행·간격 변경 후부터 계산하며, 선택한 요일에만 울려요. 기본 간격: 1시간 (1분~23시간 59분).", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 12) });
@@ -458,7 +460,7 @@ namespace ChunsikDesktop {
                     updated.Items.Add(copy);
                 }
                 EnsureBuiltins(updated);
-                try { Write(updated); } catch (Exception ex) { status.Text = "저장 실패: " + ex.Message; status.Foreground = Brushes.Firebrick; return false; }
+                try { Write(updated); } catch (Exception ex) { Diagnostics.Record("알림 설정 저장", ex); status.Text = "저장 실패: " + ex.Message; status.Foreground = Brushes.Firebrick; return false; }
                 foreach (Reminder next in updated.Items) foreach (Reminder prior in settings.Items)
                     if (next.Id == prior.Id && !ReminderRules.SameSchedule(prior, next)) dateSeen.RemoveWhere(delegate(string key) { return key.StartsWith(next.Id + ":", StringComparison.Ordinal); });
                 ResetIntervals(updated, settings, DateTime.Now);
@@ -758,3 +760,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+

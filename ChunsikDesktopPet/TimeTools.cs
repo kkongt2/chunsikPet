@@ -30,7 +30,19 @@ namespace ChunsikDesktop {
         readonly Button start, reset, lap;
         TimeSpan duration = TimeSpan.FromMinutes(5), lastLap;
         bool started, completed;
+        bool forceClose, pendingReveal, policySuppressed;
+        readonly StackPanel presets = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         int lapCount;
+        public static string TimerMenuLabel { get { return countdownWindow == null ? "타이머…" : countdownWindow.MenuLabel(); } }
+        public static string StopwatchMenuLabel { get { return stopwatchWindow == null ? "스톱워치…" : stopwatchWindow.MenuLabel(); } }
+        string MenuLabel() {
+            string name = countdown ? "타이머" : "스톱워치";
+            if (!started) return name + " · 대기 중";
+            TimeSpan remaining = duration - elapsed.Elapsed;
+            if (completed || (countdown && remaining <= TimeSpan.Zero)) return name + " · 완료";
+            if (!elapsed.IsRunning) return name + " · 일시정지";
+            return countdown ? name + " · " + FormatTime(TimeSpan.FromSeconds(Math.Ceiling(remaining.TotalSeconds)), false) + " 남음" : name + " · " + FormatTime(elapsed.Elapsed, false) + " 측정 중";
+        }
         public static void OpenTimer() { Open(true); }
         public static void OpenStopwatch() { Open(false); }
         static void Open(bool countdown) {
@@ -41,12 +53,13 @@ namespace ChunsikDesktop {
             win.Show();
         }
         public static void StopAll() {
-            if (countdownWindow != null) countdownWindow.Close();
-            if (stopwatchWindow != null) stopwatchWindow.Close();
+            if (countdownWindow != null) { countdownWindow.forceClose = true; countdownWindow.Close(); }
+            if (stopwatchWindow != null) { stopwatchWindow.forceClose = true; stopwatchWindow.Close(); }
         }
         static Button ActionButton(string text) {
             Button button = new Button { Content = text, Margin = new Thickness(3), Padding = new Thickness(12, 7, 12, 7), Cursor = Cursors.Hand, Foreground = Brushes.DarkSlateBlue };
-            button.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='b' CornerRadius='12' Background='#EAF3FF' BorderBrush='#C9DBF1' BorderThickness='1' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='b' Property='Background' Value='#D7E9FF'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.4'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='b' Property='BorderBrush' Value='#0064A8'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            button.Template = SettingsTheme.SharedButtonTemplate;
+            button.Background = BubblePalette.BrushFor("#D9EAFE"); button.BorderBrush = SettingsTheme.Line;
             return button;
         }
         TimeToolWindow(bool isCountdown) {
@@ -62,16 +75,26 @@ namespace ChunsikDesktop {
             Grid header = new Grid(); header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); content.Children.Add(header);
             TextBlock heading = new TextBlock { Text = countdown ? "타이머 담당 춘식이" : "스톱워치 담당 춘식이", FontSize = 17, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.SizeAll, ToolTip = "끌어서 위치 이동" };
             header.Children.Add(heading); heading.MouseLeftButtonDown += MoveWindow;
-            Button close = ActionButton("×"); close.ToolTip = "측정을 종료하고 전담 춘식이 닫기"; close.Click += delegate { Close(); }; Grid.SetColumn(close, 1); header.Children.Add(close);
+            Button close = ActionButton("×"); close.ToolTip = "측정 중에는 창만 숨겨요. 트레이의 타이머/스톱워치에서 다시 열 수 있어요."; close.Click += delegate { Close(); }; Grid.SetColumn(close, 1); header.Children.Add(close);
             readout.FontSize = 36; readout.FontWeight = FontWeights.Bold; readout.FontFamily = new FontFamily("Consolas"); readout.HorizontalAlignment = HorizontalAlignment.Center; readout.Margin = new Thickness(0, 12, 0, 6); content.Children.Add(readout);
             status.Text = "시작을 눌러주세요"; status.Foreground = Brushes.SlateGray; status.HorizontalAlignment = HorizontalAlignment.Center; status.Margin = new Thickness(0, 0, 0, 12); content.Children.Add(status);
             if (countdown) {
                 AddDuration(hours, "시간", "0"); AddDuration(minutes, "분", "5"); AddDuration(seconds, "초", "0"); content.Children.Add(durationPanel);
                 content.Children.Add(new TextBlock { Text = "최대 99시간 59분 59초", FontSize = 10, Foreground = Brushes.SlateGray, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 8) });
+                foreach (int value in new int[] { 5, 10, 25, 50 }) {
+                    int preset = value; Button b = ActionButton(value + "분"); b.Padding = new Thickness(8, 6, 8, 6);
+                    b.Click += delegate { SetDuration(TimeSpan.FromMinutes(preset)); }; presets.Children.Add(b);
+                }
+                content.Children.Add(presets);
+                StackPanel extra = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+                foreach (int value in new int[] { 1, 5 }) { int extraMinutes = value; Button b = ActionButton("+" + value + "분"); b.Click += delegate { Extend(extraMinutes); }; extra.Children.Add(b); }
+                content.Children.Add(extra);
             }
             StackPanel controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center }; content.Children.Add(controls);
             start = ActionButton("시작"); reset = ActionButton("초기화"); lap = ActionButton("랩"); controls.Children.Add(start); controls.Children.Add(reset);
             start.Click += delegate { Toggle(); }; reset.Click += delegate { Reset(); };
+            Button finish = ActionButton("측정 종료"); finish.ToolTip = "측정을 끝내고 창을 닫아요";
+            finish.Click += delegate { forceClose = true; Close(); }; content.Children.Add(finish);
             if (!countdown) {
                 controls.Children.Add(lap); lap.Click += delegate { AddLap(); };
                 laps.Height = 112; laps.Margin = new Thickness(0, 10, 0, 0); laps.BorderThickness = new Thickness(0); laps.Background = Brushes.Transparent; laps.FontFamily = new FontFamily("Consolas"); content.Children.Add(laps);
@@ -81,17 +104,48 @@ namespace ChunsikDesktop {
             pet.Margin = new Thickness(0, 14, 0, 8);
             pet.Source = PetWindow.ToolPose(false); pet.Height = 108; pet.Stretch = Stretch.Uniform; pet.HorizontalAlignment = HorizontalAlignment.Center; pet.RenderTransformOrigin = new Point(0.5, 1); pet.RenderTransform = petMotion; pet.Cursor = Cursors.SizeAll; pet.ToolTip = "전담 춘식이를 끌어 위치를 바꿀 수 있어요"; pet.MouseLeftButtonDown += MoveWindow; root.Children.Add(pet);
             TextBlock badge = new TextBlock { Text = countdown ? "TIMER" : "STOPWATCH", FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Brushes.DarkSlateBlue, HorizontalAlignment = HorizontalAlignment.Center }; root.Children.Add(new Border { Background = Brushes.White, CornerRadius = new CornerRadius(7), Padding = new Thickness(7, 2, 7, 2), HorizontalAlignment = HorizontalAlignment.Center, Child = badge });
+            bool placed = false;
             Loaded += delegate {
+                if (placed) return; placed = true;
                 Rect area = ScreenLayout.AreaFor(this);
                 Left = Math.Max(area.Left, area.Right - Width - (countdown ? 20 : 380));
                 Top = Math.Max(area.Top, area.Bottom - ActualHeight - 12);
             };
             refresh.Interval = TimeSpan.FromMilliseconds(50); refresh.Tick += delegate { UpdateDisplay(); }; refresh.Start();
+            Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) {
+                if (!forceClose && started && !completed) { e.Cancel = true; Hide(); }
+            };
+            IsVisibleChanged += delegate { UpdateDisplay(); };
             Closed += delegate { refresh.Stop(); elapsed.Stop(); animation.Stop(); if (countdown) countdownWindow = null; else stopwatchWindow = null; };
             UpdateDisplay();
         }
         void MoveWindow(object sender, MouseButtonEventArgs e) {
             if (e.LeftButton == MouseButtonState.Pressed) { DragMove(); e.Handled = true; }
+        }
+        void SetDuration(TimeSpan value) {
+            if (started && !completed) return;
+            if (completed) Reset();
+            hours.Text = ((int)value.TotalHours).ToString(); minutes.Text = value.Minutes.ToString(); seconds.Text = value.Seconds.ToString();
+            UpdateDisplay();
+        }
+        void Extend(int extraMinutes) {
+            UpdateDisplay();
+            TimeSpan extra = TimeSpan.FromMinutes(extraMinutes), max = TimeSpan.FromSeconds(359999);
+            if (started && !completed) {
+                if (duration + extra > max) { status.Text = "최대 99시간 59분 59초까지 설정할 수 있어요"; return; }
+                duration += extra;
+            } else {
+                TimeSpan input;
+                if (completed) { Reset(); input = TimeSpan.Zero; }
+                else if (!ReadDuration(out input)) input = TimeSpan.Zero;
+                if (input + extra > max) { status.Text = "최대 99시간 59분 59초까지 설정할 수 있어요"; return; }
+                SetDuration(input + extra);
+            }
+            UpdateDisplay();
+        }
+        public void SetPresentationSuppressed(bool suppressed) {
+            if (policySuppressed == suppressed) return;
+            policySuppressed = suppressed; UpdateDisplay();
         }
         void AddDuration(TextBox box, string unit, string initial) {
             box.Text = initial; box.Width = 40; box.Padding = new Thickness(5); box.VerticalContentAlignment = VerticalAlignment.Center;
@@ -117,7 +171,7 @@ namespace ChunsikDesktop {
             UpdateDisplay();
         }
         void Reset() {
-            elapsed.Reset(); started = false; completed = false; lastLap = TimeSpan.Zero; lapCount = 0; laps.Items.Clear(); durationPanel.IsEnabled = true;
+            elapsed.Reset(); started = false; completed = false; pendingReveal = false; lastLap = TimeSpan.Zero; lapCount = 0; laps.Items.Clear(); durationPanel.IsEnabled = true;
             status.Text = "시작을 눌러주세요"; UpdateDisplay();
         }
         void AddLap() {
@@ -132,7 +186,7 @@ namespace ChunsikDesktop {
             return fractions ? result + "." + (value.Milliseconds / 10).ToString("00") : result;
         }
         void UpdateDisplay() {
-            if (start == null) return; // Duration fields fire events during construction.
+            if (start == null || forceClose) return; // Construction or explicit shutdown must not reveal a window.
             TimeSpan shown = elapsed.Elapsed;
             if (countdown) {
                 if (!started) { TimeSpan input; shown = ReadDuration(out input) ? input : TimeSpan.Zero; }
@@ -140,11 +194,17 @@ namespace ChunsikDesktop {
                     shown = duration - elapsed.Elapsed;
                     if (!completed && shown <= TimeSpan.Zero) {
                         elapsed.Stop(); completed = true; completionStartedAt = animation.Elapsed.TotalSeconds; status.Text = "시간이 다 됐어요! 수고했어요 ♥";
+                        pendingReveal = !IsVisible;
                         try { if (!PresentationPolicy.IsSuppressed) SystemSounds.Exclamation.Play(); } catch { }
                     }
                     shown = TimeSpan.FromSeconds(Math.Max(0, Math.Ceiling(shown.TotalSeconds)));
                 }
             }
+            if (pendingReveal && !PresentationPolicy.IsSuppressed) { pendingReveal = false; Show(); }
+            bool animate = IsVisible && !PresentationPolicy.IsSuppressed;
+            refresh.Interval = TimeSpan.FromMilliseconds(!animate || (!elapsed.IsRunning && !completed) ? 1000 : completed ? 25 : 50);
+            presets.IsEnabled = !started || completed;
+            if (!animate) return; // Measurement/completion above continues while visual work stops.
             readout.Text = FormatTime(shown, !countdown);
             start.Content = completed ? "다시 시작" : elapsed.IsRunning ? "일시정지" : started ? "재개" : "시작";
             lap.IsEnabled = elapsed.IsRunning && lapCount < 200;
@@ -169,8 +229,7 @@ namespace ChunsikDesktop {
                 hop.X = hop.Y = messageMotion.X = messageMotion.Y = 0;
                 bounceScale.ScaleX = bounceScale.ScaleY = 1;
             }
-            TimeSpan frameInterval = TimeSpan.FromMilliseconds(completed ? 25 : 50);
-            if (refresh.Interval != frameInterval) refresh.Interval = frameInterval;
         }
     }
 }
+

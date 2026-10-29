@@ -29,6 +29,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="Accessibility" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
@@ -40,22 +41,30 @@
   <ItemGroup>
     <Compile Include="PaydayCalendar.cs" />
     <Compile Include="Pet.cs" />
+    <Compile Include="GiantPet.cs" />
     <Compile Include="PetReactions.cs" />
+    <Compile Include="PetManagement.cs" />
     <Compile Include="InputAvoidance.cs" />
+    <Compile Include="AccessibilityCaret.cs" />
+    <Compile Include="MsaaCaret.cs" />
     <Compile Include="PreviewUI.cs" />
     <Compile Include="Scheduling.cs" />
     <Compile Include="ScreenLayout.cs" />
     <Compile Include="NoticePlacement.cs" />
     <Compile Include="SettingsHub.cs" />
     <Compile Include="UndoToast.cs" />
+    <Compile Include="CompletionCelebration.cs" />
     <Compile Include="SettingsBackup.cs" />
     <Compile Include="PresentationPolicy.cs" />
     <Compile Include="ReminderHistory.cs" />
     <Compile Include="PetOptions.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Diagnostics.cs" />
     <Compile Include="Reminders.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
+    <Compile Include="TodoSettingsView.cs" />
+    <Compile Include="SettingsTheme.cs" />
     <Compile Include="TodoHotKey.cs" />
     <Compile Include="GhostNoteHeader.cs" />
     <Compile Include="TodoModels.cs" />
@@ -70,7 +79,11 @@
     <EmbeddedResource Include="chunsik-stretch.png"><LogicalName>Assets.chunsik-stretch.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-tickle.png"><LogicalName>Assets.chunsik-tickle.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-water.png"><LogicalName>Assets.chunsik-water.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-completion.jpg"><LogicalName>Assets.chunsik-completion.jpg</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="ControlsTheme.xaml"><LogicalName>Theme.Controls.xaml</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="holidays-2025-2040.csv"><LogicalName>Assets.holidays-2025-2040.csv</LogicalName></EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="Version.targets" />
 </Project>
+

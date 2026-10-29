@@ -15,6 +15,9 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
       - name: Build Release x64
         run: msbuild ChunsikPet.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /m
+      - name: Verify generated versions and incremental rebuild
+        shell: pwsh
+        run: ./tests/version-build.ps1
       - name: Build scheduling tests
         run: msbuild tests/ScheduleTests.csproj /t:Rebuild /m
       - name: Run scheduling tests
@@ -35,3 +38,16 @@ jobs:
         with:
           name: ChunsikPet-Windows-x64
           path: ChunsikDesktopPet/bin/x64/Release/ChunsikPet.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Postit-settings-preview
+          path: tests/bin/postit-settings.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shared-controls-preview
+          path: tests/bin/controls-theme.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Completion-celebration-preview
+          path: tests/bin/completion-celebration.png

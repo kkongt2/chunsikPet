@@ -15,6 +15,7 @@ namespace ChunsikDesktop {
             SetFrame(paused ? 6 : 4);
         }
         void SetRestMode(bool value) {
+            if (giant) return;
             if (paused == value) return;
             Wake(); EndReaction(); paused = value; wasEvading = false;
             StartCue(value ? 2 : 3);
@@ -48,3 +49,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+

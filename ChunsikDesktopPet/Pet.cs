@@ -53,7 +53,11 @@ namespace ChunsikDesktop {
             if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
         public static void ResizeAll(double value) { foreach (PetWindow pet in Pets) pet.ResizePet(value); }
-        public static void SpeedAll(double value) { foreach (PetWindow pet in Pets) pet.speed = value; }
+        public static void SpeedAll(double value) {
+            if (!ValidSpeed(value)) return;
+            foreach (PetWindow pet in Pets) pet.speed = value;
+            SaveManagement();
+        }
         public static int Count { get { return Pets.Count; } }
         public static void ApplyAppearance() {
             if (PetPreferences.Current == null) return;
@@ -70,6 +74,12 @@ namespace ChunsikDesktop {
         readonly ScaleTransform clothScale = new ScaleTransform(1, 1);
         readonly RotateTransform clothTilt = new RotateTransform();
         readonly Viewbox wings = new Viewbox { IsHitTestVisible = false, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
+        readonly System.Windows.Shapes.Ellipse halo = new System.Windows.Shapes.Ellipse {
+            IsHitTestVisible = false, Visibility = Visibility.Collapsed,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom,
+            Stroke = new SolidColorBrush(Color.FromRgb(102, 190, 203)), Fill = Brushes.Transparent,
+            RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform(-12)
+        };
         readonly ScaleTransform wingScale = new ScaleTransform(1, 1);
         readonly RotateTransform wingFlap = new RotateTransform(0, 106, 98);
         bool wingFall;
@@ -95,6 +105,13 @@ namespace ChunsikDesktop {
         bool paused, dragging, closing;
         System.Windows.Point down, origin;
         bool pressed;
+        bool presentationPaused;
+        public void SetPresentationSuppressed(bool suppressed) {
+            if (presentationPaused == suppressed) return;
+            presentationPaused = suppressed;
+            if (suppressed) { clock.Stop(); timer.Stop(); }
+            else { clock.Start(); lastTime = clock.Elapsed.TotalSeconds; if (IsLoaded && !closing) timer.Start(); }
+        }
 
         [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] struct MONITORINFO {
@@ -166,16 +183,17 @@ namespace ChunsikDesktop {
         static ImageSource WithRestHeadband(ImageSource sprite, double width, double height) {
             DrawingGroup drawing = new DrawingGroup();
             using (DrawingContext dc = drawing.Open()) {
-                dc.DrawImage(sprite, new Rect(0, 0, width, height));
                 dc.PushTransform(new ScaleTransform(width, height));
                 Pen edge = new Pen(new SolidColorBrush(Color.FromRgb(133, 125, 110)), 0.007);
                 edge.LineJoin = PenLineJoin.Round;
-                // Two short cloth tails and a knot at the right temple.
+                // Tie behind the head: draw both tails first so the sprite covers their roots.
                 dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.26 Q 0.94,0.28 0.985,0.37 L 0.94,0.36 0.92,0.40 Q 0.90,0.33 0.85,0.30 Z"));
-                dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.27 Q 0.92,0.34 0.90,0.44 L 0.87,0.41 0.84,0.43 Q 0.87,0.35 0.83,0.29 Z"));
-                // Curved white cloth sits above the eyes, leaving ears and face visible.
+                dc.DrawGeometry(Brushes.WhiteSmoke, edge, Geometry.Parse("M 0.86,0.27 Q 0.97,0.34 0.965,0.47 L 0.935,0.44 0.90,0.46 Q 0.92,0.35 0.83,0.29 Z"));
+                dc.Pop();
+                dc.DrawImage(sprite, new Rect(0, 0, width, height));
+                dc.PushTransform(new ScaleTransform(width, height));
+                // Only the forehead strip is in front; no visible round temple knot.
                 dc.DrawGeometry(Brushes.White, edge, Geometry.Parse("M 0.14,0.21 Q 0.50,0.26 0.86,0.21 L 0.91,0.31 Q 0.50,0.36 0.09,0.31 Z"));
-                dc.DrawEllipse(Brushes.White, edge, new Point(0.88, 0.28), 0.028, 0.035);
                 dc.Pop();
             }
             drawing.Freeze(); DrawingImage result = new DrawingImage(drawing); result.Freeze(); return result;
@@ -225,13 +243,24 @@ namespace ChunsikDesktop {
         public static List<PetPlacement> CapturePlacements() {
             List<PetPlacement> result = new List<PetPlacement>();
             foreach (PetWindow pet in Pets) {
-                if (!pet.placementReady || pet.closing) return null;
+                if (!pet.placementReady || pet.closing || pet.movingMonitor) return null;
                 Rect bounds = ScreenLayout.BoundsPixels(pet); if (bounds.IsEmpty) return null;
-                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.size, CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom });
+                System.Windows.Forms.Screen screen = pet.CurrentScreen();
+                Rect work = MonitorWork(screen);
+                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.giant ? 500 : pet.size, Giant = pet.giant, Speed = pet.speed,
+                    CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom, MonitorDevice = screen.DeviceName,
+                    RelativeX = PlacementGeometry.Fraction(bounds.Left, work.Left, work.Width - bounds.Width),
+                    RelativeY = PlacementGeometry.Fraction(bounds.Top, work.Top, work.Height - bounds.Height) });
             }
             return result;
         }
         void RestorePlacement(PetPlacement place) {
+            speed = place.RestoredSpeed;
+            if (place.HasRelativePosition) {
+                System.Windows.Forms.Screen target = FindMonitor(place.MonitorDevice) ?? System.Windows.Forms.Screen.PrimaryScreen;
+                PositionOnMonitor(target, place.RelativeX, place.RelativeY, false);
+                return;
+            }
             // Stored positions are physical pixels, so mixed-DPI and negative monitor
             // coordinates do not get interpreted in the primary monitor's scale.
             System.Drawing.Rectangle work = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)place.CenterX, (int)place.BottomY - 1)).WorkingArea;
@@ -261,7 +290,7 @@ namespace ChunsikDesktop {
             picture.RenderTransformOrigin = new Point(0.5, 1);
             TransformGroup effects = new TransformGroup(); effects.Children.Add(flip); effects.Children.Add(squirm); effects.Children.Add(hop);
             picture.RenderTransform = effects;
-            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(sleepMark); root.Children.Add(reactionMark); Content = root;
+            BuildParachute(); BuildWings(); root.Children.Add(parachute); root.Children.Add(wings); root.Children.Add(picture); root.Children.Add(halo); root.Children.Add(sleepMark); root.Children.Add(reactionMark); root.Children.Add(managementHighlight); root.Children.Add(giantBadge); Content = root;
             RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
             MouseRightButtonDown += delegate { if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake(); EndReaction(); recentClicks.Clear(); };
             MouseLeftButtonDown += OnDown; MouseMove += OnMove; MouseLeftButtonUp += OnUp;
@@ -278,7 +307,7 @@ namespace ChunsikDesktop {
                     int index = Pets.IndexOf(this);
                     if (positions != null && index >= 0 && index < positions.Count && positions[index] != null && positions[index].IsValid()) saved = positions[index];
                 }
-                ResizePet(saved == null ? 80 : saved.Size);
+                ResizePet(saved == null ? 80 : saved.Giant ? GiantSize : saved.Size);
                 if (!IsTodoCompanion && PetPreferences.Current != null) PresentationPolicy.SetOpacity(this, 1.0 - PetPreferences.Current.Options.TransparencyPercent / 100.0);
                 Rect area = WorkArea(); Left = area.Left + Rng.NextDouble() * Math.Max(0, area.Width - Width);
                 Top = area.Bottom - Height;
@@ -286,7 +315,7 @@ namespace ChunsikDesktop {
                 paused = saved != null && saved.Paused;
                 placementReady = true;
                 if (paused) { state = 2; SetFrame(6); } else ChooseState();
-                timer.Start();
+                if (!presentationPaused) timer.Start();
             };
             Closed += delegate { closing = true; timer.Stop(); Pets.Remove(this); if (!IsTodoCompanion && Pets.Count == 0) Quit(); };
             timer.Interval = TimeSpan.FromMilliseconds(40); timer.Tick += Tick;
@@ -320,14 +349,14 @@ namespace ChunsikDesktop {
             parachute.RenderTransform = transform;
         }
         void BuildWings() {
-            // Leave room around the feather tips throughout the flap rotation.
+            // Compact two-lobed angel wings, tucked behind the shoulders.
             Canvas pair = new Canvas { Width = 260, Height = 170 };
-            Geometry outline = Geometry.Parse("M 106,98 C 87,67 58,54 30,24 Q 17,10 9,9 C 4,29 14,49 29,62 Q 9,50 8,56 C 10,77 25,90 44,96 Q 23,89 26,98 C 37,116 57,120 72,114 Q 65,120 73,123 C 89,126 102,114 106,98 Z");
-            Geometry feathers = Geometry.Parse("M 24,38 Q 54,74 88,97 M 29,62 Q 53,89 84,103 M 44,96 Q 63,108 79,108");
+            Geometry outline = Geometry.Parse("M 106,98 C 100,82 99,66 85,49 C 73,34 53,33 42,45 C 29,59 32,77 42,87 C 27,93 31,111 45,118 C 62,127 90,117 106,98 Z");
+            Geometry highlight = Geometry.Parse("M 43,72 C 38,58 47,44 61,43");
             for (int side = 0; side < 2; side++) {
                 Canvas wing = new Canvas { Width = 220, Height = 140 };
-                wing.Children.Add(new System.Windows.Shapes.Path { Data = outline, Fill = new LinearGradientBrush(Colors.White, Color.FromRgb(225, 236, 247), 90), Stroke = new SolidColorBrush(Color.FromRgb(154, 172, 190)), StrokeThickness = 1.8, StrokeLineJoin = PenLineJoin.Round });
-                wing.Children.Add(new System.Windows.Shapes.Path { Data = feathers, Stroke = new SolidColorBrush(Color.FromRgb(197, 212, 227)), StrokeThickness = 1.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
+                wing.Children.Add(new System.Windows.Shapes.Path { Data = outline, Fill = new LinearGradientBrush(Color.FromRgb(236, 253, 253), Color.FromRgb(180, 231, 236), 90), Stroke = new SolidColorBrush(Color.FromRgb(102, 190, 203)), StrokeThickness = 3.5, StrokeLineJoin = PenLineJoin.Round });
+                wing.Children.Add(new System.Windows.Shapes.Path { Data = highlight, Stroke = Brushes.White, StrokeThickness = 3, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
                 TransformGroup transform = new TransformGroup(); transform.Children.Add(wingFlap);
                 if (side == 1) transform.Children.Add(new ScaleTransform(-1, 1, 110, 0));
                 wing.RenderTransform = transform; Canvas.SetLeft(wing, 20); Canvas.SetTop(wing, 15); pair.Children.Add(wing);
@@ -335,6 +364,7 @@ namespace ChunsikDesktop {
             wings.Child = pair; wings.RenderTransformOrigin = new Point(0.5, 0.72); wings.RenderTransform = wingScale;
         }
         void StartFall() {
+            if (giant) return;
             double feet = Top + Height, center = Left + Width / 2;
             Wake(); EndReaction(); StopNoticeAnimation();
             falling = true; fallArea = WorkArea(); fallStart = clock.Elapsed.TotalSeconds; landedAt = -1;
@@ -344,6 +374,7 @@ namespace ChunsikDesktop {
             fallCenter = Left + Width / 2; Top = feet - Height;
             SetFrame(7); parachute.Visibility = wingFall ? Visibility.Collapsed : Visibility.Visible;
             wings.Visibility = wingFall ? Visibility.Visible : Visibility.Collapsed;
+            halo.Visibility = wings.Visibility; halo.Opacity = 0.3;
             wingScale.ScaleX = wingScale.ScaleY = 0.15; wings.Opacity = 0.3;
             wingDirection = Rng.Next(2) == 0 ? -1 : 1;
             if (wingFall) StartWingLeg(fallStart);
@@ -353,7 +384,7 @@ namespace ChunsikDesktop {
             if (!falling) return;
             double feet = Top + Height, center = Left + Width / 2;
             falling = false; landedAt = -1; parachute.Visibility = Visibility.Collapsed;
-            wings.Visibility = Visibility.Collapsed; wingFall = false;
+            wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = false;
             squirm.Angle = 0; hop.X = 0; hop.Y = 0; flip.ScaleX = 1; flip.ScaleY = 1;
             timer.Interval = TimeSpan.FromMilliseconds(40); LayoutPet();
             Left = Clamp(center - Width / 2, fallArea.Left, fallArea.Right - Width);
@@ -396,7 +427,7 @@ namespace ChunsikDesktop {
             SetFrame(7); wingFlap.Angle = -5 + 9 * Math.Sin(elapsed * 4);
             if (landedAt < 0) {
                 wingScale.ScaleX = wingScale.ScaleY = 0.15 + 0.85 * opened;
-                wings.Opacity = 0.3 + 0.7 * opened;
+                wings.Opacity = 0.3 + 0.7 * opened; halo.Opacity = wings.Opacity;
                 double progress = Math.Min(1, Math.Max(0, (now - wingLegStart) / wingLegDuration));
                 // Smoothstep comes to rest at each turn, like a drifting leaf.
                 double smooth = progress * progress * (3 - 2 * progress);
@@ -408,7 +439,7 @@ namespace ChunsikDesktop {
                 else if (progress >= 1) { wingDirection = -wingDirection; StartWingLeg(now); }
             } else {
                 double fold = Math.Max(0, 1 - (now - landedAt) / 0.35);
-                wingScale.ScaleX = wingScale.ScaleY = fold; wings.Opacity = fold;
+                wingScale.ScaleX = wingScale.ScaleY = fold; wings.Opacity = fold; halo.Opacity = fold;
                 squirm.Angle = 0; flip.ScaleY = 1 - 0.06 * Math.Sin((1 - fold) * Math.PI);
                 if (fold <= 0) StopFall(true);
             }
@@ -419,12 +450,13 @@ namespace ChunsikDesktop {
             if (!IsLoaded || closing || pressed || dragging) return;
             CancelCue(); wasEvading = false;
             falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
-            wings.Visibility = Visibility.Collapsed; wingFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
+            wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
             squirm.Angle = 0; flip.ScaleX = flip.ScaleY = 1;
             Rect area = WorkArea(); LayoutPet(); Left = Clamp(Left, area.Left, area.Right - Width); Top = Math.Max(area.Top, area.Bottom - Height);
         }
 
         void LayoutPet() {
+            if (giant) { FitGiant(); return; }
             double center = IsLoaded && !Double.IsNaN(Left) ? Left + Width / 2 : SystemParameters.WorkArea.Left + Width / 2;
             Width = Math.Ceiling(size * maxW / maxH + 12 + (reactionKind == 0 ? 0 : size * 0.45));
             Height = size + 6 + (reactionKind == 0 ? 0 : size * 0.22 + 18);
@@ -438,8 +470,11 @@ namespace ChunsikDesktop {
             }
             if (falling) {
                 if (wingFall) {
-                    Width = Math.Max(Width, size * 2.1 + 12); Height = size * 1.45 + 6;
-                    wings.Width = size * 2.1; wings.Height = size * 1.34;
+                    Width = Math.Max(Width, size * 1.85 + 12); Height = size * 1.45 + 6;
+                    wings.Width = size * 1.85; wings.Height = size * 1.21;
+                    halo.Width = size * 0.38; halo.Height = size * 0.13;
+                    halo.StrokeThickness = Math.Max(1.2, size * 0.025);
+                    halo.Margin = new Thickness(0, 0, 0, size * frames[7].PixelHeight / maxH + size * 0.06);
                     wings.Margin = new Thickness(0, 0, 0, size * 0.08);
                 } else {
                     Width = Math.Max(Width, size * 1.72 + 12); Height = size * 2.05 + 6;
@@ -451,7 +486,15 @@ namespace ChunsikDesktop {
         }
         void ResizePet(double value) {
             double feet = Top + Height;
-            size = value; LayoutPet(); SetFrame(frame);
+            if (value != GiantSize && (value < 50 || value > 500)) return;
+            if (giant || value == GiantSize) {
+                pressed = dragging = false; ReleaseMouseCapture();
+                CancelCue(); EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction(); Wake();
+            }
+            giant = value == GiantSize;
+            giantBadge.Visibility = giant ? Visibility.Visible : Visibility.Collapsed;
+            if (!giant) size = value;
+            LayoutPet(); SetFrame(giant ? 4 : frame);
             if (falling) { Top = Math.Min(feet, fallArea.Bottom) - Height; fallCenter = Left + Width / 2; }
             if (placementReady && !IsTodoCompanion && PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
         }
@@ -489,6 +532,7 @@ namespace ChunsikDesktop {
         }
         static double Clamp(double n, double lo, double hi) { return Math.Max(lo, Math.Min(Math.Max(lo, hi), n)); }
         void SetFrame(int index) {
+            if (giant) { ShowGiantFrame(index); return; }
             scooting = false; frame = index;
             picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
             if (paused && index == 6 && pausedSeatedFrame != null) picture.Source = pausedSeatedFrame;
@@ -506,6 +550,7 @@ namespace ChunsikDesktop {
             foreach (PetWindow pet in Pets) pet.BeginPayday();
         }
         void BeginPayday() {
+            if (giant) return;
             // Dragging and parachuting remain under the user's control.
             if (pressed || dragging || falling) return;
             EndReaction(); StopNoticeAnimation(); Wake();
@@ -548,7 +593,8 @@ namespace ChunsikDesktop {
         }
         void Tick(object sender, EventArgs args) {
             double now = clock.Elapsed.TotalSeconds, dt = Math.Min(0.1, now - lastTime); lastTime = now;
-            if (closing || pressed || dragging) return;
+            if (presentationPaused || closing || pressed || dragging || movingMonitor) return;
+            if (giant) { TickGiant(now); return; }
             if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
             if (falling) { CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
@@ -647,6 +693,7 @@ namespace ChunsikDesktop {
             // Use the same pose for press and drag so crossing the drag threshold
             // cannot resize/reposition the body a second time.
             SetFrame(7); UpdateLayout();
+            if (giant) { down = pointerPixels; return; }
             Point anchor = picture.PointToScreen(new Point(picture.ActualWidth * bodyFraction.X, picture.ActualHeight * bodyFraction.Y));
             Rect bounds = ScreenLayout.BoundsPixels(this);
             if (!bounds.IsEmpty) ScreenLayout.MovePixels(this, bounds.Left + pointerPixels.X - anchor.X, bounds.Top + pointerPixels.Y - anchor.Y);
@@ -664,7 +711,7 @@ namespace ChunsikDesktop {
                 dragging = true;
                 recentClicks.Clear();
             }
-            if (dragging) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
+            if (dragging && !giant) { SetFrame(7); ScreenLayout.MovePixels(this, origin.X + delta.X, origin.Y + delta.Y); }
         }
         void OnUp(object sender, MouseButtonEventArgs e) {
             if (!pressed) return;
@@ -686,18 +733,18 @@ namespace ChunsikDesktop {
         }
         void AddQuickSettings(ContextMenu menu) {
             StackPanel panel = new StackPanel { Margin = new Thickness(8) };
-            panel.Children.Add(new TextBlock { Text = "빠른 설정", FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray, Margin = new Thickness(4, 0, 0, 6) });
+            TextBlock heading = new TextBlock { Text = "빠른 설정", FontWeight = FontWeights.SemiBold, Foreground = Brushes.DimGray, Margin = new Thickness(4, 0, 0, 6) }; panel.Children.Add(heading);
             System.Windows.Controls.Primitives.UniformGrid buttons = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
             panel.Children.Add(buttons);
             string[] names = { "걷기 / 쉬기", "입력 피하기", "포스트잇" };
-            Button[] controls = new Button[3]; TextBlock[] states = new TextBlock[3]; TextBlock[] icons = new TextBlock[3];
+            Button[] controls = new Button[3]; TextBlock[] states = new TextBlock[3]; TextBlock[] icons = new TextBlock[3]; TextBlock[] labels = new TextBlock[3];
             ControlTemplate template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'><Border x:Name='card' CornerRadius='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' Padding='8'><ContentPresenter HorizontalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='card' Property='Opacity' Value='0.8'/></Trigger><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='card' Property='BorderBrush' Value='#0064A8'/><Setter TargetName='card' Property='BorderThickness' Value='2'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='card' Property='Opacity' Value='0.4'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             for (int i = 0; i < controls.Length; i++) {
                 StackPanel content = new StackPanel();
                 icons[i] = new TextBlock { FontSize = 18, HorizontalAlignment = HorizontalAlignment.Center };
                 states[i] = new TextBlock { FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
                 content.Children.Add(icons[i]);
-                content.Children.Add(new TextBlock { Text = names[i], FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center });
+                labels[i] = new TextBlock { Text = names[i], FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center }; content.Children.Add(labels[i]);
                 content.Children.Add(states[i]);
                 controls[i] = new Button { Content = content, MinWidth = 94, Margin = new Thickness(3), Template = template, Cursor = Cursors.Hand, Foreground = new SolidColorBrush(Color.FromRgb(32, 69, 94)), BorderBrush = Brushes.LightSteelBlue };
                 buttons.Children.Add(controls[i]);
@@ -705,19 +752,25 @@ namespace ChunsikDesktop {
             Action refresh = delegate {
                 bool avoid = PetPreferences.Current != null && PetPreferences.Current.Options.AvoidCursor;
                 bool hidden = TodoService.Current != null && TodoService.Current.AllHidden;
-                icons[0].Text = paused ? "Ⅱ" : "▶"; icons[1].Text = "↔"; icons[2].Text = hidden ? "□" : "▣";
+                heading.Text = "춘식이 " + (Pets.IndexOf(this) + 1) + " · " + MonitorLabel(CurrentScreen());
+                labels[0].Text = paused ? "다시 걷기" : "쉬게 하기";
+                labels[1].Text = avoid ? "회피 끄기" : "회피 켜기";
+                labels[2].Text = hidden ? "모두 보이기" : "모두 숨기기";
+                icons[0].Text = paused ? "▶" : "Ⅱ"; icons[1].Text = "↔"; icons[2].Text = hidden ? "□" : "▣";
                 states[0].Text = paused ? "이 춘식이 · 쉬는 중" : "이 춘식이 · 걷기 모드";
-                states[1].Text = avoid ? "모두 · ON" : "모두 · OFF";
-                states[2].Text = hidden ? "전체 숨김 중" : "전체 숨김 해제";
+                states[1].Text = avoid ? "전체 회피 · 켜짐" : "전체 회피 · 꺼짐";
+                states[2].Text = hidden ? "포스트잇 · 숨김 중" : "포스트잇 · 표시 허용";
                 controls[0].ToolTip = paused ? "이 춘식이 다시 걷기" : "이 춘식이 쉬기";
-                controls[1].ToolTip = "모든 춘식이의 마우스 + 키입력 피하기 " + (avoid ? "끄기" : "켜기");
+                controls[1].ToolTip = "모든 춘식이의 마우스·입력 위치 피하기 " + (avoid ? "끄기" : "켜기");
                 controls[2].ToolTip = (hidden ? "포스트잇 전체 보이기" : "포스트잇 전체 숨기기") + " · " + TodoHotKey.Label;
+                if (giant) { labels[0].Text = "초대형 고정"; states[0].Text = "이 춘식이 · 이동 안 함"; }
+                controls[0].IsEnabled = !giant;
                 controls[1].IsEnabled = PetPreferences.Current != null;
                 controls[2].IsEnabled = TodoService.Current != null;
-                bool[] active = { paused, avoid, hidden };
+                bool[] active = { false, avoid, false };
                 for (int i = 0; i < controls.Length; i++) {
                     controls[i].Background = new SolidColorBrush(active[i] ? Color.FromRgb(211, 239, 226) : Color.FromRgb(239, 244, 250));
-                    System.Windows.Automation.AutomationProperties.SetName(controls[i], names[i] + ": " + states[i].Text + ". " + controls[i].ToolTip);
+                    System.Windows.Automation.AutomationProperties.SetName(controls[i], labels[i].Text + ": " + states[i].Text + ". " + controls[i].ToolTip);
                 }
             };
             controls[0].Click += delegate { SetRestMode(!paused); if (PetPreferences.Current != null) PetPreferences.Current.SaveLayout(); refresh(); };
@@ -732,27 +785,44 @@ namespace ChunsikDesktop {
         }
         ContextMenu BuildMenu() {
             ContextMenu menu = new ContextMenu();
-            if (!IsTodoCompanion) AddQuickSettings(menu);
-            menu.Items.Add(Item("포스트잇 · 할 일 등록/관리", delegate { TodoService.Current.OpenSettings(this); }));
-            if (IsTodoCompanion) return menu;
-            MenuItem sizes = new MenuItem(); sizes.Header = "크기";
-            sizes.Items.Add(Item("작게 (50)", delegate { ResizePet(50); }));
-            sizes.Items.Add(Item("보통 (80)", delegate { ResizePet(80); }));
-            sizes.Items.Add(Item("크게 (120)", delegate { ResizePet(120); })); sizes.Items.Add(Item("더 크게 (180)", delegate { ResizePet(180); }));
-            sizes.Items.Add(Item("엄청 크게 (270)", delegate { ResizePet(270); }));
-            sizes.Items.Add(Item("진격의 춘식이 (500)", delegate { ResizePet(500); })); menu.Items.Add(sizes);
-            MenuItem speeds = new MenuItem(); speeds.Header = "걷는 속도";
-            speeds.Items.Add(Item("느리게", delegate { speed = 22; }));
-            speeds.Items.Add(Item("보통", delegate { speed = 44; }));
-            speeds.Items.Add(Item("빠르게", delegate { speed = 80; })); menu.Items.Add(speeds);
-            menu.Items.Add(Item("캐릭터 설정 (투명도 · 마우스 회피 · 기타)", delegate { PetPreferences.Current.OpenSettings(); }));
-            menu.Items.Add(Item("춘식이 한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }));
+            if (IsTodoCompanion) {
+                menu.Items.Add(Item("포스트잇 관리…", delegate { TodoService.Current.OpenSettings(this); }));
+                return menu;
+            }
+            AddQuickSettings(menu);
+            MenuItem shrink = Item("보통 크기로 돌아가기", delegate { ResizePet(80); }); menu.Items.Add(shrink);
+            MenuItem sizes = new MenuItem();
+            foreach (double value in new double[] { 50, 80, 120, 180, 270, 500, GiantSize }) {
+                double selected = value; MenuItem choice = Item(SizeName(value), delegate { ResizePet(selected); });
+                choice.Tag = value; sizes.Items.Add(choice);
+            }
+            menu.Items.Add(sizes);
+            MenuItem speeds = new MenuItem();
+            foreach (double value in new double[] { 22, 44, 80 }) {
+                double selected = value; MenuItem choice = Item(SpeedName(value), delegate { SetSpeed(selected); });
+                choice.Tag = value; speeds.Items.Add(choice);
+            }
+            menu.Items.Add(speeds);
+            AddMonitorMenu(menu);
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("알림 설정 (점심·퇴근·사용자 지정)", delegate { ReminderService.Current.OpenSettings(); }));
-            menu.Items.Add(Item("테스트 알림", delegate { ReminderService.Current.Test(); }));
+            MenuItem add = Item("한 마리 추가", delegate { PetPreferences.Current.ChangeCount(Pets.Count + 1); }); menu.Items.Add(add);
+            menu.Items.Add(Item("춘식이 관리…", delegate { SettingsHub.Open("캐릭터"); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("이 춘식이 종료", delegate { PetPreferences.Current.ChangeCount(Pets.Count - 1, this); }));
-            menu.Items.Add(Item("모두 종료", delegate { Quit(); }));
+            MenuItem remove = Item("이 춘식이 제거", delegate {
+                if (Pets.Count == 1) {
+                    if (MessageBox.Show("마지막 춘식이예요. 알림·포스트잇·타이머를 포함한 프로그램을 종료할까요?", "프로그램 종료", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes) Quit();
+                } else PetPreferences.Current.ChangeCount(Pets.Count - 1, this);
+            }); menu.Items.Add(remove);
+            menu.Opened += delegate {
+                shrink.Visibility = giant ? Visibility.Visible : Visibility.Collapsed;
+                speeds.IsEnabled = !giant;
+                sizes.Header = "크기 · " + SizeName(SelectedSize);
+                speeds.Header = "걷는 속도 · " + SpeedName(speed);
+                foreach (MenuItem item in sizes.Items) item.IsChecked = (double)item.Tag == SelectedSize;
+                foreach (MenuItem item in speeds.Items) item.IsChecked = (double)item.Tag == speed;
+                add.IsEnabled = Pets.Count < 20;
+                remove.Header = Pets.Count == 1 ? "프로그램 종료…" : "이 춘식이 제거";
+            };
             return menu;
         }
         public static List<PetWindow> SpeechPets() {
@@ -810,7 +880,7 @@ namespace ChunsikDesktop {
             BuildSeatedScootFrames();
             LoadSleepingFrame(Path.Combine(folder, "chunsik-sleep.png"));
             TodoNote.LoadArt(folder);
-            Application app = new Application(); app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Application app = new Application(); SettingsTheme.Install(app); Diagnostics.Attach(app); app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             PetPreferences.Current = new PetPreferences();
             ReminderService.Current = new ReminderService();
             TodoService.Current = new TodoService();
@@ -825,3 +895,4 @@ namespace ChunsikDesktop {
         }
     }
 }
+

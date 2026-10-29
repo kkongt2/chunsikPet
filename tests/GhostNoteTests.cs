@@ -14,9 +14,36 @@ internal static class GhostNoteTests {
     static void Pump() { Application.Current.Dispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(delegate {})); }
     [STAThread] public static void Main() {
         Application app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        typeof(TodoService).Assembly.GetType("ChunsikDesktop.SettingsTheme").GetMethod("Install").Invoke(null, new object[] { app });
+        // Run the actual entry-point extraction path, not just UI constructors.
+        string assetFolder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Chunsik-startup-" + Guid.NewGuid().ToString("N"));
+        try {
+            Type program = typeof(UndoToast).Assembly.GetType("ChunsikDesktop.Program");
+            MethodInfo extract = program.GetMethod("ExtractAssets", BindingFlags.Static | BindingFlags.NonPublic);
+            extract.Invoke(null, new object[] { assetFolder });
+            string jpg = System.IO.Path.Combine(assetFolder, "chunsik-completion.jpg");
+            byte[] originalAssetBytes = System.IO.File.ReadAllBytes(jpg);
+            Check(originalAssetBytes.Length > 0, "real startup accepts and extracts embedded JPEG");
+            extract.Invoke(null, new object[] { assetFolder });
+            Check(Convert.ToBase64String(System.IO.File.ReadAllBytes(jpg)) == Convert.ToBase64String(originalAssetBytes), "existing startup assets remain intact");
+            System.IO.File.WriteAllText(jpg, "corrupt cache");
+            extract.Invoke(null, new object[] { assetFolder });
+            Check(Convert.ToBase64String(System.IO.File.ReadAllBytes(jpg)) == Convert.ToBase64String(originalAssetBytes), "startup repairs stale or corrupt cached artwork");
+        } finally { if (System.IO.Directory.Exists(assetFolder)) System.IO.Directory.Delete(assetFolder, true); }
         TodoNote.LoadArt(System.IO.Path.GetFullPath("ChunsikDesktopPet"));
+        typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-tickle.png") });
+        typeof(PetWindow).GetField("reactionFrames", BindingFlags.Static | BindingFlags.NonPublic).SetValue(null, typeof(PetWindow).GetField("frames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
         typeof(PetWindow).GetMethod("LoadFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { System.IO.Path.GetFullPath("ChunsikDesktopPet/chunsik-sprites.png") });
         typeof(PetWindow).GetMethod("BuildSeatedScootFrames", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+        AccessibilityCaretTests.Run();
+        MsaaCaretTests.Run();
+        PetManagementTests.Run();
+        GiantPetTests.Run();
+        ProductivityTests.Run();
+        MenuTests.Run();
+        DiagnosticsTests.Run();
+        PostitEditorTests.Run();
+        ControlsThemeTests.Run();
         double escapeTarget;
         Rect work = new Rect(0, 0, 1920, 1080);
         Check(InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, new Rect(880, 880, 200, 160), out escapeTarget) && escapeTarget == 778, "input avoidance chooses nearest free side");
@@ -274,8 +301,33 @@ internal static class GhostNoteTests {
         Button undoButton = (Button)typeof(UndoToast).GetField("undoButton", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(toast);
         Point undoAt = undoButton.TranslatePoint(new Point(), toast);
         Check(toast.SizeToContent == SizeToContent.Height && undoButton.ActualHeight >= 38 && undoAt.Y + undoButton.ActualHeight <= toast.ActualHeight - 10, "undo action is fully visible in content-sized toast");
+        object celebration = typeof(UndoToast).GetField("celebration", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(toast);
+        Type artType = celebration.GetType();
+        artType.GetMethod("SetPose", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(celebration, new object[] { 0.48 });
+        toast.UpdateLayout();
+        FrameworkElement art = (FrameworkElement)celebration;
+        System.Windows.Media.Imaging.BitmapSource original = (System.Windows.Media.Imaging.BitmapSource)artType.GetField("artwork", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        Check(original.PixelWidth == 1536 && original.PixelHeight == 1059 && original.IsFrozen, "original full-resolution image is embedded and cached without cropping");
+        Check(!art.IsHitTestVisible && art.ActualHeight > 0 && art.TranslatePoint(new Point(0, art.ActualHeight), toast).Y < undoAt.Y, "celebration stays above actions without intercepting input");
+        System.Windows.Media.Imaging.RenderTargetBitmap preview = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(toast.ActualWidth), (int)Math.Ceiling(toast.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        preview.Render(toast);
+        System.Windows.Media.Imaging.PngBitmapEncoder encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(preview));
+        using (System.IO.MemoryStream stream = new System.IO.MemoryStream()) {
+            encoder.Save(stream); System.IO.File.WriteAllBytes("tests/bin/completion-celebration.png", stream.ToArray());
+            Console.WriteLine("CELEBRATION_PREVIEW_BASE64=" + Convert.ToBase64String(stream.ToArray()));
+        }
         undoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
         Check(undoCount == 1 && !toast.IsVisible, "undo action fires once and dismisses toast");
+        DispatcherTimer artTimer = (DispatcherTimer)artType.GetField("timer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(celebration);
+        Check(!artTimer.IsEnabled, "undo stops celebration timer");
+        UndoToast.ShowCompleted("연속 완료 1", delegate {}); Pump();
+        UndoToast previousToast = (UndoToast)typeof(UndoToast).GetField("current", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        object previousArt = typeof(UndoToast).GetField("celebration", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(previousToast);
+        UndoToast.ShowCompleted("연속 완료 2", delegate {}); Pump();
+        Check(!previousToast.IsVisible && !((DispatcherTimer)artType.GetField("timer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(previousArt)).IsEnabled, "replacement closes old toast and stops animation");
+        ((UndoToast)typeof(UndoToast).GetField("current", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null)).Close();
         Console.WriteLine("PASS: " + count + " normal mode assertions"); app.Shutdown();
     }
 }
+
