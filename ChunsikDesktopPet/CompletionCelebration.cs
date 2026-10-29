@@ -58,7 +58,7 @@ namespace ChunsikDesktop {
             bool active = seconds >= 0 && seconds < 3.6;
             double cycle = active ? seconds % 1.2 / 1.2 : 0;
             double wave = Math.Sin(cycle * Math.PI);
-            armRotation.Angle = -38 * wave;
+            armRotation.Angle = 38 * wave;
             bounce.Y = -3 * wave;
             for (int i = 0; i < confetti.Length; i++) {
                 double t = (cycle - (i % 4) * 0.045) / 0.82;
