@@ -59,11 +59,12 @@ namespace ChunsikDesktop {
                 }
             }
         }
+        // MsaaCaret normalizes provider DPI before reaching this validator or the result cache.
         // Validate physical pixels; never protect an entire document/window.
         internal static Rect Accept(Rect candidate, Rect owner) {
             if (candidate.IsEmpty || owner.IsEmpty || Double.IsNaN(candidate.X) || Double.IsNaN(candidate.Y) ||
                 Double.IsInfinity(candidate.X) || Double.IsInfinity(candidate.Y) ||
-                candidate.Width < 0 || candidate.Height <= 0 || Double.IsInfinity(candidate.Width) || Double.IsInfinity(candidate.Height)) return Rect.Empty;
+                Double.IsNaN(candidate.Width) || Double.IsNaN(candidate.Height) || candidate.Width < 0 || candidate.Height <= 0 || Double.IsInfinity(candidate.Width) || Double.IsInfinity(candidate.Height)) return Rect.Empty;
             if (candidate.Height > 120 || candidate.Width > 64) return Rect.Empty;
             Rect value = new Rect(candidate.X, candidate.Y, Math.Max(1, candidate.Width), candidate.Height);
             value.Intersect(owner);
