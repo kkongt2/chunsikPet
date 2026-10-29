@@ -39,7 +39,7 @@ internal static class PostitEditorTests {
             Check(All<RadioButton>(hub).Any(x => Convert.ToString(x.Content) == "항상 표시"), "detail controls available");
             TextBox title = All<TextBox>(hub).First(x => x.Text == data.Items[0].Text);
             title.Text = "이번 주 회의 자료 정리 · 수정"; Check(data.Items[0].Text == title.Text, "inline edit updates model");
-            All<RadioButton>(hub).First(x => Convert.ToString(x.Content) == "완료").IsChecked = true; Pump();
+            All<RadioButton>(hub).First(x => Convert.ToString(x.Content) == "완료 보관함").IsChecked = true; Pump();
             Check(All<TextBox>(hub).Any(x => x.Text == "완료한 메모"), "completed filter opens records");
             All<Button>(hub).First(x => Convert.ToString(x.Content) == "복원").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
             Check(!data.Items[2].Done, "restore persists through redesigned controls");
