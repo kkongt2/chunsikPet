@@ -311,7 +311,7 @@ namespace ChunsikDesktop {
                 if (saved != null) RestorePlacement(saved);
                 paused = saved != null && saved.Paused;
                 placementReady = true;
-                if (saved == null) RememberMonitor(true);
+                if (saved == null && !IsTodoCompanion) RememberMonitor(true);
                 if (paused) { state = 2; SetFrame(6); } else ChooseState();
                 if (!presentationPaused) timer.Start();
             };
