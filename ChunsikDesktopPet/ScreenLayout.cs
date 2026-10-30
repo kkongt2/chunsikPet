@@ -23,7 +23,41 @@ namespace ChunsikDesktop {
             // Coordinates shared by different HWNDs must stay in physical desktop pixels.
             SetWindowPos(new WindowInteropHelper(window).Handle, IntPtr.Zero, (int)Math.Round(x), (int)Math.Round(y), 0, 0, 0x0015);
         }
-        static DispatcherTimer debounce;
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool SystemParametersInfo(uint action, uint parameter, [MarshalAs(UnmanagedType.Bool)] out bool value, uint flags);
+        static DispatcherTimer debounce, monitorPoll;
+        static bool sessionLocked, suspended, screenSaver;
+        static DateTime captureAfter;
+        static string topology;
+        public static bool PlacementCaptureBlocked { get { return sessionLocked || suspended || screenSaver || DateTime.UtcNow < captureAfter; } }
+        static string Topology() {
+            List<string> screens = new List<string>();
+            foreach (System.Windows.Forms.Screen screen in System.Windows.Forms.Screen.AllScreens)
+                screens.Add(screen.DeviceName + ":" + screen.Bounds + ":" + screen.WorkingArea + ":" + screen.Primary);
+            screens.Sort(StringComparer.Ordinal); return String.Join("|", screens.ToArray());
+        }
+        static void OnUI(Action action) {
+            if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
+                Application.Current.Dispatcher.BeginInvoke(action);
+        }
+        static void SessionChanged(object sender, Microsoft.Win32.SessionSwitchEventArgs args) {
+            if (args.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock || args.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleDisconnect || args.Reason == Microsoft.Win32.SessionSwitchReason.RemoteDisconnect)
+                OnUI(delegate { sessionLocked = true; Schedule(); });
+            else if (args.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock || args.Reason == Microsoft.Win32.SessionSwitchReason.SessionLogon || args.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect || args.Reason == Microsoft.Win32.SessionSwitchReason.RemoteConnect)
+                OnUI(delegate { sessionLocked = false; Schedule(); });
+        }
+        static void PowerChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs args) {
+            if (args.Mode == Microsoft.Win32.PowerModes.Suspend) OnUI(delegate { suspended = true; Schedule(); });
+            else if (args.Mode == Microsoft.Win32.PowerModes.Resume) OnUI(delegate { suspended = false; Schedule(); });
+        }
+        static void PollMonitors() {
+            bool running;
+            if (SystemParametersInfo(0x0072, 0, out running, 0) && running != screenSaver) { screenSaver = running; Schedule(); }
+            string current = Topology();
+            if (current != topology) { topology = current; Schedule(); }
+            if (!PlacementCaptureBlocked) PetWindow.RestoreAssignedMonitors();
+        }
         static readonly HashSet<Window> tracked = new HashSet<Window>();
         static bool started;
         public static Rect AreaFor(Window window) {
@@ -35,8 +69,18 @@ namespace ChunsikDesktop {
         }
         public static void Start() {
             if (started) return; started = true;
-            debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
-            debounce.Tick += delegate { debounce.Stop(); RepairAll(); };
+            debounce = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            debounce.Tick += delegate {
+                debounce.Stop();
+                if (sessionLocked || suspended || screenSaver) return;
+                captureAfter = DateTime.UtcNow.AddSeconds(1); // Include deferred per-monitor DPI settling.
+                RepairAll();
+            };
+            topology = Topology();
+            monitorPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            monitorPoll.Tick += delegate { PollMonitors(); }; monitorPoll.Start();
+            Microsoft.Win32.SystemEvents.SessionSwitch += SessionChanged;
+            Microsoft.Win32.SystemEvents.PowerModeChanged += PowerChanged;
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplayChanged;
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(Loaded));
         }
@@ -57,7 +101,7 @@ namespace ChunsikDesktop {
             w.Dispatcher.BeginInvoke(new Action(delegate { Clamp(w); }), DispatcherPriority.Loaded);
         }
         static void DisplayChanged(object sender, EventArgs args) { if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted) Application.Current.Dispatcher.BeginInvoke(new Action(Schedule)); }
-        static void Schedule() { if (debounce == null) return; debounce.Stop(); debounce.Start(); }
+        static void Schedule() { if (debounce == null) return; captureAfter = DateTime.UtcNow.AddSeconds(3); debounce.Stop(); debounce.Start(); }
         public static void Clamp(Window w) {
             if (!w.IsLoaded || !w.IsVisible || w.WindowState != WindowState.Normal || w is NoticeWindow) return;
             Rect area = AreaFor(w); double width = w.ActualWidth, height = w.ActualHeight;
@@ -78,6 +122,12 @@ namespace ChunsikDesktop {
             }
             if (ReminderService.Current != null) ReminderService.Current.LayoutNotices();
         }
-        public static void Stop() { Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplayChanged; if (debounce != null) debounce.Stop(); started = false; }
+        public static void Stop() {
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplayChanged;
+            Microsoft.Win32.SystemEvents.SessionSwitch -= SessionChanged;
+            Microsoft.Win32.SystemEvents.PowerModeChanged -= PowerChanged;
+            if (debounce != null) debounce.Stop(); if (monitorPoll != null) monitorPoll.Stop();
+            sessionLocked = suspended = screenSaver = false; captureAfter = DateTime.MinValue; started = false;
+        }
     }
 }

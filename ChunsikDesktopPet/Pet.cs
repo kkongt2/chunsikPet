@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -244,17 +244,14 @@ namespace ChunsikDesktop {
             List<PetPlacement> result = new List<PetPlacement>();
             foreach (PetWindow pet in Pets) {
                 if (!pet.placementReady || pet.closing || pet.movingMonitor) return null;
-                Rect bounds = ScreenLayout.BoundsPixels(pet); if (bounds.IsEmpty) return null;
-                System.Windows.Forms.Screen screen = pet.CurrentScreen();
-                Rect work = MonitorWork(screen);
-                result.Add(new PetPlacement { Paused = pet.paused, Size = pet.giant ? 500 : pet.size, Giant = pet.giant, Speed = pet.speed,
-                    CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom, MonitorDevice = screen.DeviceName,
-                    RelativeX = PlacementGeometry.Fraction(bounds.Left, work.Left, work.Width - bounds.Width),
-                    RelativeY = PlacementGeometry.Fraction(bounds.Top, work.Top, work.Height - bounds.Height) });
+                pet.RememberMonitor(false);
+                if (pet.assignedPlacement == null) return null;
+                result.Add(pet.assignedPlacement.Copy());
             }
             return result;
         }
         void RestorePlacement(PetPlacement place) {
+            assignedPlacement = place.Copy();
             speed = place.RestoredSpeed;
             if (place.HasRelativePosition) {
                 System.Windows.Forms.Screen target = FindMonitor(place.MonitorDevice) ?? System.Windows.Forms.Screen.PrimaryScreen;
@@ -314,6 +311,7 @@ namespace ChunsikDesktop {
                 if (saved != null) RestorePlacement(saved);
                 paused = saved != null && saved.Paused;
                 placementReady = true;
+                if (saved == null) RememberMonitor(true);
                 if (paused) { state = 2; SetFrame(6); } else ChooseState();
                 if (!presentationPaused) timer.Start();
             };
@@ -447,12 +445,18 @@ namespace ChunsikDesktop {
 
         Rect WorkArea() { return ScreenLayout.AreaFor(this); }
         public void RecoverDisplay() {
-            if (!IsLoaded || closing || pressed || dragging) return;
+            if (!IsLoaded || closing || pressed || dragging || movingMonitor) return;
             CancelCue(); wasEvading = false;
             falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
             wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
             squirm.Angle = 0; flip.ScaleX = flip.ScaleY = 1;
-            Rect area = WorkArea(); LayoutPet(); Left = Clamp(Left, area.Left, area.Right - Width); Top = Math.Max(area.Top, area.Bottom - Height);
+            if (assignedPlacement != null && assignedPlacement.HasRelativePosition) {
+                LayoutPet();
+                PositionOnMonitor(FindMonitor(assignedPlacement.MonitorDevice) ?? System.Windows.Forms.Screen.PrimaryScreen,
+                    assignedPlacement.RelativeX, assignedPlacement.RelativeY, false);
+            } else {
+                Rect area = WorkArea(); LayoutPet(); Left = Clamp(Left, area.Left, area.Right - Width); Top = Math.Max(area.Top, area.Bottom - Height);
+            }
         }
 
         void LayoutPet() {
@@ -721,8 +725,10 @@ namespace ChunsikDesktop {
             e.Handled = true;
         }
         void FinishDrag() {
+            bool userMoved = dragging;
             pressed = false; dragging = false; ReleaseMouseCapture();
             Rect area = WorkArea(); Left = Clamp(Left, area.Left, area.Right - Width);
+            if (userMoved) RememberMonitor(true);
             if (!IsTodoCompanion && PetPreferences.Current != null) PetPreferences.Current.SaveLayout();
             if (Top + Height < area.Bottom - 12) { StartFall(); return; }
             Top = area.Bottom - Height;
