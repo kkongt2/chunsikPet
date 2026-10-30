@@ -537,7 +537,7 @@ namespace ChunsikDesktop {
         static double Clamp(double n, double lo, double hi) { return Math.Max(lo, Math.Min(Math.Max(lo, hi), n)); }
         void SetFrame(int index) {
             if (giant) { ShowGiantFrame(index); return; }
-            scooting = false; frame = index;
+            cuteKind = 0; scooting = false; frame = index;
             picture.Source = reactionKind != 0 && (index == 5 || index == 7) ? reactionFrames[index] : frames[index];
             if (paused && index == 6 && pausedSeatedFrame != null) picture.Source = pausedSeatedFrame;
             picture.Width = size * frames[index].PixelWidth / maxH;
@@ -600,12 +600,14 @@ namespace ChunsikDesktop {
             if (presentationPaused || closing || pressed || dragging || movingMonitor) return;
             if (giant) { TickGiant(now); return; }
             if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
-            if (falling) { CancelCue(); AnimateFall(now, dt); return; }
+            if (falling) { EndCute(); CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
             bool specialNotice = noticeKind == "lunch" || noticeKind == "dinner" || noticeKind == "home" || noticeKind == "water" || noticeKind == "stretch";
-            if (paydayPlaying) { CancelCue(); AnimatePayday(now, dt); return; }
+            if (paydayPlaying) { EndCute(); CancelCue(); AnimatePayday(now, dt); return; }
+            if (specialNotice || reactionKind != 0) EndCute();
             if (!specialNotice) StopNoticeAnimation();
-            if (!specialNotice && PetPreferences.Current != null && PetPreferences.Current.IsIdle) { EndReaction(); recentClicks.Clear(); ShowSleep(now); return; }
+            if (!specialNotice && PetPreferences.Current != null && PetPreferences.Current.IsIdle) { EndReaction(); recentClicks.Clear(); if (!DozeBeforeSleep(now)) ShowSleep(now); return; }
+            dozeDone = false;
             Wake();
             if (reactionKind != 0) {
                 CancelCue();
@@ -614,18 +616,20 @@ namespace ChunsikDesktop {
             }
             if (specialNotice) { CancelCue(); AnimateNotice(noticeKind, now); return; }
             if (ReminderService.Current != null && ReminderService.Current.IsSpeakingFor(this)) {
-                CancelCue();
+                EndCute(); CancelCue();
                 if (frame != 7) SetFrame(7); return;
             }
-            if (TodoService.Current != null && TodoService.Current.IsHoldingFor(this)) { if (frame != 4) SetFrame(4); return; }
+            if (TodoService.Current != null && TodoService.Current.IsHoldingFor(this)) { EndCute(); if (frame != 4) SetFrame(4); return; }
             // Let an explicit mode change finish before the nearby menu cursor triggers evasion.
+            if (cueKind != 0) EndCute();
             if ((cueKind == 2 || cueKind == 3) && AnimateCue(now)) return;
-            if (EvadeInput(now, dt, paused || state == 2)) { wasEvading = true; CancelCue(); return; }
+            if (EvadeInput(now, dt, paused || state == 2)) { wasEvading = true; EndCute(); CancelCue(); return; }
             if (wasEvading) {
                 wasEvading = false;
                 if (cueKind == 0 && now >= nextLookBack && PetPreferences.Current != null && PetPreferences.Current.Options.AvoidCursor) { StartCue(1); nextLookBack = now + 4; }
             }
             if (AnimateCue(now)) return;
+            if (IdleCute(now)) return;
             if (paused) { if (frame != 6) SetFrame(6); return; }
             Rect area = WorkArea();
             Top = area.Bottom - Height;
@@ -796,6 +800,7 @@ namespace ChunsikDesktop {
                 return menu;
             }
             AddQuickSettings(menu);
+            AddCuteMenu(menu);
             MenuItem shrink = Item("보통 크기로 돌아가기", delegate { ResizePet(80); }); menu.Items.Add(shrink);
             MenuItem sizes = new MenuItem();
             foreach (double value in new double[] { 50, 80, 120, 180, 270, 500, GiantSize }) {
@@ -884,6 +889,7 @@ namespace ChunsikDesktop {
             reactionFrames = frames;
             LoadFrames(Path.Combine(folder, "chunsik-sprites.png"));
             BuildSeatedScootFrames();
+            LoadCuteMotions(folder);
             LoadSleepingFrame(Path.Combine(folder, "chunsik-sleep.png"));
             TodoNote.LoadArt(folder);
             Application app = new Application(); SettingsTheme.Install(app); Diagnostics.Attach(app); app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -893,7 +899,7 @@ namespace ChunsikDesktop {
             app.SessionEnding += delegate { PetPreferences.Current.SaveLayout(); };
             app.Exit += delegate { ScreenLayout.Stop(); if (trayController != null) trayController.Dispose(); TimeToolWindow.StopAll(); TodoService.Current.Stop(); PetPreferences.Current.Stop(); ReminderService.Current.Stop(); };
             app.Startup += delegate {
-                ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); trayController = new TrayController();
+                ScreenLayout.Start(); SetCount(PetPreferences.Current.Options.PetCount); WelcomeAll(); trayController = new TrayController();
                 if (PetPreferences.Current.Options.PaydayEnabled && PaydayCalendar.IsPayday(DateTime.Today, PetPreferences.Current.Options.PaydayDay))
                     app.Dispatcher.BeginInvoke(new Action(PreviewPayday), DispatcherPriority.Loaded);
             };

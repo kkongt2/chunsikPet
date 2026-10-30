@@ -27,7 +27,7 @@ namespace ChunsikDesktop {
         [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool SystemParametersInfo(uint action, uint parameter, [MarshalAs(UnmanagedType.Bool)] out bool value, uint flags);
         static DispatcherTimer debounce, monitorPoll;
-        static bool sessionLocked, suspended, screenSaver;
+        static bool sessionLocked, suspended, screenSaver, welcomeOnRecovery;
         static DateTime captureAfter;
         static string topology;
         public static bool PlacementCaptureBlocked { get { return sessionLocked || suspended || screenSaver || DateTime.UtcNow < captureAfter; } }
@@ -45,15 +45,15 @@ namespace ChunsikDesktop {
             if (args.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock || args.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleDisconnect || args.Reason == Microsoft.Win32.SessionSwitchReason.RemoteDisconnect)
                 OnUI(delegate { sessionLocked = true; Schedule(); });
             else if (args.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock || args.Reason == Microsoft.Win32.SessionSwitchReason.SessionLogon || args.Reason == Microsoft.Win32.SessionSwitchReason.ConsoleConnect || args.Reason == Microsoft.Win32.SessionSwitchReason.RemoteConnect)
-                OnUI(delegate { sessionLocked = false; Schedule(); });
+                OnUI(delegate { sessionLocked = false; welcomeOnRecovery = true; Schedule(); });
         }
         static void PowerChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs args) {
             if (args.Mode == Microsoft.Win32.PowerModes.Suspend) OnUI(delegate { suspended = true; Schedule(); });
-            else if (args.Mode == Microsoft.Win32.PowerModes.Resume) OnUI(delegate { suspended = false; Schedule(); });
+            else if (args.Mode == Microsoft.Win32.PowerModes.Resume) OnUI(delegate { suspended = false; welcomeOnRecovery = true; Schedule(); });
         }
         static void PollMonitors() {
             bool running;
-            if (SystemParametersInfo(0x0072, 0, out running, 0) && running != screenSaver) { screenSaver = running; Schedule(); }
+            if (SystemParametersInfo(0x0072, 0, out running, 0) && running != screenSaver) { screenSaver = running; if (!running) welcomeOnRecovery = true; Schedule(); }
             string current = Topology();
             if (current != topology) { topology = current; Schedule(); }
             if (!PlacementCaptureBlocked) PetWindow.RestoreAssignedMonitors();
@@ -75,6 +75,7 @@ namespace ChunsikDesktop {
                 if (sessionLocked || suspended || screenSaver) return;
                 captureAfter = DateTime.UtcNow.AddSeconds(1); // Include deferred per-monitor DPI settling.
                 RepairAll();
+                if (welcomeOnRecovery) { welcomeOnRecovery = false; PetWindow.WelcomeAll(); }
             };
             topology = Topology();
             monitorPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };

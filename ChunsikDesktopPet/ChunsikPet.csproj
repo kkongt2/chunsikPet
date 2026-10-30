@@ -43,6 +43,7 @@
     <Compile Include="Pet.cs" />
     <Compile Include="GiantPet.cs" />
     <Compile Include="PetReactions.cs" />
+    <Compile Include="CuteMotions.cs" />
     <Compile Include="PetManagement.cs" />
     <Compile Include="InputAvoidance.cs" />
     <Compile Include="AccessibilityCaret.cs" />
@@ -71,6 +72,9 @@
     <Compile Include="TrayController.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="chunsik-snack.png"><LogicalName>Assets.chunsik-snack.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-doze.png"><LogicalName>Assets.chunsik-doze.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-welcome.png"><LogicalName>Assets.chunsik-welcome.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-notices.png"><LogicalName>Assets.chunsik-notices.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-payday.png"><LogicalName>Assets.chunsik-payday.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-peek.png"><LogicalName>Assets.chunsik-peek.png</LogicalName></EmbeddedResource>
