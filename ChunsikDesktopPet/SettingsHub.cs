@@ -47,8 +47,8 @@ namespace ChunsikDesktop {
         }
         public static void Attach(Window form, string name, Func<bool> flush) {
             Ensure(); TabItem tab = sections[name]; object content = form.Content; form.Content = null;
-            FrameworkElement element = content as FrameworkElement; if (element != null && name == "알림") element.MinWidth = 1240;
-            tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = name == "포스트잇" ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
+            FrameworkElement element = content as FrameworkElement; if (element != null && name == "알림") element.MinWidth = 0;
+            tab.Content = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = (name == "포스트잇" || name == "알림") ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; tab.Tag = form; forms[form] = flush;
             form.Closed += delegate { forms.Remove(form); if (tab.Tag == form) { tab.Tag = null; Button reopen = new Button { Content = name + " 설정 다시 열기", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(20) }; reopen.Click += delegate { Open(name); }; tab.Content = reopen; } };
             tabs.SelectedItem = tab; window.Activate();
         }

@@ -10,6 +10,15 @@ using Screen = System.Windows.Forms.Screen;
 namespace ChunsikDesktop {
     // Pure pixel geometry, shared by restore/move and covered without physical monitors.
     public static class PlacementGeometry {
+        // Keep the assigned display through Windows' temporary fallback relocation.
+        // Explicit drag/menu moves alone may replace a different assigned display.
+        public static PetPlacement Remember(PetPlacement assigned, PetPlacement current, bool explicitMove, bool blocked) {
+            if (assigned == null || !assigned.HasRelativePosition || (!blocked && (explicitMove || assigned.MonitorDevice == current.MonitorDevice))) return current.Copy();
+            PetPlacement result = current.Copy();
+            result.MonitorDevice = assigned.MonitorDevice; result.RelativeX = assigned.RelativeX; result.RelativeY = assigned.RelativeY;
+            result.CenterX = assigned.CenterX; result.BottomY = assigned.BottomY;
+            return result;
+        }
         public static double Fraction(double position, double start, double travel) {
             return travel <= 0 ? 0 : Math.Max(0, Math.Min(1, (position - start) / travel));
         }
@@ -21,6 +30,7 @@ namespace ChunsikDesktop {
 
     public partial class PetWindow {
         bool movingMonitor;
+        PetPlacement assignedPlacement;
         int monitorMoveGeneration;
         readonly Border managementHighlight = new Border {
             BorderBrush = Brushes.DeepSkyBlue, BorderThickness = new Thickness(3), CornerRadius = new CornerRadius(14),
@@ -72,9 +82,28 @@ namespace ChunsikDesktop {
                 if (closing || generation != monitorMoveGeneration) return;
                 try { settle(); }
                 finally { movingMonitor = false; }
-                if (save) { SaveManagement(); HighlightForManagement(); }
+                if (save) { RememberMonitor(true); SaveManagement(); HighlightForManagement(); }
                 if (ReminderService.Current != null) ReminderService.Current.LayoutNotices();
             }), DispatcherPriority.Loaded);
+        }
+        PetPlacement CurrentPlacement() {
+            Rect bounds = ScreenLayout.BoundsPixels(this); if (bounds.IsEmpty) return null;
+            Screen screen = CurrentScreen(); Rect work = MonitorWork(screen);
+            return new PetPlacement { Paused = paused, Size = giant ? 500 : size, Giant = giant, Speed = speed,
+                CenterX = bounds.Left + bounds.Width / 2, BottomY = bounds.Bottom, MonitorDevice = screen.DeviceName,
+                RelativeX = PlacementGeometry.Fraction(bounds.Left, work.Left, work.Width - bounds.Width),
+                RelativeY = PlacementGeometry.Fraction(bounds.Top, work.Top, work.Height - bounds.Height) };
+        }
+        void RememberMonitor(bool explicitMove) {
+            PetPlacement current = CurrentPlacement(); if (current == null) return;
+            assignedPlacement = PlacementGeometry.Remember(assignedPlacement, current, explicitMove, ScreenLayout.PlacementCaptureBlocked);
+        }
+        public static void RestoreAssignedMonitors() {
+            foreach (PetWindow pet in new List<PetWindow>(Pets)) {
+                if (pet.assignedPlacement == null || pet.movingMonitor || pet.pressed || pet.dragging || pet.closing) continue;
+                Screen target = FindMonitor(pet.assignedPlacement.MonitorDevice) ?? Screen.PrimaryScreen;
+                if (target != null && pet.CurrentScreen().DeviceName != target.DeviceName) pet.RecoverDisplay();
+            }
         }
         void MoveToMonitor(Screen target, double x) {
             if (closing || !IsLoaded || target == null) return;
@@ -140,7 +169,7 @@ namespace ChunsikDesktop {
                 Window window = SettingsHub.OwnerFor(owner);
                 GatherOnMonitor(Screen.FromHandle(new System.Windows.Interop.WindowInteropHelper(window).Handle));
             }));
-            panel.Children.Add(new TextBlock { Text = "모니터를 분리한 경우 주 화면으로 복원해요. 방해 금지 중에는 위치 강조도 숨겨져요.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 0) });
+            panel.Children.Add(new TextBlock { Text = "모니터 분리 중에는 주 화면에 임시 표시하고 다시 연결되면 원래 화면으로 돌아가요. 방해 금지 중에는 위치 강조도 숨겨져요.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 0) });
             bool refreshing = false;
             list.SelectionChanged += delegate { if (!refreshing) { PetWindow p = selected(); if (p != null) p.HighlightForManagement(); } };
             Action refresh = delegate {

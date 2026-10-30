@@ -10,6 +10,8 @@ namespace ChunsikDesktop {
     public sealed class TodoHotKey : IDisposable {
         public static TodoHotKey Current { get; private set; }
         public static event Action Changed;
+        public static uint SavedModifiers { get { return Current == null ? 7U : Current.modifiers; } }
+        public static uint SavedKey { get { return Current == null ? 0x5AU : Current.key; } }
         public static string Label { get { return Format(Current == null ? 7U : Current.modifiers, Current == null ? 0x5AU : Current.key); } }
         static readonly string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "hotkey.txt");
         const int FirstId = 0x4353, SecondId = 0x4354, WmHotKey = 0x0312;
@@ -27,7 +29,7 @@ namespace ChunsikDesktop {
             return (mods & 3) != 0 && (mods & ~7U) == 0 && ((code >= 0x41 && code <= 0x5A) || (code >= 0x30 && code <= 0x39) || (code >= 0x70 && code <= 0x7A));
         }
         static string KeyLabel(uint code) { return code >= 0x70 ? "F" + (code - 0x6F) : ((char)code).ToString(); }
-        static string Format(uint mods, uint code) { return ((mods & 2) != 0 ? "Ctrl + " : "") + ((mods & 1) != 0 ? "Alt + " : "") + ((mods & 4) != 0 ? "Shift + " : "") + KeyLabel(code); }
+        public static string Format(uint mods, uint code) { return ((mods & 2) != 0 ? "Ctrl + " : "") + ((mods & 1) != 0 ? "Alt + " : "") + ((mods & 4) != 0 ? "Shift + " : "") + KeyLabel(code); }
         public TodoHotKey(Action action) {
             toggle = action;
             try {
