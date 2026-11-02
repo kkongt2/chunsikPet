@@ -74,6 +74,13 @@
   <ItemGroup>
     <EmbeddedResource Include="chunsik-snack.png"><LogicalName>Assets.chunsik-snack.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-doze.png"><LogicalName>Assets.chunsik-doze.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-look.png"><LogicalName>Assets.chunsik-look.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-roll.png"><LogicalName>Assets.chunsik-roll.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-focus.png"><LogicalName>Assets.chunsik-focus.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-heart.png"><LogicalName>Assets.chunsik-heart.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-umbrella.png"><LogicalName>Assets.chunsik-umbrella.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-clean.png"><LogicalName>Assets.chunsik-clean.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="chunsik-balloon.png"><LogicalName>Assets.chunsik-balloon.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-welcome.png"><LogicalName>Assets.chunsik-welcome.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-notices.png"><LogicalName>Assets.chunsik-notices.png</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="chunsik-payday.png"><LogicalName>Assets.chunsik-payday.png</LogicalName></EmbeddedResource>

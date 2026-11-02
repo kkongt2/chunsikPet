@@ -82,7 +82,7 @@ namespace ChunsikDesktop {
         };
         readonly ScaleTransform wingScale = new ScaleTransform(1, 1);
         readonly RotateTransform wingFlap = new RotateTransform(0, 106, 98);
-        bool wingFall;
+        bool wingFall, balloonFall;
         double wingLegStart, wingLegDuration, wingFromX, wingTargetX;
         int wingDirection;
         bool falling;
@@ -366,23 +366,24 @@ namespace ChunsikDesktop {
             double feet = Top + Height, center = Left + Width / 2;
             Wake(); EndReaction(); StopNoticeAnimation();
             falling = true; fallArea = WorkArea(); fallStart = clock.Elapsed.TotalSeconds; landedAt = -1;
-            wingFall = Rng.Next(2) == 0;
+            int effect = Rng.Next(3); wingFall = effect == 0; balloonFall = effect == 2 && cuteSheets.ContainsKey(10);
             fallCenter = center; timer.Interval = TimeSpan.FromMilliseconds(25);
             LayoutPet(); Left = Clamp(center - Width / 2, fallArea.Left, fallArea.Right - Width);
             fallCenter = Left + Width / 2; Top = feet - Height;
-            SetFrame(7); parachute.Visibility = wingFall ? Visibility.Collapsed : Visibility.Visible;
+            SetFrame(7); parachute.Visibility = (wingFall || balloonFall) ? Visibility.Collapsed : Visibility.Visible;
             wings.Visibility = wingFall ? Visibility.Visible : Visibility.Collapsed;
             halo.Visibility = wings.Visibility; halo.Opacity = 0.3;
             wingScale.ScaleX = wingScale.ScaleY = 0.15; wings.Opacity = 0.3;
             wingDirection = Rng.Next(2) == 0 ? -1 : 1;
             if (wingFall) StartWingLeg(fallStart);
+            if (balloonFall) ShowBalloonFrame(0);
             clothScale.ScaleX = 0.15; clothScale.ScaleY = 0.1; parachute.Opacity = 0.3;
         }
         void StopFall(bool landed) {
             if (!falling) return;
             double feet = Top + Height, center = Left + Width / 2;
             falling = false; landedAt = -1; parachute.Visibility = Visibility.Collapsed;
-            wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = false;
+            wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = balloonFall = false;
             squirm.Angle = 0; hop.X = 0; hop.Y = 0; flip.ScaleX = 1; flip.ScaleY = 1;
             timer.Interval = TimeSpan.FromMilliseconds(40); LayoutPet();
             Left = Clamp(center - Width / 2, fallArea.Left, fallArea.Right - Width);
@@ -390,6 +391,7 @@ namespace ChunsikDesktop {
             state = 1; stateEnd = clock.Elapsed.TotalSeconds + 0.7; SetFrame(4);
         }
         void AnimateFall(double now, double dt) {
+            if (balloonFall) { AnimateBalloonFall(now, dt); return; }
             if (wingFall) { AnimateWingFall(now, dt); return; }
             double elapsed = now - fallStart;
             double opened = Math.Min(1, elapsed / 0.4);
@@ -448,7 +450,7 @@ namespace ChunsikDesktop {
             if (!IsLoaded || closing || pressed || dragging || movingMonitor) return;
             CancelCue(); wasEvading = false;
             falling = false; dragging = false; pressed = false; ReleaseMouseCapture(); parachute.Visibility = Visibility.Collapsed;
-            wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
+            wings.Visibility = Visibility.Collapsed; halo.Visibility = Visibility.Collapsed; wingFall = balloonFall = false; timer.Interval = TimeSpan.FromMilliseconds(40);
             squirm.Angle = 0; flip.ScaleX = flip.ScaleY = 1;
             if (assignedPlacement != null && assignedPlacement.HasRelativePosition) {
                 LayoutPet();
@@ -473,7 +475,9 @@ namespace ChunsikDesktop {
                 Height = Math.Max(Height, size * paydayH / paydayBodyH + 6);
             }
             if (falling) {
-                if (wingFall) {
+                if (balloonFall) {
+                    Width = Math.Max(Width, size * 1.3 + 12); Height = size * 1.6 + 6;
+                } else if (wingFall) {
                     Width = Math.Max(Width, size * 1.85 + 12); Height = size * 1.45 + 6;
                     wings.Width = size * 1.85; wings.Height = size * 1.21;
                     halo.Width = size * 0.38; halo.Height = size * 0.13;
