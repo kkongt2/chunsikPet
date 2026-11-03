@@ -20,6 +20,11 @@ internal static class CuteMotionTests {
         var sheets = (Dictionary<int, BitmapSource[]>)typeof(PetWindow).GetField("cuteSheets", shared).GetValue(null);
         Check(sheets.Count == 10, "all ten embedded sheets decode");
         foreach (BitmapSource[] frames in sheets.Values) { Check(frames.Length == 8, "eight frames"); foreach (BitmapSource frame in frames) Check(frame.IsFrozen && frame.PixelWidth > 0 && frame.PixelHeight > 0, "frames decoded and frozen"); }
+        for (int i = 0; i < 8; i++) {
+            Int32Rect crop = ((CroppedBitmap)sheets[5][i]).SourceRect;
+            Check(i < 4 ? crop.Y + crop.Height <= 451 : crop.Y >= 500, "roll frames exclude neighboring row fragments");
+        }
+        Check(((CroppedBitmap)sheets[5][0]).SourceRect.Y + sheets[5][0].PixelHeight >= 449, "roll upper feet are not clipped at midpoint");
         Check(PetWindow.CuteFrameAt(0, 4) == 0 && PetWindow.CuteFrameAt(2, 4) == 4 && PetWindow.CuteFrameAt(4, 4) == 7, "frame order and endpoint bounded");
         var pool = (List<PetWindow>)typeof(PetWindow).GetField("Pets", shared).GetValue(null);
         PetWindow placeholder = new PetWindow(true); pool.Add(placeholder);

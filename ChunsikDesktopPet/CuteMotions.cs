@@ -17,7 +17,9 @@ namespace ChunsikDesktop {
             try {
                 string[] names = { "chunsik-snack.png", "chunsik-doze.png", "chunsik-welcome.png", "chunsik-look.png", "chunsik-roll.png", "chunsik-focus.png", "chunsik-heart.png", "chunsik-umbrella.png", "chunsik-clean.png", "chunsik-balloon.png" };
                 for (int i = 0; i < names.Length; i++) {
-                    LoadFrames(Path.Combine(folder, names[i]));
+                    // Roll artwork extends below the geometric midpoint (448/887).
+                    // Split inside its transparent gutter (rows 449..504), preserving both rows.
+                    LoadSpriteFrames(Path.Combine(folder, names[i]), names[i] == "chunsik-roll.png" ? 0.54 : 0.5);
                     cuteSheets[i + 1] = frames; cuteSizes[i + 1] = new Size(maxW, maxH);
                 }
             } finally { frames = original; maxW = originalW; maxH = originalH; }

@@ -124,7 +124,8 @@ namespace ChunsikDesktop {
         [DllImport("user32.dll")] static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);
         [DllImport("user32.dll", EntryPoint="SetWindowLong")] static extern int SetWindowLong32(IntPtr hwnd, int index, int value);
 
-        static void LoadFrames(string path) {
+        static void LoadFrames(string path) { LoadSpriteFrames(path, 0.5); }
+        static void LoadSpriteFrames(string path, double rowSplitFraction) {
             BitmapImage raw = new BitmapImage();
             raw.BeginInit(); raw.UriSource = new Uri(path); raw.CacheOption = BitmapCacheOption.OnLoad; raw.EndInit();
             FormatConvertedBitmap bitmap = new FormatConvertedBitmap(raw, PixelFormats.Bgra32, null, 0);
@@ -133,7 +134,8 @@ namespace ChunsikDesktop {
             frames = new BitmapSource[8]; maxW = maxH = 1;
             for (int k = 0; k < 8; k++) {
                 int x0 = k % 4 * w / 4, x1 = (k % 4 + 1) * w / 4;
-                int y0 = k / 4 * h / 2, y1 = (k / 4 + 1) * h / 2;
+                int rowSplit = (int)(h * rowSplitFraction);
+                int y0 = k < 4 ? 0 : rowSplit, y1 = k < 4 ? rowSplit : h;
                 int left = x1, right = x0, top = y1, bottom = y0;
                 for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
                     if (pixels[y * stride + x * 4 + 3] < 40) continue;
