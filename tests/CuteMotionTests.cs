@@ -13,7 +13,35 @@ internal static class CuteMotionTests {
     static object Call(PetWindow pet, string method, params object[] args) { return typeof(PetWindow).GetMethod(method, instance).Invoke(pet, args); }
     static object Get(PetWindow pet, string name) { return typeof(PetWindow).GetField(name, instance).GetValue(pet); }
     static void Set(PetWindow pet, string name, object value) { typeof(PetWindow).GetField(name, instance).SetValue(pet, value); }
+    static void AuditSheets() {
+        int sheets = 0, cells = 0, singles = 0;
+        foreach (string path in Directory.GetFiles(Path.GetFullPath("ChunsikDesktopPet"), "*.png")) {
+            BitmapImage raw = new BitmapImage(new Uri(path));
+            var bitmap = new FormatConvertedBitmap(raw, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            int w = bitmap.PixelWidth, h = bitmap.PixelHeight, stride = w * 4;
+            byte[] pixels = new byte[stride * h]; bitmap.CopyPixels(pixels, stride, 0);
+            bool single = Path.GetFileName(path) == "chunsik-sleep.png" || Path.GetFileName(path) == "chunsik-peek.png";
+            if (single) singles++; else sheets++;
+            for (int k = 0; k < (single ? 1 : 8); k++) {
+                Int32Rect cell = single ? new Int32Rect(0, 0, w, h) : (Int32Rect)typeof(PetWindow).GetMethod("SpriteCellRect", shared).Invoke(null, new object[] { path, w, h, k });
+                int count = 0;
+                for (int y = cell.Y; y < cell.Y + cell.Height; y++) for (int x = cell.X; x < cell.X + cell.Width; x++) {
+                    int alpha = pixels[y * stride + x * 4 + 3];
+                    if (alpha >= 40) count++;
+                    // Two-pixel crop padding must fit without touching another pose.
+                    // Alpha below 8 is compression/antialias noise (at most 7/255 opacity).
+                    if (x < cell.X + 2 || x >= cell.X + cell.Width - 2 || y < cell.Y + 2 || y >= cell.Y + cell.Height - 2)
+                        Check(alpha < 8, Path.GetFileName(path) + " cell " + k + " clear boundary");
+                }
+                Check(count > 0, Path.GetFileName(path) + " nonempty cell");
+                if (!single) cells++;
+            }
+        }
+        Check(sheets == 16 && cells == 128 && singles == 2, "all PNG assets audited");
+        Console.WriteLine("PASS: 16 sprite sheets / 128 cells and 2 single PNGs have clear boundaries");
+    }
     public static void Run() {
+        AuditSheets();
         object originals = typeof(PetWindow).GetField("frames", shared).GetValue(null);
         typeof(PetWindow).GetMethod("LoadCuteMotions", shared).Invoke(null, new object[] { Path.GetFullPath("ChunsikDesktopPet") });
         Check(Object.ReferenceEquals(originals, typeof(PetWindow).GetField("frames", shared).GetValue(null)), "loader preserves base walking frames");
