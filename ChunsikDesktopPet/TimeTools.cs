@@ -223,8 +223,7 @@ namespace ChunsikDesktop {
                 messageMotion.X = hop.X * 0.45;
                 messageMotion.Y = hop.Y * 0.25;
             } else {
-                bool wave = elapsed.IsRunning && (int)(phase / 1.2) % 4 == 0;
-                pet.Source = PetWindow.ToolPose(wave);
+                pet.Source = elapsed.IsRunning ? PetWindow.FocusPose(phase) : PetWindow.ToolPose(false);
                 tilt.Angle = elapsed.IsRunning ? Math.Sin(phase * 2) * 2 : 0;
                 hop.X = hop.Y = messageMotion.X = messageMotion.Y = 0;
                 bounceScale.ScaleX = bounceScale.ScaleY = 1;

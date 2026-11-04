@@ -66,14 +66,14 @@ namespace ChunsikDesktop {
             Grid searchBox = new Grid(); searchBox.Children.Add(search);
             TextBlock searchHint = SettingsTheme.Text("메모 검색"); searchHint.Margin = new Thickness(12, 0, 12, 6); searchHint.VerticalAlignment = VerticalAlignment.Center; searchHint.IsHitTestVisible = false; searchBox.Children.Add(searchHint); filters.Children.Add(searchBox);
             int filter = 1; // Start with active work; completed notes stay one click away.
-            Border filterChoice = SettingChoice(new[] { "전체", "진행 중", "완료" }, filter, delegate(int value) { filter = value; if (render != null) render(); });
+            Border filterChoice = SettingChoice(new[] { "전체", "진행 중", "완료 보관함" }, filter, delegate(int value) { filter = value; if (render != null) render(); });
             ((System.Windows.Controls.Primitives.UniformGrid)filterChoice.Child).Columns = 3;
             filterChoice.Width = 240; filterChoice.Margin = new Thickness(0, 0, 12, 6); filters.Children.Add(filterChoice);
             TextBlock resultCount = SettingsTheme.Text(""); resultCount.VerticalAlignment = VerticalAlignment.Center; filters.Children.Add(resultCount);
             search.TextChanged += delegate { searchHint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; if (render != null) render(); };
             Action add = delegate {
                 if (String.IsNullOrWhiteSpace(entry.Text)) { status.Text = "할 일을 입력해 주세요."; entry.Focus(); return; }
-                if (settings.Items.Count >= 50) { status.Text = "최대 50개까지 저장할 수 있어요. 완료 항목을 정리해 주세요."; return; }
+                if (!settings.HasRoom(false)) { status.Text = "진행 중 메모는 최대 50개예요. 완료하거나 삭제한 뒤 추가해 주세요."; return; }
                 List<PetWindow> pets = PetWindow.TodoPets(); int index = preferredPet == null ? 0 : Math.Max(0, pets.IndexOf(preferredPet));
                 TodoItem item = new TodoItem { Text = entry.Text.Trim(), PetIndex = index, Dedicated = preferredPet != null && preferredPet.IsTodoCompanion };
                 settings.Items.Add(item); if (!persist()) { settings.Items.Remove(item); return; }
@@ -99,7 +99,8 @@ namespace ChunsikDesktop {
                 visibility.Content = AllHidden ? "전체 보이기" : "전체 숨기기";
                 clearCompleted.IsEnabled = settings.Items.Any(item => item.Done);
                 List<TodoItem> visibleItems = QueryItems(settings.Items, search.Text, filter);
-                resultCount.Text = visibleItems.Count + "개";
+                resultCount.Text = "진행 중 " + settings.CountItems(false) + "/50 · 보관함 " + settings.CountItems(true) + "/1,000 · 검색 " + visibleItems.Count + "개";
+                resultCount.TextWrapping = TextWrapping.Wrap;
                 foreach (TodoItem item in visibleItems) {
                     StackPanel content = new StackPanel();
                     Border card = SettingsTheme.Card(content); list.Children.Add(card);

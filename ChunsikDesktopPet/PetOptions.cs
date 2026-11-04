@@ -88,6 +88,7 @@ namespace ChunsikDesktop {
             IsIdle = Options.SleepEnabled && elapsed >= (uint)Options.IdleMinutes * 60000U;
         }
         bool Write(PetOptions value, bool notify) {
+            if (SettingsBackup.Restoring) return true;
             if (!Valid(value)) return false;
             try {
                 Directory.CreateDirectory(Path.GetDirectoryName(PathName));

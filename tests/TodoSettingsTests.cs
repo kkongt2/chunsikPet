@@ -38,6 +38,17 @@ internal static class TodoSettingsTests {
         bad.NoteOpacity = 0.09; Check(!TodoItem.ValidAppearance(bad), "invisible note rejected");
         bad.NoteOpacity = 1.01; Check(!TodoItem.ValidAppearance(bad), "opacity above one rejected");
         bad.NoteOpacity = 0.1; Check(TodoItem.ValidAppearance(bad), "minimum opacity accepted");
+        TodoSettings capacity = new TodoSettings();
+        for (int i = 0; i < TodoSettings.ArchiveLimit; i++) capacity.Items.Add(new TodoItem { Done = true, Text = "completed " + i });
+        Check(capacity.HasRoom(false) && !capacity.HasRoom(true), "full archive does not consume active capacity");
+        for (int i = 0; i < TodoSettings.ActiveLimit; i++) capacity.Items.Add(new TodoItem { Text = "active " + i });
+        Check(capacity.ValidCounts() && !capacity.HasRoom(false), "50 active plus 1000 archived accepted");
+        using (StringWriter writer = new StringWriter()) { serializer.Serialize(writer, capacity); xml = writer.ToString(); }
+        using (StringReader reader = new StringReader(xml)) capacity = (TodoSettings)serializer.Deserialize(reader);
+        Check(capacity.CountItems(true) == 1000 && capacity.CountItems(false) == 50, "independent capacities survive reload");
+        capacity.Items.Add(new TodoItem()); Check(!capacity.ValidCounts(), "51 active rejected");
+        capacity.Items.RemoveAt(capacity.Items.Count - 1);
+        capacity.Items.Add(new TodoItem { Done = true }); Check(!capacity.ValidCounts(), "1001 archived rejected without deleting history");
         Console.WriteLine("PASS: " + count + " post-it persistence assertions");
     }
 }

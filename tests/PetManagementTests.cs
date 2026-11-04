@@ -36,6 +36,27 @@ internal static class PetManagementTests {
         Check(PlacementGeometry.Position(new Rect(0, 0, 800, 600), new Size(1000, 900), 1, 1) == new Point(0, 0), "oversized pet remains anchored on small display");
         Check(PlacementGeometry.Position(new Rect(1920, 0, 1920, 1080), new Size(300, 450), 0.5, 1) == new Point(2730, 630), "new DPI pixel dimensions stay within destination");
 
+        // Simulate a 3 -> 1 -> 3 display transition during lock/screen saver.
+        for (int i = 1; i <= 3; i++) {
+            PetPlacement assigned = new PetPlacement { Size = 80, MonitorDevice = "DISPLAY" + i, RelativeX = i * 0.2, RelativeY = 1, CenterX = i * 1600, BottomY = 1080 };
+            PetPlacement collapsed = new PetPlacement { Size = 180, Speed = 80, Paused = true, MonitorDevice = "DISPLAY1", RelativeX = 0, RelativeY = 1, CenterX = 100, BottomY = 1080 };
+            PetPlacement retained = PlacementGeometry.Remember(assigned, collapsed, false, true);
+            Check(retained.MonitorDevice == assigned.MonitorDevice && retained.RelativeX == assigned.RelativeX, "lock keeps each monitor and relative position");
+            Check(retained.Size == 180 && retained.Paused && retained.Speed == 80, "location protection keeps current appearance and mode");
+            if (i > 1) {
+                for (int tick = 0; tick < 20; tick++) retained = PlacementGeometry.Remember(retained, collapsed, false, false);
+                Check(retained.MonitorDevice == assigned.MonitorDevice && retained.CenterX == assigned.CenterX, "fallback autosaves never replace absent display");
+                string preserved;
+                using (StringWriter writer = new StringWriter()) { serializer.Serialize(writer, retained); preserved = writer.ToString(); }
+                using (StringReader reader = new StringReader(preserved)) retained = (PetPlacement)serializer.Deserialize(reader);
+                Check(retained.MonitorDevice == assigned.MonitorDevice, "restart while unplugged preserves original display");
+                PetPlacement explicitMove = PlacementGeometry.Remember(retained, collapsed, true, false);
+                Check(explicitMove.MonitorDevice == "DISPLAY1" && explicitMove.RelativeX == 0, "intentional move overrides assigned display");
+            }
+            PetPlacement returned = assigned.Copy(); returned.RelativeX = 0.7;
+            Check(PlacementGeometry.Remember(retained, returned, false, false).RelativeX == 0.7, "walking resumes position updates on assigned display");
+        }
+
         List<PetWindow> pool = (List<PetWindow>)typeof(PetWindow).GetField("Pets", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
         PetWindow pet = new PetWindow(true), other = new PetWindow(true);
         Window owner = new Window();
@@ -46,6 +67,14 @@ internal static class PetManagementTests {
             Call(pet, "SetSpeed", 80.0); Call(other, "SetSpeed", 22.0);
             List<PetPlacement> captured = PetWindow.CapturePlacements();
             Check(captured.Count == 2 && captured[0].Speed == 80 && captured[1].Speed == 22 && captured[0].HasRelativePosition, "capture independent speeds and monitor placement");
+            PetPlacement home = captured[0].Copy(); home.MonitorDevice = "temporarily-disconnected-display"; home.RelativeX = 0.23;
+            FieldInfo assignment = typeof(PetWindow).GetField("assignedPlacement", BindingFlags.NonPublic | BindingFlags.Instance);
+            assignment.SetValue(pet, home);
+            pet.RecoverDisplay(); Pump();
+            List<PetPlacement> fallback = PetWindow.CapturePlacements();
+            Check(fallback[0].MonitorDevice == home.MonitorDevice && fallback[0].RelativeX == 0.23, "real fallback and capture preserve missing monitor");
+            Call(pet, "RememberMonitor", true);
+            Check(PetWindow.CapturePlacements()[0].MonitorDevice == captured[0].MonitorDevice, "explicit adoption can keep fallback monitor");
             Call(pet, "SetSpeed", 10.0); Check((double)Field(pet, "speed") == 80, "unsupported speed rejected");
             PetWindow.SpeedAll(22); Check((double)Field(pet, "speed") == 22 && (double)Field(other, "speed") == 22, "all speed action updates every pet");
             Call(pet, "RestorePlacement", captured[0]); Pump();
