@@ -838,6 +838,7 @@ namespace ChunsikDesktop {
         }
         ContextMenu BuildMenu() {
             ContextMenu menu = new ContextMenu();
+            menu.Items.Add(Item("＋ 빠른 알림", delegate { ReminderService.Current.OpenQuickReminder(); }));
             if (IsTodoCompanion) {
                 menu.Items.Add(Item("포스트잇 관리…", delegate { TodoService.Current.OpenSettings(this); }));
                 return menu;
