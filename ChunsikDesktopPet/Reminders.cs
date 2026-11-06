@@ -494,8 +494,25 @@ namespace ChunsikDesktop {
             Reminder selected = rows.Count == 0 ? null : rows[0];
             bool rebuilding = false;
             Action render = null;
-            Button add = Pill("＋ 알림 추가", delegate { selected = new Reminder(); rows.Add(selected); render(); changed(); });
-            DockPanel.SetDock(add, Dock.Top); navigation.Children.Add(add); navigation.Children.Add(reminderList);
+            Action<Reminder> addReminder = delegate(Reminder reminder) {
+                selected = reminder;
+                rows.Add(reminder);
+                render();
+                changed();
+            };
+            WrapPanel addButtons = new WrapPanel();
+            addButtons.Children.Add(Pill("＋ 알림 추가", delegate { addReminder(new Reminder()); }));
+            addButtons.Children.Add(Pill("＋ 1회성 알림", delegate {
+                DateTime due = DateTime.Now.AddHours(1);
+                addReminder(new Reminder {
+                    Title = "1회성 알림", ScheduleType = "date", HasTime = true,
+                    Date = due.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    Time = due.ToString("HH:mm", CultureInfo.InvariantCulture)
+                });
+            }));
+            DockPanel.SetDock(addButtons, Dock.Top);
+            navigation.Children.Add(addButtons);
+            navigation.Children.Add(reminderList);
             reminderList.SelectionChanged += delegate {
                 if (rebuilding || reminderList.SelectedItem == null) return;
                 selected = (Reminder)((ListBoxItem)reminderList.SelectedItem).Tag; render();
@@ -574,7 +591,7 @@ namespace ChunsikDesktop {
                         picker.SelectedDateChanged += delegate { row.Date = picker.SelectedDate.HasValue ? picker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""; changed(); };
                         picker.DateValidationError += delegate(object sender, DatePickerDateValidationErrorEventArgs e) { e.ThrowException = false; picker.SelectedDate = null; row.Date = ""; changed(); };
                         dateArea.Children.Add(picker);
-                        dateArea.Children.Add(new TextBlock { Text = "날짜 필수 · 반복 없음\n시간 미지정: 당일 실행 시 알림", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 7, 0, 0) }); detail(dateArea, 3);
+                        dateArea.Children.Add(new TextBlock { Text = "시간 지정 시 한 번만 알림\n시간 미지정 시 당일 앱을 시작할 때마다 알림", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 7, 0, 0) }); detail(dateArea, 3);
                     } else {
                         WeekdayPicker days = new WeekdayPicker { DataContext = row };
                         days.AddHandler(System.Windows.Controls.Primitives.ToggleButton.CheckedEvent, new RoutedEventHandler(delegate { changed(); }));
