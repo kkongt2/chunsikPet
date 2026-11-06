@@ -73,6 +73,29 @@ namespace ChunsikDesktop {
             return new Rect(first.X, first.Y, Math.Max(1, last.X - first.X), last.Y - first.Y);
         }
 
+        // Both input zones are in window DIPs, inflated by their normal avoidance margins.
+        public static bool TryJumpLanding(Rect pet, Rect work, Rect caret, Rect mouse, out double target) {
+            target = pet.Left;
+            if (pet.IsEmpty || work.IsEmpty || caret.IsEmpty || mouse.IsEmpty) return false;
+            if (!pet.IntersectsWith(caret) && !pet.IntersectsWith(mouse)) return false;
+            if (!caret.IntersectsWith(work) || !mouse.IntersectsWith(work) ||
+                mouse.Bottom < pet.Top || mouse.Top > pet.Bottom || caret.Bottom < pet.Top || caret.Top > pet.Bottom) return false;
+
+            double center = pet.Left + pet.Width / 2;
+            double caretCenter = caret.Left + caret.Width / 2, mouseCenter = mouse.Left + mouse.Width / 2;
+            if (center < Math.Min(caretCenter, mouseCenter) || center > Math.Max(caretCenter, mouseCenter) || caretCenter == mouseCenter) return false;
+            Rect leftZone = caretCenter < mouseCenter ? caret : mouse;
+            Rect rightZone = caretCenter < mouseCenter ? mouse : caret;
+            if (rightZone.Left - leftZone.Right > pet.Width + 4) return false;
+
+            double left = Math.Min(caret.Left, mouse.Left) - pet.Width - 2;
+            double right = Math.Max(caret.Right, mouse.Right) + 2;
+            bool fitsLeft = left >= work.Left, fitsRight = right + pet.Width <= work.Right;
+            if (!fitsLeft && !fitsRight) return false;
+            target = fitsLeft && (!fitsRight || pet.Left - left <= right - pet.Left) ? left : right;
+            return true;
+        }
+
         // Return a reachable horizontal position outside the protected input area.
         // If neither side fits, prefer the edge with the smaller overlap without bouncing.
         public static bool TryEscape(Rect pet, Rect workArea, Rect protectedArea, out double target) {

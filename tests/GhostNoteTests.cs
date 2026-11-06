@@ -55,6 +55,13 @@ internal static class GhostNoteTests {
         Check(!InputAvoidance.TryEscape(new Rect(900, 900, 100, 100), work, Rect.Empty, out escapeTarget), "unsupported caret leaves mouse behavior unchanged");
         Check(InputAvoidance.TryEscape(new Rect(-1900, 900, 100, 100), new Rect(-1920, 0, 1920, 1080), new Rect(-1950, 880, 200, 160), out escapeTarget) && escapeTarget == -1748, "negative monitor coordinates supported");
         Check(InputAvoidance.TryEscape(new Rect(0, 0, 80, 100), new Rect(0, 0, 100, 100), new Rect(-10, 0, 130, 100), out escapeTarget) && escapeTarget == 0, "no room settles at edge instead of oscillating");
+        Rect trapped = new Rect(300, 900, 100, 100), keyboard = new Rect(200, 900, 130, 100), mouse = new Rect(390, 900, 140, 130);
+        Check(InputAvoidance.TryJumpLanding(trapped, work, keyboard, mouse, out escapeTarget) && escapeTarget == 98, "jump over closest blocker");
+        Check(InputAvoidance.TryJumpLanding(trapped, new Rect(150, 0, 1000, 1080), mouse, keyboard, out escapeTarget) && escapeTarget == 532, "jump over other blocker when nearest side has no landing");
+        Check(!InputAvoidance.TryJumpLanding(trapped, work, keyboard, new Rect(480, 900, 140, 130), out escapeTarget), "walk when the gap fits the pet");
+        Check(!InputAvoidance.TryJumpLanding(trapped, work, keyboard, new Rect(390, 600, 140, 130), out escapeTarget), "ignore mouse on a different vertical path");
+        Check(!InputAvoidance.TryJumpLanding(trapped, work, keyboard, new Rect(190, 900, 140, 130), out escapeTarget), "same side inputs do not trigger jump");
+        Check(!InputAvoidance.TryJumpLanding(trapped, new Rect(180, 0, 400, 1080), keyboard, mouse, out escapeTarget), "do not jump without a safe landing");
         Check(InputAvoidance.CaretPixels().IsEmpty, "disabled or absent preferences skip caret query");
         PetWindow fallingPet = new PetWindow(true) { Left = 300, Top = 0 };
         try {
