@@ -62,6 +62,14 @@ internal static class GhostNoteTests {
         Check(!InputAvoidance.TryJumpLanding(trapped, work, keyboard, new Rect(390, 600, 140, 130), out escapeTarget), "ignore mouse on a different vertical path");
         Check(!InputAvoidance.TryJumpLanding(trapped, work, keyboard, new Rect(190, 900, 140, 130), out escapeTarget), "same side inputs do not trigger jump");
         Check(!InputAvoidance.TryJumpLanding(trapped, new Rect(180, 0, 400, 1080), keyboard, mouse, out escapeTarget), "do not jump without a safe landing");
+        Rect leftPet = new Rect(0, 900, 100, 100), leftBlock = new Rect(70, 900, 140, 100);
+        Rect rightPet = new Rect(1820, 900, 100, 100), rightBlock = new Rect(1710, 900, 140, 100);
+        Check(InputAvoidance.TryJumpLanding(leftPet, work, Rect.Empty, leftBlock, out escapeTarget) && escapeTarget == 212, "jump from left edge over mouse without caret");
+        Check(InputAvoidance.TryJumpLanding(rightPet, work, Rect.Empty, rightBlock, out escapeTarget) && escapeTarget == 1608, "jump from right edge over mouse without caret");
+        Check(InputAvoidance.TryJumpLanding(leftPet, work, leftBlock, rightBlock, out escapeTarget) && escapeTarget == 212, "jump from left edge over caret with distant mouse");
+        Check(InputAvoidance.TryJumpLanding(rightPet, work, rightBlock, leftBlock, out escapeTarget) && escapeTarget == 1608, "jump from right edge over caret with distant mouse");
+        Check(!InputAvoidance.TryJumpLanding(new Rect(130, 900, 100, 100), work, Rect.Empty, leftBlock, out escapeTarget), "walk away when already on open side of edge blocker");
+        Check(!InputAvoidance.TryJumpLanding(leftPet, new Rect(0, 0, 260, 1080), leftBlock, Rect.Empty, out escapeTarget), "no jump if monitor cannot fit landing");
         Check(InputAvoidance.CaretPixels().IsEmpty, "disabled or absent preferences skip caret query");
         PetWindow fallingPet = new PetWindow(true) { Left = 300, Top = 0 };
         try {

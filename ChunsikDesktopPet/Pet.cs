@@ -663,32 +663,33 @@ namespace ChunsikDesktop {
             System.Drawing.Point screen = System.Windows.Forms.Cursor.Position;
             Point cursor = PointFromScreen(new Point(screen.X, screen.Y));
             Rect caretPixels = InputAvoidance.CaretPixels();
+            Rect protectedArea = Rect.Empty;
             if (!caretPixels.IsEmpty) {
                 Point first = PointFromScreen(caretPixels.TopLeft), last = PointFromScreen(caretPixels.BottomRight);
-                Rect protectedArea = new Rect(new Point(Left + first.X, Top + first.Y), new Point(Left + last.X, Top + last.Y));
+                protectedArea = new Rect(new Point(Left + first.X, Top + first.Y), new Point(Left + last.X, Top + last.Y));
                 protectedArea.Inflate(100, 65);
-                double target;
-                Rect pet = new Rect(Left, Top, Width, Height);
-                Rect mouse = new Rect(Left + cursor.X - 70, Top + cursor.Y - 65, 140, 130);
-                if (InputAvoidance.TryJumpLanding(pet, area, protectedArea, mouse, out target)) {
-                    jumpStarted = now;
-                    jumpFromX = Left; jumpFromY = Top; jumpTargetX = target;
-                    direction = target > Left ? 1 : -1;
-                    fleeUntil = 0;
-                    StopSeatedScoot();
-                    EndCute(); CancelCue();
-                    SetFrame(7);
-                    return true;
-                }
-                if (InputAvoidance.TryEscape(pet, area, protectedArea, out target)) {
-                    fleeUntil = 0;
-                    double delta = target - Left;
-                    if (Math.Abs(delta) < 0.5) { StopSeatedScoot(); return true; }
-                    direction = delta > 0 ? 1 : -1;
-                    Left += direction * Math.Min(Math.Abs(delta), Math.Max(240, speed * 4) * dt);
-                    Top = area.Bottom - Height;
-                    ShowEscapePose(now, seated); return true;
-                }
+            }
+            double target;
+            Rect pet = new Rect(Left, Top, Width, Height);
+            Rect mouse = new Rect(Left + cursor.X - 70, Top + cursor.Y - 65, 140, 130);
+            if (InputAvoidance.TryJumpLanding(pet, area, protectedArea, mouse, out target)) {
+                jumpStarted = now;
+                jumpFromX = Left; jumpFromY = Top; jumpTargetX = target;
+                direction = target > Left ? 1 : -1;
+                fleeUntil = 0;
+                StopSeatedScoot();
+                EndCute(); CancelCue();
+                SetFrame(7);
+                return true;
+            }
+            if (InputAvoidance.TryEscape(pet, area, protectedArea, out target)) {
+                fleeUntil = 0;
+                double delta = target - Left;
+                if (Math.Abs(delta) < 0.5) { StopSeatedScoot(); return true; }
+                direction = delta > 0 ? 1 : -1;
+                Left += direction * Math.Min(Math.Abs(delta), Math.Max(240, speed * 4) * dt);
+                Top = area.Bottom - Height;
+                ShowEscapePose(now, seated); return true;
             }
             double dx = Math.Max(0, Math.Max(-cursor.X, cursor.X - Width));
             double dy = Math.Max(0, Math.Max(-cursor.Y, cursor.Y - Height));

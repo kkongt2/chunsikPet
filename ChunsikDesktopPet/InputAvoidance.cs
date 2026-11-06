@@ -76,21 +76,32 @@ namespace ChunsikDesktop {
         // Both input zones are in window DIPs, inflated by their normal avoidance margins.
         public static bool TryJumpLanding(Rect pet, Rect work, Rect caret, Rect mouse, out double target) {
             target = pet.Left;
-            if (pet.IsEmpty || work.IsEmpty || caret.IsEmpty || mouse.IsEmpty) return false;
-            if (!pet.IntersectsWith(caret) && !pet.IntersectsWith(mouse)) return false;
-            if (!caret.IntersectsWith(work) || !mouse.IntersectsWith(work) ||
-                mouse.Bottom < pet.Top || mouse.Top > pet.Bottom || caret.Bottom < pet.Top || caret.Top > pet.Bottom) return false;
+            if (pet.IsEmpty || work.IsEmpty) return false;
+            // Only consider blockers along this pet's horizontal path on this monitor.
+            Rect lane = new Rect(work.Left, pet.Top, work.Width, pet.Height);
+            bool hasCaret = !caret.IsEmpty && lane.IntersectsWith(caret);
+            bool hasMouse = !mouse.IsEmpty && lane.IntersectsWith(mouse);
+            if (!(hasCaret && pet.IntersectsWith(caret)) && !(hasMouse && pet.IntersectsWith(mouse))) return false;
 
-            double center = pet.Left + pet.Width / 2;
-            double caretCenter = caret.Left + caret.Width / 2, mouseCenter = mouse.Left + mouse.Width / 2;
-            if (center < Math.Min(caretCenter, mouseCenter) || center > Math.Max(caretCenter, mouseCenter) || caretCenter == mouseCenter) return false;
-            Rect leftZone = caretCenter < mouseCenter ? caret : mouse;
-            Rect rightZone = caretCenter < mouseCenter ? mouse : caret;
-            if (rightZone.Left - leftZone.Right > pet.Width + 4) return false;
-
-            double left = Math.Min(caret.Left, mouse.Left) - pet.Width - 2;
-            double right = Math.Max(caret.Right, mouse.Right) + 2;
+            Rect first = hasCaret ? caret : mouse, last = first;
+            if (hasCaret && hasMouse) {
+                first = caret.Left + caret.Width / 2 <= mouse.Left + mouse.Width / 2 ? caret : mouse;
+                last = first == caret ? mouse : caret;
+                // A wide gap provides a landing before the more distant blocker.
+                if (last.Left - first.Right > pet.Width + 4) {
+                    if (pet.IntersectsWith(first)) last = first;
+                    else first = last;
+                }
+            }
+            double left = Math.Min(first.Left, last.Left) - pet.Width - 2;
+            double right = Math.Max(first.Right, last.Right) + 2;
             bool fitsLeft = left >= work.Left, fitsRight = right + pet.Width <= work.Right;
+            double center = pet.Left + pet.Width / 2;
+            double firstCenter = first.Left + first.Width / 2, lastCenter = last.Left + last.Width / 2;
+            bool betweenInputs = firstCenter < lastCenter && center >= firstCenter && center <= lastCenter;
+            bool againstLeftEdge = !fitsLeft && center <= firstCenter;
+            bool againstRightEdge = !fitsRight && center >= lastCenter;
+            if (!betweenInputs && !againstLeftEdge && !againstRightEdge) return false;
             if (!fitsLeft && !fitsRight) return false;
             target = fitsLeft && (!fitsRight || pet.Left - left <= right - pet.Left) ? left : right;
             return true;
