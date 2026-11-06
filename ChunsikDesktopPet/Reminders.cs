@@ -127,7 +127,7 @@ namespace ChunsikDesktop {
         public int SnoozeMinutes = 5;
     }
 
-    public sealed class ReminderService {
+    public sealed partial class ReminderService {
         public static ReminderService Current;
         public static readonly string SettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChunsikDesktopPet", "reminders.xml");
         static readonly XmlSerializer Serializer = new XmlSerializer(typeof(ReminderSettings));
@@ -387,6 +387,7 @@ namespace ChunsikDesktop {
         public void Stop() {
             stopping = true; timer.Stop(); queue.Clear(); snoozes.Clear();
             foreach (NoticeGroup group in new List<NoticeGroup>(active)) group.Close();
+            if (quickWindow != null) quickWindow.Close();
             if (editor != null) editor.Close();
         }
         public void Replay(NoticeData old) {
@@ -421,6 +422,7 @@ namespace ChunsikDesktop {
             TextBlock status = new TextBlock { Text = "모든 변경사항 저장됨", Foreground = Accent, Margin = new Thickness(0, 12, 0, 0) };
             StackPanel options = new StackPanel { Margin = new Thickness(0, 14, 0, 0) }; DockPanel.SetDock(options, Dock.Bottom); root.Children.Add(options);
             WrapPanel timing = new WrapPanel(); options.Children.Add(new Expander { Header = "공통 표시 옵션 · 소리 / 문구 전환 / 다시 알림", Content = timing });
+            options.Children.Add(new Expander { Header = "빠른 알림 단축키", Content = TodoHotKey.BuildSettings(true) });
             CheckBox sound = new CheckBox { Content = "알림 소리", IsChecked = settings.Sound, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 20, 0) }; timing.Children.Add(sound);
             timing.Children.Add(new TextBlock { Text = "문구 전환  ", VerticalAlignment = VerticalAlignment.Center });
             NumberField seconds = new NumberField(settings.MessageSeconds, 60, "문구 전환 초");
@@ -606,9 +608,14 @@ namespace ChunsikDesktop {
                 }
                 refreshCountdowns();
             };
+            quickListChanged = delegate(Reminder item, bool added) {
+                if (added) rows.Add(item.Copy());
+                else rows.RemoveAll(delegate(Reminder row) { return row.Id == item.Id; });
+                render();
+            };
             render(); refreshCountdowns(); countdownTimer.Tick += delegate { refreshCountdowns(); }; countdownTimer.Start();
             win.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!stopping && !save()) { e.Cancel = true; MessageBox.Show(SettingsHub.OwnerFor(win), status.Text, "저장 확인"); } };
-            win.Closed += delegate { debounce.Stop(); countdownTimer.Stop(); editor = null; }; SettingsHub.Attach(win, "알림", save);
+            win.Closed += delegate { debounce.Stop(); countdownTimer.Stop(); quickListChanged = null; editor = null; }; SettingsHub.Attach(win, "알림", save);
         }
         sealed class MessageDraft { public string Text; }
         void EditActivity(Window owner, Reminder row, Action changed) {

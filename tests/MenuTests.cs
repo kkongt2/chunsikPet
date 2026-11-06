@@ -28,7 +28,8 @@ internal static class MenuTests {
             Check(Find(menu, "이 춘식이 제거") != null, "multiple pets offer individual removal");
             menu.IsOpen = false; pool.Remove(placeholder); menu.IsOpen = true; Pump();
             Check(Find(menu, "프로그램 종료…") != null && Find(menu, "이 춘식이 제거") == null, "last pet clearly offers application shutdown");
-            StackPanel quick = (StackPanel)((MenuItem)menu.Items[0]).Header;
+            Check(menu.Items[0] == Find(menu, "＋ 빠른 알림"), "quick reminder is the first action");
+            StackPanel quick = (StackPanel)((MenuItem)menu.Items[1]).Header;
             var buttons = (System.Windows.Controls.Primitives.UniformGrid)quick.Children[1];
             Button rest = (Button)buttons.Children[0]; rest.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(((TextBlock)((StackPanel)rest.Content).Children[1]).Text == "다시 걷기", "quick action names next action after switching mode");

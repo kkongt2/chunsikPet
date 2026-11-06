@@ -9,7 +9,7 @@ namespace ChunsikDesktop {
         readonly System.Windows.Forms.NotifyIcon tray;
         readonly System.Windows.Forms.ContextMenuStrip menu;
         readonly System.Drawing.Icon icon;
-        readonly TodoHotKey todoHotKey;
+        readonly TodoHotKey todoHotKey, reminderHotKey;
         bool disposed;
         Window about;
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
@@ -58,6 +58,8 @@ namespace ChunsikDesktop {
             System.Windows.Forms.ToolStripMenuItem fullscreen = Item("전체 화면에서 자동 숨김", PresentationPolicy.ToggleFullscreen); quiet.DropDownItems.Add(fullscreen);
             System.Windows.Forms.ToolStripMenuItem timerItem = Item("타이머", TimeToolWindow.OpenTimer);
             System.Windows.Forms.ToolStripMenuItem stopwatchItem = Item("스톱워치", TimeToolWindow.OpenStopwatch);
+            var quickReminder = Item("＋ 빠른 알림", delegate { ReminderService.Current.OpenQuickReminder(); });
+            menu.Items.Add(quickReminder);
             menu.Items.Add(timerItem); menu.Items.Add(stopwatchItem);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             System.Windows.Forms.ToolStripMenuItem notes = Item("포스트잇 모두 숨기기", delegate { TodoService.Current.ToggleAllVisibility(); });
@@ -91,6 +93,7 @@ namespace ChunsikDesktop {
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             menu.Items.Add(Item("프로그램 종료", PetWindow.Quit));
             Action refreshMenu = delegate {
+                if (reminderHotKey != null) quickReminder.ShortcutKeyDisplayString = reminderHotKey.ShortcutLabel + (reminderHotKey.Registered ? "" : " (사용 불가)");
                 timerItem.Text = TimeToolWindow.TimerMenuLabel;
                 stopwatchItem.Text = TimeToolWindow.StopwatchMenuLabel;
                 notes.ShortcutKeyDisplayString = TodoHotKey.Label + (todoHotKey != null && todoHotKey.Registered ? "" : " (사용 불가)");
@@ -125,6 +128,7 @@ namespace ChunsikDesktop {
                 if (e.Button == System.Windows.Forms.MouseButtons.Left) Dispatch(delegate { PetPreferences.Current.OpenSettings(); });
             };
             todoHotKey = new TodoHotKey(delegate { TodoService.Current.ToggleAllVisibility(); });
+            reminderHotKey = new TodoHotKey(delegate { ReminderService.Current.OpenQuickReminder(); }, true);
             if (!todoHotKey.Registered) {
                 notes.ShortcutKeyDisplayString = TodoHotKey.Label + " (사용 불가)";
                 tray.ShowBalloonTip(6000, "포스트잇 단축키 등록 실패", TodoHotKey.Label + " 단축키를 등록하지 못했어요. 다른 프로그램이 사용 중일 수 있어요. 트레이 메뉴의 전체 숨기기/보이기를 이용해 주세요.", System.Windows.Forms.ToolTipIcon.Warning);
@@ -175,7 +179,7 @@ namespace ChunsikDesktop {
         }
         public void Dispose() {
             if (disposed) return; disposed = true;
-            todoHotKey.Dispose();
+            reminderHotKey.Dispose(); todoHotKey.Dispose();
             if (about != null) about.Close();
             tray.Visible = false; tray.Dispose(); menu.Dispose(); icon.Dispose();
         }

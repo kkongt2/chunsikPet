@@ -62,6 +62,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Diagnostics.cs" />
     <Compile Include="Reminders.cs" />
+    <Compile Include="QuickReminder.cs" />
     <Compile Include="TimeTools.cs" />
     <Compile Include="Todos.cs" />
     <Compile Include="TodoSettingsView.cs" />
