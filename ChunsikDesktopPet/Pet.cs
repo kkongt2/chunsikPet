@@ -65,6 +65,7 @@ namespace ChunsikDesktop {
         }
         double fleeUntil;
         int fleeDirection;
+        double jumpStarted = -1, jumpFromX, jumpFromY, jumpTargetX;
         static double maxW, maxH;
         static bool exiting;
         public static bool IsExiting { get { return exiting; } }
@@ -253,7 +254,7 @@ namespace ChunsikDesktop {
             List<PetPlacement> result = new List<PetPlacement>();
             foreach (PetWindow pet in Pets) {
                 if (!pet.placementReady || pet.closing || pet.movingMonitor) return null;
-                pet.RememberMonitor(false);
+                if (pet.jumpStarted < 0) pet.RememberMonitor(false);
                 if (pet.assignedPlacement == null) return null;
                 result.Add(pet.assignedPlacement.Copy());
             }
@@ -471,6 +472,7 @@ namespace ChunsikDesktop {
         }
 
         void LayoutPet() {
+            jumpStarted = -1;
             if (giant) { FitGiant(); return; }
             double center = IsLoaded && !Double.IsNaN(Left) ? Left + Width / 2 : SystemParameters.WorkArea.Left + Width / 2;
             Width = Math.Ceiling(size * maxW / maxH + 12 + (reactionKind == 0 ? 0 : size * 0.45));
@@ -613,6 +615,7 @@ namespace ChunsikDesktop {
             if (presentationPaused || closing || pressed || dragging || movingMonitor) return;
             if (giant) { TickGiant(now); return; }
             if (ContextMenu != null && ContextMenu.IsOpen) { AnimateCue(now); return; }
+            if (jumpStarted >= 0) { AnimateInputJump(now); return; }
             if (falling) { EndCute(); CancelCue(); AnimateFall(now, dt); return; }
             string noticeKind = ReminderService.Current == null ? "" : ReminderService.Current.AnimationKindFor(this);
             bool specialNotice = noticeKind == "lunch" || noticeKind == "dinner" || noticeKind == "home" || noticeKind == "water" || noticeKind == "stretch";
@@ -657,24 +660,37 @@ namespace ChunsikDesktop {
         bool EvadeInput(double now, double dt, bool seated) {
             if (IsTodoCompanion || PresentationPolicy.IsSuppressed || PetPreferences.Current == null || !PetPreferences.Current.Options.AvoidCursor) { fleeUntil = 0; StopSeatedScoot(); return false; }
             Rect area = WorkArea();
-            Rect caretPixels = InputAvoidance.CaretPixels();
-            if (!caretPixels.IsEmpty) {
-                Point first = PointFromScreen(caretPixels.TopLeft), last = PointFromScreen(caretPixels.BottomRight);
-                Rect protectedArea = new Rect(new Point(Left + first.X, Top + first.Y), new Point(Left + last.X, Top + last.Y));
-                protectedArea.Inflate(100, 65);
-                double target;
-                if (InputAvoidance.TryEscape(new Rect(Left, Top, Width, Height), area, protectedArea, out target)) {
-                    fleeUntil = 0;
-                    double delta = target - Left;
-                    if (Math.Abs(delta) < 0.5) { StopSeatedScoot(); return true; }
-                    direction = delta > 0 ? 1 : -1;
-                    Left += direction * Math.Min(Math.Abs(delta), Math.Max(240, speed * 4) * dt);
-                    Top = area.Bottom - Height;
-                    ShowEscapePose(now, seated); return true;
-                }
-            }
             System.Drawing.Point screen = System.Windows.Forms.Cursor.Position;
             Point cursor = PointFromScreen(new Point(screen.X, screen.Y));
+            Rect caretPixels = InputAvoidance.CaretPixels();
+            Rect protectedArea = Rect.Empty;
+            if (!caretPixels.IsEmpty) {
+                Point first = PointFromScreen(caretPixels.TopLeft), last = PointFromScreen(caretPixels.BottomRight);
+                protectedArea = new Rect(new Point(Left + first.X, Top + first.Y), new Point(Left + last.X, Top + last.Y));
+                protectedArea.Inflate(100, 65);
+            }
+            double target;
+            Rect pet = new Rect(Left, Top, Width, Height);
+            Rect mouse = new Rect(Left + cursor.X - 70, Top + cursor.Y - 65, 140, 130);
+            if (InputAvoidance.TryJumpLanding(pet, area, protectedArea, mouse, out target)) {
+                jumpStarted = now;
+                jumpFromX = Left; jumpFromY = Top; jumpTargetX = target;
+                direction = target > Left ? 1 : -1;
+                fleeUntil = 0;
+                StopSeatedScoot();
+                EndCute(); CancelCue();
+                SetFrame(7);
+                return true;
+            }
+            if (InputAvoidance.TryEscape(pet, area, protectedArea, out target)) {
+                fleeUntil = 0;
+                double delta = target - Left;
+                if (Math.Abs(delta) < 0.5) { StopSeatedScoot(); return true; }
+                direction = delta > 0 ? 1 : -1;
+                Left += direction * Math.Min(Math.Abs(delta), Math.Max(240, speed * 4) * dt);
+                Top = area.Bottom - Height;
+                ShowEscapePose(now, seated); return true;
+            }
             double dx = Math.Max(0, Math.Max(-cursor.X, cursor.X - Width));
             double dy = Math.Max(0, Math.Max(-cursor.Y, cursor.Y - Height));
             bool near = dx < 70 && dy < 65;
@@ -692,6 +708,19 @@ namespace ChunsikDesktop {
             Top = area.Bottom - Height;
             ShowEscapePose(now, seated); return true;
         }
+        void AnimateInputJump(double now) {
+            Rect area = WorkArea();
+            double progress = Math.Min(1, (now - jumpStarted) / 0.65);
+            double floor = area.Bottom - Height;
+            double baseline = jumpFromY + (floor - jumpFromY) * progress;
+            double arc = 4 * progress * (1 - progress) * Math.Min(160, size * 0.85);
+            Left = Clamp(jumpFromX + (jumpTargetX - jumpFromX) * progress, area.Left, area.Right - Width);
+            Top = Math.Max(area.Top, baseline - arc);
+            if (progress >= 1) {
+                jumpStarted = -1;
+                SetFrame(paused || state == 2 ? 6 : 4);
+            }
+        }
         void ShowEscapePose(double now, bool seated) {
             if (seated) { state = 2; stateEnd = now + 0.8; ShowSeatedScoot(now); return; }
             state = 1; stateEnd = now + 0.5;
@@ -708,6 +737,7 @@ namespace ChunsikDesktop {
             e.Handled = true;
         }
         void BeginGrab(Point pointerPixels, Point bodyFraction) {
+            jumpStarted = -1;
             pressed = true; dragging = false; pressedAt = clock.Elapsed.TotalSeconds;
             if (PetPreferences.Current != null) PetPreferences.Current.RefreshIdle(); Wake();
             CancelCue(); wasEvading = false; EndPayday(); StopFall(false); StopNoticeAnimation(); EndReaction();
