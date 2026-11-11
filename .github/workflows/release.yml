@@ -36,10 +36,11 @@ jobs:
           script: |
             const fs = require('fs');
             const policy = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-policy.cjs`);
-            const version = fs.readFileSync('VERSION', 'utf8').trim();
+            const { execFileSync } = require('node:child_process');
+            let version = fs.readFileSync('VERSION', 'utf8').trim();
             if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('VERSION must contain major.minor.patch');
-            const tag = `v${version}`;
-            const sha = policy.resolveCommit('HEAD');
+            let tag = `v${version}`;
+            let sha = policy.resolveCommit('HEAD');
             core.setOutput('publish', 'false');
             core.setOutput('version', version);
             core.setOutput('tag', tag);
@@ -60,9 +61,23 @@ jobs:
               await core.summary.addHeading('Release skipped').addRaw(`No runtime/build-input changes since ${latest.tag_name}. Existing notes refreshed; no EXE build, tag or new release.`).write();
               return;
             }
-            if (releases.some(r => r.tag_name === tag)) {
-              await core.summary.addHeading('Release skipped').addRaw(`${tag} already exists (including drafts). Bump the application version before publishing runtime changes.`).write();
-              return;
+            // Reserve a fresh version even when a previous run left a draft or tag.
+            const tags = execFileSync('git', ['tag', '--list'], { encoding: 'utf8' }).trim().split('\n');
+            const nextVersion = policy.nextReleaseVersion(version, tags.concat(releases.map(r => r.tag_name)));
+            if (nextVersion !== version) {
+              fs.writeFileSync('VERSION', nextVersion + '\n');
+              execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
+              execFileSync('git', ['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com']);
+              execFileSync('git', ['add', 'VERSION']);
+              execFileSync('git', ['commit', '-m', `chore: release v${nextVersion}`]);
+              // A concurrent main update must reject this push, never overwrite it.
+              execFileSync('git', ['push', 'origin', 'HEAD:refs/heads/main']);
+              version = nextVersion;
+              tag = `v${version}`;
+              sha = policy.resolveCommit('HEAD');
+              core.setOutput('version', version);
+              core.setOutput('tag', tag);
+              core.setOutput('sha', sha);
             }
             const { assertTagTarget } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-tag.cjs`);
             await assertTagTarget(github, context.repo, tag, sha);

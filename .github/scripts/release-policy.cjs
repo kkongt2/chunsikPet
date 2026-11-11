@@ -9,6 +9,35 @@ function textAt(sha, path) {
   const files = git('ls-tree', '--name-only', sha, '--', path).split('\n');
   return files.includes(path) ? git('show', `${sha}:${path}`) : '';
 }
+function parseVersion(value) {
+  if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(value)) throw new Error('Invalid application version: ' + value);
+  const parts = value.split('.').map(Number);
+  if (parts.some(part => part > 65534)) throw new Error('Version components must be 0..65534');
+  return parts;
+}
+function compareVersions(a, b) {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+function nextReleaseVersion(current, reservedTags) {
+  const requested = parseVersion(current);
+  let highest = null;
+  for (const tag of reservedTags) {
+    if (!/^v\d+\.\d+\.\d+$/.test(tag)) continue;
+    const version = parseVersion(tag.slice(1));
+    if (!highest || compareVersions(version, highest) > 0) highest = version;
+  }
+  if (!highest || compareVersions(requested, highest) > 0) return current;
+  const next = highest.slice();
+  for (let i = 2; i >= 0; i--) {
+    if (next[i] < 65534) {
+      next[i]++;
+      return next.join('.');
+    }
+    next[i] = 0;
+  }
+  throw new Error('Application version range exhausted');
+}
 function metadataOnly(path) {
   return /^(?:\.github\/|docs\/|tests\/)/i.test(path) ||
     /(?:^|\/)readme(?:\.[^/]*)?$/i.test(path) ||
@@ -66,4 +95,4 @@ async function refreshBodies(github, repo, releases, repoUrl) {
     if ((release.body || '') !== body) await github.rest.repos.updateRelease({ ...repo, release_id: release.id, body });
   }
 }
-module.exports = { resolveCommit, runtimeChanges, commitsBetween, releaseBody, publishedReleases, refreshBodies };
+module.exports = { nextReleaseVersion, resolveCommit, runtimeChanges, commitsBetween, releaseBody, publishedReleases, refreshBodies };
