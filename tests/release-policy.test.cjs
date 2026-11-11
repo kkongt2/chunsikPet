@@ -78,3 +78,21 @@ test('refresh updates only changed published bodies and is idempotent', async ()
   await policy.refreshBodies(github, { owner: 'test', repo: 'test' }, releases, 'https://github.com/test/test');
   assert.equal(count, 2);
 });
+
+test('runtime changes can publish when VERSION still names an existing release', () => {
+  assert.equal(policy.nextReleaseVersion('1.64.0', ['v1.64.0']), '1.64.1');
+});
+test('manual version ahead of all releases is retained', () => {
+  assert.equal(policy.nextReleaseVersion('1.65.0', ['v1.64.0']), '1.65.0');
+});
+test('reserve versions across drafts, tags and stale VERSION files numerically', () => {
+  assert.equal(policy.nextReleaseVersion('1.64.0', ['v1.64.9', 'v1.64.10', 'latest']), '1.64.11');
+  assert.equal(policy.nextReleaseVersion('1.64.0', ['v1.65.0']), '1.65.1');
+});
+test('first publication retains VERSION and version overflow carries safely', () => {
+  assert.equal(policy.nextReleaseVersion('1.64.0', []), '1.64.0');
+  assert.equal(policy.nextReleaseVersion('1.64.65534', ['v1.64.65534']), '1.65.0');
+  assert.throws(() => policy.nextReleaseVersion('65534.65534.65534', ['v65534.65534.65534']));
+  assert.throws(() => policy.nextReleaseVersion('1.64.65535', []));
+  assert.throws(() => policy.nextReleaseVersion('01.64.0', []));
+});
